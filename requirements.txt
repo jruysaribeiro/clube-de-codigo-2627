@@ -1,0 +1,12 @@
+# Dependencias do Clube de Codigo 2026/27.
+#
+# Instalar com:  python3 -m pip install -r requirements.txt
+# (de dentro do .venv — ver COMO-CORRER.md, seccao 1)
+#
+# As sessoes 1, 2 e 3 NAO precisam disto: so usam a biblioteca padrao.
+# Isto e preciso a partir da sessao 7.
+#
+# Versao fixa de proposito, para as 15 maquinas da sala terem todas o
+# mesmo. Se numa maquina mais antiga nao houver "wheel" para esta versao,
+# troca a linha por  pygame-ce  sem versao nenhuma, e anota-o.
+pygame-ce==2.5.8

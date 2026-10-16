@@ -1,0 +1,14 @@
+# Ambiente virtual: cria-se em cada maquina, nunca se distribui.
+.venv/
+venv/
+
+# Ficheiros gerados pelo Python
+__pycache__/
+*.py[cod]
+
+# Gerado pelo s03-gerador-personagens/nivel-ouro.py
+party.txt
+
+# Sistema
+.DS_Store
+Thumbs.db
