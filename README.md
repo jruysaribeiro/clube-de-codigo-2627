@@ -119,3 +119,11 @@ dias, não para impressionar ninguém:
 **O facilitador nunca toca no teclado do aluno.** Por isso os `NOTAS.md`
 listam, para cada erro previsível, a *pergunta* a fazer — e não a correção
 a ditar.
+
+## Licença
+
+Estes materiais estão sob a licença
+[Creative Commons Atribuição 4.0 Internacional (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/deed.pt).
+Podes usá-los, copiá-los, adaptá-los e partilhá-los, também na tua escola ou
+clube, desde que indiques a autoria original. O texto completo está no
+ficheiro `LICENSE`.
