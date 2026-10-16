@@ -101,6 +101,120 @@ inteira. Configura isto nas máquinas antes de outubro.
 > argumentos. Só muda **qual** o `python3` que é chamado. Com o VS Code
 > configurado, nem isso se nota.
 
+### Num portátil novo, do zero: passo a passo por sistema
+
+O repositório não tem ficheiro `.env` nem nenhuma configuração secreta:
+**basta trazê-lo e instalar o `pygame-ce`**. Uma vez por portátil. Não é
+preciso `git`, nem para ti nem para os alunos: a partir daqui, as alterações
+são só deles, feitas diretamente nos ficheiros.
+
+#### Primeiro, em todos os sistemas: descarregar o projeto
+
+Descarrega o ZIP por este link (é sempre a versão mais recente):
+
+**<https://github.com/jruysaribeiro/clube-de-codigo-2627/archive/refs/heads/main.zip>**
+
+1. Descompacta-o na pasta das transferências. A pasta vem com o nome
+   **`clube-de-codigo-2627-main`**.
+2. **Muda-lhe o nome para `clube-de-codigo-2627`**, para os comandos de
+   baixo funcionarem tal e qual.
+
+Os comandos abaixo chamam o Python do `.venv` diretamente
+(`.venv\Scripts\python` ou `.venv/bin/python`), por isso **não é preciso
+activar nada**. Funciona igual em todas as sessões, e no Windows evita o
+erro do PowerShell «running scripts is disabled on this system», que o
+`activate` costuma dar nos computadores das escolas.
+
+#### Windows (PowerShell)
+
+**Instalar, uma vez:**
+
+```powershell
+cd ~\Downloads\clube-de-codigo-2627
+py -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+```
+
+**Correr, em cada sessão:**
+
+```powershell
+cd ~\Downloads\clube-de-codigo-2627
+.venv\Scripts\python halloween\noite-dos-doces.py
+```
+
+Se o `py` não for reconhecido, troca-o por `python`. Se nenhum dos dois
+existir, instala o Python pelo [python.org](https://python.org/downloads) e
+marca a caixa **«Add python.exe to PATH»** no primeiro ecrã do instalador.
+
+#### Linux (Ubuntu, Debian, Mint...)
+
+**Instalar, uma vez:**
+
+```bash
+cd ~/Transferências/clube-de-codigo-2627
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+**Correr, em cada sessão:**
+
+```bash
+cd ~/Transferências/clube-de-codigo-2627
+.venv/bin/python halloween/noite-dos-doces.py
+```
+
+Num Linux em inglês, a pasta chama-se `Downloads` em vez de
+`Transferências`.
+
+Se o `python3 -m venv` disser `ensurepip is not available`, falta o pacote
+`python3-venv`: `sudo apt install python3-venv` (precisa de administrador).
+Sem administrador, usa o `uv`, mais abaixo.
+
+#### macOS
+
+**Instalar, uma vez:**
+
+```bash
+cd ~/Downloads/clube-de-codigo-2627
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+**Correr, em cada sessão:**
+
+```bash
+cd ~/Downloads/clube-de-codigo-2627
+.venv/bin/python halloween/noite-dos-doces.py
+```
+
+Se o terminal pedir para instalar as «ferramentas de linha de comandos» ao
+escreveres `python3`, aceita: é a Apple a instalar o Python.
+
+#### Plano B, para quando nada disto dá: `uv`
+
+O `uv` traz o seu próprio Python e não precisa de administrador nem de
+`.venv`. Instala-se uma vez e depois é uma linha:
+
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+```bash
+# Linux e macOS
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Fecha e volta a abrir o terminal. Depois, dentro da pasta `clube-de-codigo-2627`:
+
+```bash
+uv run --with pygame-ce halloween/noite-dos-doces.py
+```
+
+> **Para correr outro ficheiro**, troca só o caminho no fim: por exemplo
+> `.venv/bin/python s12-bicharada/bicharada.py`. No Windows, as barras são
+> ao contrário: `.venv\Scripts\python s12-bicharada\bicharada.py`.
+
 ## 2. A regra para correr qualquer ficheiro
 
 **Abre o terminal na pasta do ficheiro e corre-o sem argumentos.**
