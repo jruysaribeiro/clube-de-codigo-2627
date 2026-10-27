@@ -1,0 +1,3 @@
+# O instalar-windows.bat tem de ter fins de linha CRLF, senao o cmd do
+# Windows pode saltar para as etiquetas erradas. Guardado tal e qual.
+*.bat -text

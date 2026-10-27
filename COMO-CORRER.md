@@ -127,7 +127,23 @@ erro do PowerShell «running scripts is disabled on this system», que o
 
 #### Windows (PowerShell)
 
-**Instalar, uma vez:**
+**Instalar, uma vez — o mais simples:** na pasta `clube-de-codigo-2627`,
+botão direito em **`instalar-windows.bat`** → **Executar como
+administrador**. Instala o Python (se faltar) e o `pygame-ce` para **todos
+os utilizadores** do computador, contas de aluno incluídas. Sem
+administrador, um duplo clique normal instala só para a conta atual.
+
+Se o Windows mostrar «O Windows protegeu o seu PC», carrega em **Mais
+informações** → **Executar mesmo assim**: é por o ficheiro vir de um ZIP da
+Internet.
+
+Depois, em qualquer conta, num terminal **novo** aberto na pasta:
+
+```powershell
+py halloween\noite-dos-doces.py
+```
+
+**Ou, à mão, com um `.venv`:**
 
 ```powershell
 cd ~\Downloads\clube-de-codigo-2627
