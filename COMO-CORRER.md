@@ -148,7 +148,30 @@ marca a caixa **«Add python.exe to PATH»** no primeiro ecrã do instalador.
 
 #### Linux (Ubuntu, Debian, Mint...)
 
-**Instalar, uma vez:**
+**Portáteis com sessão de convidado (Linux Mint, Ubuntu, Debian):**
+
+O convidado não pode usar `sudo` e perde a pasta pessoal ao sair, por isso
+um `.venv` não serve: desaparecia em cada sessão. Em vez disso, corre-se
+isto uma vez por portátil, **com a sessão iniciada na conta de
+administrador** (não como convidado: aí o `sudo` recusa, mesmo com a
+palavra-passe certa):
+
+```bash
+cd ~/Transferências/clube-de-codigo-2627
+bash instalar-linux.sh
+```
+
+Instala o `pygame-ce` no Python do sistema, para todos os utilizadores.
+Daí em diante, qualquer convidado corre os jogos só com `python3`:
+
+```bash
+python3 halloween/noite-dos-doces.py
+```
+
+Os ficheiros do convidado apagam-se no fim da sessão: o projeto tem de ser
+descarregado em cada sessão, e o trabalho dos alunos guardado numa pen.
+
+**Com contas normais, ou à mão:**
 
 ```bash
 cd ~/Transferências/clube-de-codigo-2627
