@@ -211,7 +211,20 @@ Sem administrador, usa o `uv`, mais abaixo.
 
 #### macOS
 
-**Instalar, uma vez:**
+**Instalar, uma vez — o mais simples:** com uma conta de administrador, no
+Terminal:
+
+```bash
+cd ~/Downloads/clube-de-codigo-2627
+bash instalar-mac.sh
+```
+
+Pede a palavra-passe de administrador, instala o Python 3.12 do
+[python.org](https://python.org/downloads) (o `python3` que vem com o macOS é
+o 3.9, antigo demais para o `pygame-ce`) e o `pygame-ce`, para **todas as
+contas** do Mac. No fim diz qual o comando a usar, normalmente `python3`.
+
+**Ou, à mão, com um `.venv`:**
 
 ```bash
 cd ~/Downloads/clube-de-codigo-2627
