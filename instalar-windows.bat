@@ -34,7 +34,17 @@ echo ==^> Sem administrador: instala so para esta conta.
 
 :procurar
 echo ==^> 1/3  Procurar o Python
-if exist "%DESTINO%\python.exe" goto :usar_destino
+set "REPARAR=0"
+if not exist "%DESTINO%\python.exe" goto :procurar_py
+rem Um python.exe sem as bibliotecas ao lado (instalacao que ficou a meio)
+rem da "Could not find platform independent libraries": nesse caso
+rem remove-se e instala-se de novo.
+"%DESTINO%\python.exe" -c "import os" >nul 2>&1
+if not errorlevel 1 goto :usar_destino
+echo     O Python em %DESTINO% esta estragado. Vai ser instalado de novo.
+set "REPARAR=1"
+goto :instalar
+:procurar_py
 py -3 -c "import sys; sys.exit(sys.version_info < (3, 10))" >nul 2>&1
 if errorlevel 1 goto :instalar
 rem Como administrador, um Python so da conta do administrador nao serve
@@ -55,11 +65,18 @@ if not errorlevel 1 goto :correr_instalador
 powershell -NoProfile -Command "Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -OutFile '%INSTALADOR%'"
 if errorlevel 1 goto :erro_download
 :correr_instalador
+if "%REPARAR%"=="0" goto :instalar_python
+echo     A remover o Python estragado...
+"%INSTALADOR%" /quiet /uninstall >nul 2>&1
+rmdir /s /q "%DESTINO%" >nul 2>&1
+:instalar_python
 echo     A instalar o Python %VERSAO% em %DESTINO% ...
 "%INSTALADOR%" /quiet InstallAllUsers=%TODOS% InstallLauncherAllUsers=%TODOS% Include_launcher=1 PrependPath=1 Include_test=0 TargetDir="%DESTINO%"
 if errorlevel 1 goto :erro_python
 del "%INSTALADOR%" >nul 2>&1
 if not exist "%DESTINO%\python.exe" goto :erro_python
+"%DESTINO%\python.exe" -c "import os" >nul 2>&1
+if errorlevel 1 goto :erro_python
 :usar_destino
 set PY="%DESTINO%\python.exe"
 
