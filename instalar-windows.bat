@@ -59,6 +59,10 @@ goto :pygame
 :instalar
 set "INSTALADOR=%TEMP%\python-%VERSAO%-%ARQ%.exe"
 set "URL=https://www.python.org/ftp/python/%VERSAO%/python-%VERSAO%-%ARQ%.exe"
+rem Apaga um instalador antigo. Se ainda estiver preso (um instalador
+rem anterior encravado), descarrega-se com outro nome.
+del "%INSTALADOR%" >nul 2>&1
+if exist "%INSTALADOR%" set "INSTALADOR=%TEMP%\python-%VERSAO%-%ARQ%-%RANDOM%.exe"
 echo     Nao ha Python que sirva. A descarregar o Python %VERSAO%...
 curl -L --fail -o "%INSTALADOR%" "%URL%"
 if not errorlevel 1 goto :correr_instalador
