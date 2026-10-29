@@ -20,6 +20,13 @@ set "VERSAO=3.12.10"
 set "ARQ=amd64"
 if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "ARQ=arm64"
 
+rem Um Python estragado (instalacao que ficou a meio) arranca na mesma, mas
+rem sem as bibliotecas: "Could not find platform independent libraries".
+rem "import os" nao chega para o apanhar, porque o os vem dentro do
+rem python.exe; por isso confirma-se que o Lib\os.py existe e que o json
+rem (que nao vem dentro) importa.
+set "TESTE=import os, sys, json; sys.exit(not os.path.isfile(os.path.join(sys.base_prefix, 'Lib', 'os.py')))"
+
 rem "net session" so funciona como administrador.
 net session >nul 2>&1
 if errorlevel 1 goto :conta_atual
@@ -36,10 +43,8 @@ echo ==^> Sem administrador: instala so para esta conta.
 echo ==^> 1/3  Procurar o Python
 set "REPARAR=0"
 if not exist "%DESTINO%\python.exe" goto :procurar_py
-rem Um python.exe sem as bibliotecas ao lado (instalacao que ficou a meio)
-rem da "Could not find platform independent libraries": nesse caso
-rem remove-se e instala-se de novo.
-"%DESTINO%\python.exe" -c "import os" >nul 2>&1
+rem Se estiver estragado, remove-se e instala-se de novo.
+"%DESTINO%\python.exe" -c "%TESTE%" >nul 2>&1
 if not errorlevel 1 goto :usar_destino
 echo     O Python em %DESTINO% esta estragado. Vai ser instalado de novo.
 set "REPARAR=1"
@@ -47,6 +52,12 @@ goto :instalar
 :procurar_py
 py -3 -c "import sys; sys.exit(sys.version_info < (3, 10))" >nul 2>&1
 if errorlevel 1 goto :instalar
+py -3 -c "%TESTE%" >nul 2>&1
+if not errorlevel 1 goto :py_serve
+echo     O Python do "py" esta estragado. Vai ser instalado de novo.
+set "REPARAR=1"
+goto :instalar
+:py_serve
 rem Como administrador, um Python so da conta do administrador nao serve
 rem aos outros utilizadores: nesse caso instala-se um para todos.
 if "%TODOS%"=="0" goto :usar_py
@@ -80,7 +91,7 @@ echo     A instalar o Python %VERSAO% em %DESTINO% ...
 if errorlevel 1 goto :erro_python
 del "%INSTALADOR%" >nul 2>&1
 if not exist "%DESTINO%\python.exe" goto :erro_python
-"%DESTINO%\python.exe" -c "import os" >nul 2>&1
+"%DESTINO%\python.exe" -c "%TESTE%" >nul 2>&1
 if errorlevel 1 goto :erro_python
 :usar_destino
 set PY="%DESTINO%\python.exe"
