@@ -62,7 +62,8 @@ set "URL=https://www.python.org/ftp/python/%VERSAO%/python-%VERSAO%-%ARQ%.exe"
 echo     Nao ha Python que sirva. A descarregar o Python %VERSAO%...
 curl -L --fail -o "%INSTALADOR%" "%URL%"
 if not errorlevel 1 goto :correr_instalador
-powershell -NoProfile -Command "Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -OutFile '%INSTALADOR%'"
+rem O PowerShell antigo nao usa TLS 1.2 por omissao, e o python.org exige-o.
+powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -OutFile '%INSTALADOR%'"
 if errorlevel 1 goto :erro_download
 :correr_instalador
 if "%REPARAR%"=="0" goto :instalar_python
@@ -102,7 +103,10 @@ exit /b 0
 
 :erro_download
 echo.
-echo ERRO: nao foi possivel descarregar o Python. Ha internet?
+echo ERRO: nao foi possivel descarregar o Python de
+echo     %URL%
+echo Le as mensagens acima. Se o browser abre esse endereco, a rede pode
+echo estar a bloquear downloads fora do browser.
 echo Alternativa: instala-o a mao em https://python.org/downloads
 echo marcando "Add python.exe to PATH", e corre este ficheiro outra vez.
 goto :fim_erro
