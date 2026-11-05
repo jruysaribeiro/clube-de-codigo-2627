@@ -43,6 +43,23 @@ Brilho **vermelho** não se apara: rola.
 | Chefe final | **D. Sebastião, o Desejado**. A meio da luta o nevoeiro adensa-se, ele teletransporta-se e chama cavaleiros fantasma |
 | Fim | Créditos e **Novo Jogo+** (fica-se com o nível, os inimigos ficam mais fortes) |
 
+## Mexer nos números (sem ler as 2000 linhas)
+
+Logo no topo do ficheiro há um bloco **AFINAR O JOGO** (vida, stamina, caldo,
+janela de aparar, custo de subir de nível, Novo Jogo+). Cada número diz o que
+faz, o que acontece se subir ou descer, e um valor para experimentar.
+
+Os inimigos estão em `TIPOS`. Cada golpe escreve-se com nomes,
+`golpe(ante=0.6, ativo=0.12, rec=0.7, alcance=46, ...)`, e o comentário da
+função `golpe()` explica cada um. A experiência que mais ensina:
+
+| Muda | Para | E acontece |
+|---|---|---|
+| `JANELA_APARAR` | `0.5` / `0.08` | aparar fica fácil / só para reflexos de gato |
+| `ante` da mordidela do Cão Vadio | `0.1` | quase impossível de evitar: é o anúncio que torna o jogo justo |
+| `TIGELAS_DE_CALDO` | `0` | sem curas |
+| `VIDA_BASE` | `1000` | explorar o mapa sem morrer |
+
 ## As três ideias que valem a pena mostrar
 
 - **O mapa é uma lista de strings.** `#` é parede, `o` é uma ossada, `F` é um

@@ -42,6 +42,85 @@ FOGO = (255, 150, 60)
 ALMA = (150, 230, 200)
 FUNDO = (8, 7, 10)
 
+# ======================================================================
+#  AFINAR O JOGO: MUDA UM NUMERO, JOGA, VE
+# ======================================================================
+# O ficheiro tem 2000 linhas, mas para mudar o jogo nao precisas de as ler.
+# Os numeros que mandam estao aqui, no MAPA, e nos inimigos (TIPOS, mais
+# abaixo). Regra de ouro: muda UM de cada vez, corre o jogo e repara no
+# que mudou.
+#
+#   MAIS  -> o que acontece se o numero subir
+#   MENOS -> o que acontece se o numero descer
+#
+# Os tempos estao em SEGUNDOS (0.2 = um quinto de segundo) e as velocidades
+# em PIXEIS POR SEGUNDO (um quadrado do mapa tem 32 pixeis). As partes
+# escrevem-se de 0 a 1 (0.45 = 45%).
+
+# --- A tua vida e a tua stamina (a barra vermelha e a barra verde) ---
+VIDA_BASE = 80
+VIDA_POR_VIGOR = 12
+# Vida maxima = VIDA_BASE + Vigor x VIDA_POR_VIGOR. Comecas com Vigor 5,
+# por isso 80 + 5x12 = 140. Cada nivel que pos em Vigor da mais 12.
+#   Experimenta: VIDA_BASE = 1000 (para explorar o mapa sem morrer)
+
+STAMINA_BASE = 70
+STAMINA_POR_FOLEGO = 6
+# Stamina maxima = STAMINA_BASE + Folego x STAMINA_POR_FOLEGO (comecas com 100).
+# Atacar, rolar, aparar e correr gastam stamina. Sem ela nao fazes nada.
+
+RECUPERAR_STAMINA = 60
+# Quanta stamina recuperas por segundo quando nao estas a fazer nada.
+#   MAIS  -> podes atacar sem parar.   MENOS -> cada golpe tem de contar
+
+CUSTO_ROLAR = 20
+CUSTO_APARAR = 12
+CUSTO_CORRER = 24
+# Quanta stamina gasta cada coisa. Correr gasta 24 por SEGUNDO.
+# (O custo de cada ataque esta em LEVES e PESADO, mais abaixo.)
+#   Experimenta: CUSTO_ROLAR = 0 e rola para sempre
+
+DANO_POR_FORCA = 0.1
+# Cada ponto de Forca acima de 5 da mais esta parte de dano (0.1 = +10%).
+
+# --- Mexer-se ---
+VELOCIDADE_ANDAR = 150
+# Quao depressa andas.   Experimenta: 400 (D. Sebastiao de patins)
+
+CORRER_MULTIPLICA = 1.6
+# A manter Shift, andas a VELOCIDADE_ANDAR vezes isto (1.6 = 60% mais depressa).
+
+# --- Curar ---
+TIGELAS_DE_CALDO = 4
+# Quantas tigelas de caldo verde (tecla Q) tens. Enchem no fogareiro.
+#   Experimenta: 0 (sem curas: a serio, isto e para os corajosos)
+
+CURA_DO_CALDO = 0.45
+# Cada tigela cura esta parte da tua vida maxima (0.45 = 45%; 1.0 = cura tudo).
+
+# --- Aparar (L) ---
+JANELA_APARAR = 0.2
+# Segundos, depois de carregares no L, em que o aparar funciona. O golpe do
+# inimigo tem de chegar dentro deste tempo.
+#   MAIS  -> aparar fica muito mais facil.   Experimenta: 0.5
+#   MENOS -> so para quem tem reflexos de gato.   Experimenta: 0.08
+
+DANO_CRITICO = 4.5
+# Depois de aparar, o golpe critico (J) faz o dano do ataque pesado vezes isto.
+
+# --- Subir de nivel (no fogareiro) ---
+CUSTO_NIVEL_BASE = 60
+CUSTO_NIVEL_SUBIDA = 22
+# Quantas almas custa subir de nivel. Fica cada vez mais caro:
+# ao nivel 1 custa 82, ao nivel 5 custa 305, ao nivel 10 custa 755.
+#   MENOS -> sobes de nivel mais depressa (o jogo fica mais facil)
+
+# --- Novo Jogo+ (depois dos creditos) ---
+VIDA_EXTRA_NOVO_JOGO = 1.0
+DANO_EXTRA_NOVO_JOGO = 0.5
+# Cada volta ao Novo Jogo+ da aos inimigos mais esta parte de vida e de dano.
+# 1.0 = +100% (o dobro da vida), 0.5 = +50% de dano.
+
 # O mapa e so texto. Muda uma letra e o mundo muda.
 #   #  parede          .  chao             S  inicio          F  fogareiro
 #   M  mensagem        I  objeto           N  nevoeiro        X  portao
@@ -111,37 +190,132 @@ def golpe(ante, ativo, rec, alcance, arco, dano, impulso=0, aparavel=True, forma
           postura=20, rastreio=4.0, largura=16):
     # Todos os golpes do jogo tem tres fases: anuncio, golpe e recuperacao.
     # E na recuperacao que se castiga. E no anuncio que se rola.
+    #
+    # ante:      ANUNCIO. Segundos em que o inimigo brilha antes de bater.
+    #            E o teu tempo para reagir.  MENOS -> golpe mais traicoeiro.
+    #            Experimenta 0.1 no cao: quase impossivel de evitar.
+    # ativo:     GOLPE. Segundos em que o golpe magoa quem lhe tocar.
+    # rec:       RECUPERACAO. Segundos em que o inimigo fica parado depois
+    #            de bater. MAIS -> mais tempo para o castigares.
+    # alcance:   ate onde chega o golpe, em pixeis (um quadrado do mapa tem 32)
+    # arco:      a largura do golpe, em graus. 90 = um quarto de circulo a
+    #            frente dele, 360 = magoa a toda a volta. (0 nas estocadas,
+    #            que sao uma linha reta e usam a "largura".)
+    # dano:      quanta vida te tira (tu comecas com 140)
+    # impulso:   quanto o inimigo avanca para ti enquanto bate. 0 = fica no sitio
+    # aparavel:  True = brilho BRANCO, da para aparar (L).
+    #            False = brilho VERMELHO, nao da: tens de rolar.
+    # forma:     "arco" (corte normal), "estocada" (em linha reta),
+    #            "carga" (atira-se a ti), "pancada" (a toda a volta), e os
+    #            especiais do D. Sebastiao: "salto", "fantasmas", "teleporte"
+    # postura:   quanto da tua postura parte, se o aparares
+    # rastreio:  quanto o inimigo te segue com os olhos durante o anuncio.
+    #            MAIS -> e mais dificil fugir para o lado
+    # largura:   so nas estocadas: a grossura da linha
     return dict(ante=ante, ativo=ativo, rec=rec, alcance=alcance, arco=math.radians(arco), dano=dano,
                 impulso=impulso, aparavel=aparavel, forma=forma, postura=postura, rastreio=rastreio,
                 largura=largura)
 
 
+# --- Os inimigos ---
+# nome:     o que aparece por cima da barra de vida
+# vida:     quanto dano aguenta (a tua espada leve tira mais ou menos 22)
+# raio:     o tamanho, em pixeis
+# vel:      quao depressa anda, em pixeis por segundo (tu andas a 150)
+# postura:  quanto aguenta antes de ficar atordoado e aberto a um critico.
+#           MENOS -> mais facil de partir com o ataque pesado (K)
+# almas:    quantas almas da ao morrer
+# aggro:    a que distancia te ve e vem atras de ti, em pixeis.
+#           MAIS -> acorda de mais longe. (Os chefes tem 0: so lutam na arena.)
+# cor:      (vermelho, verde, azul), cada um de 0 a 255
+# combos:   a lista dos ataques que sabe fazer. Cada combo diz:
+#             de, ate:  a que distancia de ti o usa (em pixeis). O cao so
+#                       morde ate 110; o lanceiro so estoca entre 40 e 120.
+#             golpes:   um ou mais golpes seguidos (ver a funcao golpe() acima)
+#           Quando esta perto o suficiente, escolhe um ao calhas.
 TIPOS = {
-    "ossada": dict(nome="Ossada", vida=70, raio=13, vel=70, postura=30, almas=45, aggro=230, cor=(205, 195, 170),
-                   combos=[(0, 70, [golpe(0.6, 0.12, 0.7, 46, 110, 22, 140)]),
-                           (0, 70, [golpe(0.45, 0.1, 0.25, 44, 110, 18, 120), golpe(0.4, 0.1, 0.8, 46, 110, 20, 160)])]),
-    "cao": dict(nome="Cão Vadio", vida=40, raio=11, vel=150, postura=10, almas=30, aggro=280, cor=(125, 92, 62),
-                combos=[(0, 110, [golpe(0.38, 0.2, 0.55, 30, 80, 16, 430)])]),
-    "lanceiro": dict(nome="Lanceiro", vida=110, raio=14, vel=60, postura=50, almas=90, aggro=260, cor=(140, 145, 160),
-                     combos=[(40, 120, [golpe(0.7, 0.15, 0.6, 95, 0, 30, 220, forma="estocada", largura=12)]),
-                             (0, 60, [golpe(0.5, 0.12, 0.7, 60, 160, 24, 80)])]),
-    "guarda": dict(nome="Guarda da Calçada", vida=1000, raio=24, vel=65, postura=140, almas=1500, aggro=0,
-                   cor=(120, 130, 150), chefe=True,
-                   combos=[(0, 95, [golpe(0.8, 0.15, 0.45, 82, 120, 40, 150, postura=40),
-                                    golpe(0.6, 0.15, 0.9, 82, 150, 45, 180)]),
-                           (0, 130, [golpe(1.1, 0.2, 1.0, 105, 0, 60, 0, aparavel=False, forma="pancada")]),
-                           (130, 400, [golpe(0.9, 0.6, 0.8, 46, 100, 40, 470, aparavel=False, forma="carga")])]),
-    "sebastiao": dict(nome="D. Sebastião, o Desejado", vida=1800, raio=18, vel=120, postura=160, almas=5000, aggro=0,
-                      cor=(215, 175, 90), chefe=True,
-                      combos=[(0, 85, [golpe(0.45, 0.12, 0.2, 64, 130, 30, 160), golpe(0.4, 0.12, 0.2, 64, 130, 30, 160),
-                                       golpe(0.55, 0.15, 0.9, 72, 160, 40, 200)]),
-                              (0, 95, [golpe(1.35, 0.15, 0.9, 74, 140, 55, 200, rastreio=6.0)]),
-                              (100, 340, [golpe(0.6, 0.25, 0.7, 44, 100, 40, 700, forma="carga")]),
-                              (80, 420, [golpe(0.9, 0.15, 1.0, 92, 0, 55, 0, aparavel=False, forma="salto")])],
-                      combos_fase2=[(0, 600, [golpe(1.4, 0.1, 1.0, 0, 0, 45, 0, aparavel=False, forma="fantasmas")]),
-                                    (0, 600, [golpe(0.8, 0.15, 0.6, 72, 150, 45, 250, forma="teleporte")])]),
+    "ossada": dict(
+        nome="Ossada", vida=70, raio=13, vel=70, postura=30, almas=45, aggro=230, cor=(205, 195, 170),
+        combos=[
+            dict(de=0, ate=70, golpes=[
+                golpe(ante=0.6, ativo=0.12, rec=0.7, alcance=46, arco=110, dano=22, impulso=140),
+            ]),
+            dict(de=0, ate=70, golpes=[
+                golpe(ante=0.45, ativo=0.1, rec=0.25, alcance=44, arco=110, dano=18, impulso=120),
+                golpe(ante=0.4, ativo=0.1, rec=0.8, alcance=46, arco=110, dano=20, impulso=160),
+            ]),
+        ]),
+    "cao": dict(
+        nome="Cão Vadio", vida=40, raio=11, vel=150, postura=10, almas=30, aggro=280, cor=(125, 92, 62),
+        combos=[
+            dict(de=0, ate=110, golpes=[
+                golpe(ante=0.38, ativo=0.2, rec=0.55, alcance=30, arco=80, dano=16, impulso=430),
+            ]),
+        ]),
+    "lanceiro": dict(
+        nome="Lanceiro", vida=110, raio=14, vel=60, postura=50, almas=90, aggro=260, cor=(140, 145, 160),
+        combos=[
+            dict(de=40, ate=120, golpes=[
+                golpe(ante=0.7, ativo=0.15, rec=0.6, alcance=95, arco=0, dano=30, impulso=220,
+                      forma="estocada", largura=12),
+            ]),
+            dict(de=0, ate=60, golpes=[
+                golpe(ante=0.5, ativo=0.12, rec=0.7, alcance=60, arco=160, dano=24, impulso=80),
+            ]),
+        ]),
+    "guarda": dict(
+        nome="Guarda da Calçada", vida=1000, raio=24, vel=65, postura=140, almas=1500, aggro=0,
+        cor=(120, 130, 150), chefe=True,
+        combos=[
+            dict(de=0, ate=95, golpes=[
+                golpe(ante=0.8, ativo=0.15, rec=0.45, alcance=82, arco=120, dano=40, impulso=150, postura=40),
+                golpe(ante=0.6, ativo=0.15, rec=0.9, alcance=82, arco=150, dano=45, impulso=180),
+            ]),
+            dict(de=0, ate=130, golpes=[
+                golpe(ante=1.1, ativo=0.2, rec=1.0, alcance=105, arco=0, dano=60, impulso=0,
+                      aparavel=False, forma="pancada"),
+            ]),
+            dict(de=130, ate=400, golpes=[
+                golpe(ante=0.9, ativo=0.6, rec=0.8, alcance=46, arco=100, dano=40, impulso=470,
+                      aparavel=False, forma="carga"),
+            ]),
+        ]),
+    "sebastiao": dict(
+        nome="D. Sebastião, o Desejado", vida=1800, raio=18, vel=120, postura=160, almas=5000, aggro=0,
+        cor=(215, 175, 90), chefe=True,
+        combos=[
+            dict(de=0, ate=85, golpes=[
+                golpe(ante=0.45, ativo=0.12, rec=0.2, alcance=64, arco=130, dano=30, impulso=160),
+                golpe(ante=0.4, ativo=0.12, rec=0.2, alcance=64, arco=130, dano=30, impulso=160),
+                golpe(ante=0.55, ativo=0.15, rec=0.9, alcance=72, arco=160, dano=40, impulso=200),
+            ]),
+            dict(de=0, ate=95, golpes=[
+                golpe(ante=1.35, ativo=0.15, rec=0.9, alcance=74, arco=140, dano=55, impulso=200, rastreio=6.0),
+            ]),
+            dict(de=100, ate=340, golpes=[
+                golpe(ante=0.6, ativo=0.25, rec=0.7, alcance=44, arco=100, dano=40, impulso=700, forma="carga"),
+            ]),
+            dict(de=80, ate=420, golpes=[
+                golpe(ante=0.9, ativo=0.15, rec=1.0, alcance=92, arco=0, dano=55, impulso=0,
+                      aparavel=False, forma="salto"),
+            ]),
+        ],
+        # Os combos que ganha quando lhe tiras metade da vida (a segunda fase).
+        combos_fase2=[
+            dict(de=0, ate=600, golpes=[
+                golpe(ante=1.4, ativo=0.1, rec=1.0, alcance=0, arco=0, dano=45, impulso=0,
+                      aparavel=False, forma="fantasmas"),
+            ]),
+            dict(de=0, ate=600, golpes=[
+                golpe(ante=0.8, ativo=0.15, rec=0.6, alcance=72, arco=150, dano=45, impulso=250, forma="teleporte"),
+            ]),
+        ]),
 }
 
+# --- Os teus ataques ---
+# Os mesmos campos dos golpes dos inimigos (ver golpe() acima), mais:
+#   custo:  quanta stamina (a barra verde) gasta
+# LEVES sao os tres golpes do combo do J, por ordem: o terceiro e o mais forte.
 LEVES = [
     dict(ante=0.12, ativo=0.1, rec=0.28, alcance=56, arco=math.radians(120), dano=22, custo=14, impulso=140, postura=12),
     dict(ante=0.1, ativo=0.1, rec=0.28, alcance=56, arco=math.radians(120), dano=24, custo=14, impulso=140, postura=12),
@@ -552,23 +726,23 @@ class Jogador:
         self.folego = 5
         self.forca = 5
         self.almas = 0
-        self.caldo_max = 4
-        self.caldo = 4
+        self.caldo_max = TIGELAS_DE_CALDO
+        self.caldo = TIGELAS_DE_CALDO
         self.vida = self.vida_max
         self.vida_rasto = self.vida
         self.stamina = self.stamina_max
 
     @property
     def vida_max(self):
-        return 80 + self.vigor * 12
+        return VIDA_BASE + self.vigor * VIDA_POR_VIGOR
 
     @property
     def stamina_max(self):
-        return 70 + self.folego * 6
+        return STAMINA_BASE + self.folego * STAMINA_POR_FOLEGO
 
     @property
     def mult_dano(self):
-        return 1 + (self.forca - 5) * 0.1
+        return 1 + (self.forca - 5) * DANO_POR_FORCA
 
     @property
     def invulneravel(self):
@@ -590,7 +764,7 @@ class Inimigo:
 
     def repor(self):
         self.pos = Vector2(self.casa)
-        self.vida_max = self.vida = self.d["vida"] * self.ng
+        self.vida_max = self.vida = self.d["vida"] * (1 + (self.ng - 1) * VIDA_EXTRA_NOVO_JOGO)
         self.vida_rasto = self.vida
         self.postura = self.d["postura"]
         self.postura_t = 0.0
@@ -815,13 +989,13 @@ class Jogo:
             return False
         j.espera = 0.6
         if acao == "rolar":
-            j.stamina -= 20
+            j.stamina -= CUSTO_ROLAR
             j.estado, j.t = "rolar", 0.0
             j.rolar_dir = mov if mov.length() > 0 else direcao(j.face)
             tocar("rolar", 0.6)
             return True
         if acao == "aparar":
-            j.stamina -= 12
+            j.stamina -= CUSTO_APARAR
             j.estado, j.t = "aparar", 0.0
             return True
         if acao == "leve":
@@ -869,10 +1043,10 @@ class Jogo:
             self.trocar_alvo(silencioso=True)
 
         if j.estado == "livre":
-            velocidade = 150
+            velocidade = VELOCIDADE_ANDAR
             if tecla(t, pygame.K_LSHIFT, pygame.K_RSHIFT) and mov.length() > 0 and j.stamina > 0:
-                velocidade *= 1.6
-                j.stamina -= 24 * dt
+                velocidade *= CORRER_MULTIPLICA
+                j.stamina -= CUSTO_CORRER * dt
                 j.espera = 0.5
                 a_correr = True
             j.vel += (mov * velocidade - j.vel) * min(1, dt * 14)
@@ -919,7 +1093,7 @@ class Jogo:
             j.vel += (mov * 50 - j.vel) * min(1, dt * 10)
             if j.t >= 0.55 and not j.curou:
                 j.curou = True
-                j.vida = min(j.vida_max, j.vida + j.vida_max * 0.45)
+                j.vida = min(j.vida_max, j.vida + j.vida_max * CURA_DO_CALDO)
                 tocar("beber", 0.6)
                 for _ in range(16):
                     self.particula(j.pos + Vector2(random.uniform(-12, 12), random.uniform(-4, 10)),
@@ -937,7 +1111,7 @@ class Jogo:
                 j.feito = True
                 self.hitstop = 0.22
                 self.trauma = 0.7
-                self.ferir_inimigo(e, PESADO["dano"] * 4.5 * j.mult_dano, 999, critico=True)
+                self.ferir_inimigo(e, PESADO["dano"] * DANO_CRITICO * j.mult_dano, 999, critico=True)
                 self.sangue(e.pos, direcao(j.face), 40)
                 tocar("critico")
                 if not e.morto:
@@ -964,7 +1138,8 @@ class Jogo:
         if j.estado not in ("rolar", "atacar", "aparar") and not a_correr:
             j.espera -= dt
             if j.espera <= 0:
-                j.stamina = min(j.stamina_max, j.stamina + (25 if j.estado == "beber" else 60) * dt)
+                recuperar = RECUPERAR_STAMINA * (0.4 if j.estado == "beber" else 1)  # a beber, mais devagar
+                j.stamina = min(j.stamina_max, j.stamina + recuperar * dt)
 
         # As almas que deixaste cair: tocar-lhes e recupera-las
         if self.mancha is not None and j.pos.distance_to(self.mancha[0]) < 22:
@@ -1065,7 +1240,7 @@ class Jogo:
             return False
         origem = e.pos if origem is None else origem
         para = origem - j.pos
-        if j.estado == "aparar" and j.t < 0.2 and g["aparavel"] and e is not None:
+        if j.estado == "aparar" and j.t < JANELA_APARAR and g["aparavel"] and e is not None:
             if abs(angulo_dif(math.atan2(para.y, para.x), j.face)) < math.radians(100):
                 e.estado, e.espera = "aparado", (1.3 if e.chefe else 1.7)
                 e.combo = None
@@ -1075,7 +1250,7 @@ class Jogo:
                 self.texto(e.pos + Vector2(0, -e.raio - 12), "APARADO", BRANCO, 24)
                 tocar("aparar")
                 return True
-        dano = g["dano"] * (1 + (self.ng - 1) * 0.5)
+        dano = g["dano"] * (1 + (self.ng - 1) * DANO_EXTRA_NOVO_JOGO)
         j.vida -= dano
         j.invul = 0.45
         j.estado, j.t = "atingido", 0.0
@@ -1191,9 +1366,9 @@ class Jogo:
                 e.face = rodar_para(e.face, ang_jogador, dt * 6)
                 e.cd -= dt
                 combos = e.d["combos"] + (e.d.get("combos_fase2", []) if e.fase_chefe == 2 else [])
-                possiveis = [c for c in combos if c[0] <= dist <= c[1]]
+                possiveis = [c for c in combos if c["de"] <= dist <= c["ate"]]
                 if e.cd <= 0 and possiveis:
-                    e.combo = random.choice(possiveis)[2]
+                    e.combo = random.choice(possiveis)["golpes"]
                     e.passo = 0
                     e.estado = "atacar"
                     self.iniciar_passo(e)
@@ -1430,7 +1605,7 @@ class Jogo:
     # ---------------------------------------------------------- nivel
     def custo_nivel(self):
         n = self.jogador.nivel
-        return int(60 + 22 * n ** 1.5)
+        return int(CUSTO_NIVEL_BASE + CUSTO_NIVEL_SUBIDA * n ** 1.5)
 
     def subir(self, atributo):
         j = self.jogador
@@ -1890,7 +2065,7 @@ class Jogo:
             progresso = 1 - max(0.0, j.fase_t) / a["ativo"]
             atual = ini - lado * a["arco"] * progresso
             pygame.draw.polygon(cena, (230, 225, 210), crescente(j.pos - cam, 14, a["alcance"], ini, atual))
-        if j.estado == "aparar" and j.t < 0.2:
+        if j.estado == "aparar" and j.t < JANELA_APARAR:
             pygame.draw.circle(cena, (255, 220, 150), j.pos - cam + direcao(j.face) * 13, 10, 1)
         for pg in self.perigos:
             if pg["tipo"] == "anel":
