@@ -26,16 +26,59 @@ import pygame
 # --- Constantes: e aqui que se mexe primeiro ---
 LARGURA = 800
 ALTURA = 600
-FPS = 60
-TILE = 40
+FPS = 60                 # o jogo da 60 passos por segundo (60 frames = 1 segundo)
+TILE = 40                # cada letra do MAPA e um quadrado de 40x40 pixeis
 TOPO = 40                # altura da barra de cima (ouro, vidas, onda)
 
+# =====================================================================
+#                 AFINAR O JOGO: MUDA UM NUMERO, JOGA, VE
+# =====================================================================
+# Regra de ouro: muda UM numero de cada vez, corre o jogo e repara no que
+# mudou. Se mudares cinco ao mesmo tempo, nao sabes qual fez o que.
+#
+# Leitura:   MAIS -> o que acontece se o numero subir
+#            MENOS -> o que acontece se o numero descer
+
 OURO_INICIAL = 200
+# O ouro com que comecas. Uma torre custa entre 50 e 130.
+#   MAIS  -> mais torres logo no inicio, jogo mais facil
+#   MENOS -> tens de escolher bem a primeira torre
+#   Experimenta: 1000 (modo rico) ou 50 (so da para um Besteiro)
+
 VIDAS_INICIAIS = 20
-BONUS_POR_ONDA = 25      # ouro que se ganha ao acabar cada onda
-VENDA = 0.6              # ao vender, recebes 60% do que gastaste
+# Quantos inimigos podem chegar ao castelo antes de perderes.
+#   MAIS  -> perdoa mais erros       MENOS -> cada fuga doi
+#   Experimenta: 1 (um so inimigo e perdes tudo)
+
+BONUS_POR_ONDA = 25
+# Ouro que ganhas ao acabar cada onda, alem do ouro de cada inimigo.
+#   MAIS  -> as torres crescem mais depressa ao longo do jogo
+
+VENDA = 0.6
+# Ao vender uma torre, recebes esta parte do que gastaste nela.
+# 0.6 quer dizer 60%. 1.0 seria 100% (vender nao custava nada).
+#   Experimenta: 1.0 e muda as torres de sitio a vontade
+
 NIVEL_MAXIMO = 3
-VIDA_EXTRA_POR_ONDA = 0.15   # cada onda, os inimigos tem mais 15% de vida
+# Quantas vezes se pode melhorar uma torre (tecla U), contando com o nivel 1.
+
+DANO_EXTRA_POR_NIVEL = 0.5
+# Cada melhoria soma esta parte ao dano. 0.5 = +50% por nivel,
+# por isso ao nivel 3 a torre faz o dobro do dano do nivel 1.
+#   MAIS  -> melhorar compensa mais do que construir torres novas
+
+ALCANCE_EXTRA_POR_NIVEL = 0.1
+# Cada melhoria soma esta parte ao alcance. 0.1 = +10% por nivel.
+
+VIDA_EXTRA_POR_ONDA = 0.15
+# Os inimigos ficam mais rijos a cada onda. 0.15 = +15% de vida por onda,
+# por isso um Soldado na onda 10 tem mais do dobro da vida da onda 1.
+#   MAIS  -> as ultimas ondas ficam muito mais dificeis
+#   0     -> um Soldado e sempre igual, da primeira a ultima onda
+
+TEMPO_LENTIDAO = 90
+# Quanto tempo um inimigo fica lento depois de levar com o Caldeirao,
+# em frames (60 = 1 segundo, por isso 90 = um segundo e meio).
 
 PRETO = (18, 18, 28)
 BRANCO = (240, 240, 240)
@@ -78,14 +121,30 @@ MAPA = [
 ]
 
 # --- As torres ---
-# custo:      quanto ouro custa
-# alcance:    ate onde chega, em pixeis
-# dano:       quanto tira a cada golpe
-# cadencia:   frames entre dois golpes (60 = um por segundo)
+# nome:       o que aparece na barra de baixo
+# tecla:      a tecla que a escolhe (pygame.K_1 e a tecla 1, K_5 seria a 5)
+# custo:      quanto ouro custa.            MAIS -> mais cara
+# alcance:    ate onde chega, em pixeis.    Um quadrado do mapa tem 40,
+#             por isso 120 chega a 3 quadrados de distancia.
+#             (Ao passar o rato por cima ves o circulo do alcance.)
+# dano:       quanto tira a cada golpe.     Um Soldado tem 40 de vida:
+#             com dano 7 precisa de 6 setas, com dano 40 cai a primeira.
+# cadencia:   ATENCAO, e ao contrario do que parece: e quanto a torre
+#             ESPERA entre dois golpes, em frames (60 = 1 segundo).
+#             MENOS -> dispara mais depressa.   MAIS -> mais devagar.
+#             35 = quase dois tiros por segundo. 120 = um a cada 2 segundos.
 # efeito:     "tiro"      dispara uma seta contra um inimigo
 #             "explosao"  dispara uma pedra que rebenta e magoa a volta
+#                         (raio_explosao: o tamanho do rebentamento, em pixeis)
 #             "area"      magoa todos os que estao perto, e abranda-os
+#                         (lentidao: a que velocidade ficam. 0.45 = andam a
+#                         45% da velocidade normal. MENOS -> mais lentos!
+#                         0.1 quase os para, 1.0 nao abranda nada)
 #             "golpe"     acerta logo, sem projetil (curto alcance)
+# cor:        (vermelho, verde, azul), cada um de 0 a 255
+#
+# Para inventar uma torre: copia um bloco { ... }, cola por baixo, muda o
+# nome, a tecla e os numeros. So cabem 4 botoes na barra de baixo.
 TORRES = [
     {
         "nome": "Besteiro", "tecla": pygame.K_1, "custo": 50,
@@ -110,9 +169,14 @@ TORRES = [
 ]
 
 # --- Os inimigos ---
-# velocidade: pixeis por frame
-# recompensa: ouro que dao ao cair
+# vida:       quanto dano aguentam (na onda 1; depois sobe, ver
+#             VIDA_EXTRA_POR_ONDA la em cima)
+# velocidade: pixeis por frame. 1.2 = mais ou menos um quadrado do mapa
+#             a cada meio segundo. 3 ja e muito rapido; 0.3 e um caracol.
+# recompensa: ouro que dao ao cair.   MAIS -> o jogo fica mais facil
 # estrago:    vidas que tiram se chegarem ao castelo
+# tamanho:    o tamanho do desenho, em pixeis (nao muda a dificuldade)
+# forma:      "circulo" ou "quadrado"
 INIMIGOS = {
     "Soldado": {"vida": 40, "velocidade": 1.2, "recompensa": 5, "estrago": 1,
                 "tamanho": 16, "cor": (200, 60, 60), "forma": "circulo"},
@@ -125,8 +189,14 @@ INIMIGOS = {
 }
 
 # --- As ondas ---
-# Cada onda e uma lista de grupos. Um grupo diz: "manda X inimigos deste
-# tipo, com Y frames entre cada um". Os grupos saem uns a seguir aos outros.
+# Cada linha [ ... ] e uma onda. Ha 10 linhas, ha 10 ondas: acrescenta uma
+# e passa a haver 11.
+# Dentro de cada onda ha grupos { ... }. Um grupo diz:
+#   inimigo:    que inimigo (escrito igual ao nome em INIMIGOS, com acentos)
+#   quantos:    quantos vem
+#   intervalo:  quanto tempo entre um e o seguinte, em frames (60 = 1 segundo)
+#               MENOS -> vem todos encavalitados (mais dificil)
+# Os grupos saem uns a seguir aos outros.
 ONDAS = [
     [{"inimigo": "Soldado", "quantos": 8, "intervalo": 50}],
     [{"inimigo": "Soldado", "quantos": 12, "intervalo": 40}],
@@ -342,12 +412,13 @@ def construir(coluna, linha):
 
 
 def valor_da_torre(torre, chave):
-    # Cada nivel a mais: +50% de dano e +10% de alcance.
+    # Cada nivel a mais soma DANO_EXTRA_POR_NIVEL ao dano e
+    # ALCANCE_EXTRA_POR_NIVEL ao alcance (os numeros estao la em cima).
     base = TORRES[torre["tipo"]][chave]
     if chave == "dano":
-        return base * (1 + 0.5 * (torre["nivel"] - 1))
+        return base * (1 + DANO_EXTRA_POR_NIVEL * (torre["nivel"] - 1))
     if chave == "alcance":
-        return base * (1 + 0.1 * (torre["nivel"] - 1))
+        return base * (1 + ALCANCE_EXTRA_POR_NIVEL * (torre["nivel"] - 1))
     return base
 
 
@@ -439,7 +510,7 @@ def atualizar_torres():
             for inimigo in inimigos:
                 if distancia(torre["x"], torre["y"], inimigo["x"], inimigo["y"]) <= alcance:
                     magoar(inimigo, dano)
-                    inimigo["lento"] = 90
+                    inimigo["lento"] = TEMPO_LENTIDAO
                     inimigo["fator_lento"] = modelo["lentidao"]
             efeitos.append(circulo_a_crescer(torre["x"], torre["y"], modelo["cor"], alcance))
         elif modelo["efeito"] == "golpe":

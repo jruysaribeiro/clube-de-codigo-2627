@@ -42,6 +42,19 @@ Joga-se **com o rato**, e as teclas ajudam.
 | Números a voar e círculos a crescer | `efeitos`, `texto_a_voar()` |
 | Alcance meio transparente debaixo do rato | `desenhar_alcance()` |
 
+## Mexer nos números
+
+Logo a seguir às constantes há um bloco **AFINAR O JOGO**: cada número diz o
+que faz, o que acontece se subir ou descer, e um valor para experimentar. As
+listas `TORRES`, `INIMIGOS` e `ONDAS` têm por cima a explicação de cada campo,
+em unidades que se percebem («120 de alcance = 3 quadrados»).
+
+Duas armadilhas que estão agora avisadas no código, porque enganam toda a gente:
+- **`cadencia` é ao contrário:** é o tempo de espera entre golpes. **Menos** é
+  disparar mais depressa.
+- **`lentidao` também:** `0.45` quer dizer «andam a 45% da velocidade».
+  **Menos** é mais lento.
+
 ## As ideias que valem a pena mostrar
 
 - **O mapa é uma lista de strings**, como no Almas Penadas. Mudar o caminho é
