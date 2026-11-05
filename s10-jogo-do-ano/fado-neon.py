@@ -31,7 +31,6 @@ ALTURA = 540
 FPS = 60
 CENTRO = Vector2(LARGURA / 2, ALTURA / 2)
 TAU = math.tau
-ONDAS_TOTAIS = 10
 
 FUNDO = (7, 5, 16)
 BRANCO = (240, 240, 255)
@@ -44,11 +43,142 @@ VERMELHO = (255, 60, 80)
 LARANJA = (255, 140, 50)
 CINZENTO = (120, 115, 150)
 
+# ======================================================================
+#  AFINAR O JOGO: MUDA UM NUMERO, JOGA, VE
+# ======================================================================
+# O ficheiro tem 2000 linhas, mas para mudar o jogo nao precisas de as ler.
+# Os numeros que mandam estao todos aqui. Regra de ouro: muda UM de cada
+# vez, corre o jogo e repara no que mudou.
+#
+#   MAIS  -> o que acontece se o numero subir
+#   MENOS -> o que acontece se o numero descer
+#
+# Os tempos estao em SEGUNDOS (0.5 = meio segundo) e as velocidades em
+# PIXEIS POR SEGUNDO (a janela tem 960 de largura: a 480, atravessas metade
+# do ecra num segundo). As percentagens escrevem-se de 0 a 1 (0.05 = 5%).
+
+# --- O jogo ---
+ONDAS_TOTAIS = 10
+# Quantas ondas e preciso aguentar para ganhar.
+#   Experimenta: 3 (um jogo rapido para mostrar ao professor)
+
+ONDA_DO_CHEFE = 5
+# O Saudosista aparece de tantas em tantas ondas (5 = nas ondas 5, 10, 15...).
+#   Experimenta: 1 (so chefes!) ou 100 (nunca aparece)
+
+# --- Tu ---
+VIDAS_JOGADOR = 5
+# Coracoes no inicio.   MAIS -> mais facil.   Experimenta: 1 (modo saudade)
+
+VELOCIDADE_JOGADOR = 270
+# Quao depressa andas.   MAIS -> foges melhor, mas e mais dificil fazer
+# curvas apertadas.   Experimenta: 500 (patins) ou 120 (a arrastar os pes)
+
+DANO_BALA = 10
+# Quanto tira cada bala. Um corredor tem 20 de vida: com 10 morre em dois
+# tiros, com 20 morre num so.   Experimenta: 100 (nada te para)
+
+TEMPO_ENTRE_TIROS = 0.15
+# Segundos de espera entre dois tiros.   ATENCAO, e ao contrario:
+#   MENOS -> disparas mais depressa.   Experimenta: 0.03 (metralhadora)
+#   MAIS  -> mais devagar.             Experimenta: 1 (um tiro por segundo)
+
+VELOCIDADE_BALA = 720
+# Quao depressa voam as tuas balas.   MENOS -> da para as ver a ir.
+
+CHANCE_CRITICO = 0.05
+# Probabilidade de um tiro ser critico (amarelo, faz mais dano).
+# 0.05 = 5% = mais ou menos 1 tiro em cada 20.   1.0 = todos!
+
+DANO_CRITICO = 2.5
+# Um tiro critico faz o dano normal vezes isto. (A carta "Bacalhau Critico"
+# diz "x2.5": se mudares aqui, muda tambem o texto da carta em MELHORIAS.)
+
+RECARGA_INVESTIDA = 0.6
+# Segundos ate poderes investir (Espaco) outra vez.
+#   MENOS -> investes sem parar.   Experimenta: 0 e foge de tudo
+
+INVULNERAVEL_DEPOIS_DE_DANO = 1.3
+# Segundos a piscar, sem levar dano, depois de perderes um coracao.
+#   MAIS  -> perdoa mais.   0 -> um monte de balas tira-te tudo de uma vez
+
+DURACAO_LASER = 1.6
+# Segundos que o laser (tecla E) fica ligado.
+
+CARGA_LASER_POR_MORTE = 0.06
+# Quanto enche a barra do laser por cada inimigo que matas. A barra cheia
+# e 1, por isso 0.06 = cerca de 17 mortes (o dano tambem enche um pouco).
+#   Experimenta: 1 (laser a cada morte)
+
+CHANCE_CORACAO = 0.04
+# Probabilidade de um inimigo largar um coracao ao morrer. 0.04 = 1 em 25.
+
+# --- Os inimigos ---
+ORCAMENTO_BASE = 4
+ORCAMENTO_POR_ONDA = 3
+# Quantos inimigos vem em cada onda. A onda "compra" inimigos com pontos:
+# cada inimigo tem um "custo" em PERFIS (la em baixo). A onda N tem
+#   ORCAMENTO_BASE + N x ORCAMENTO_POR_ONDA  pontos.
+# Na onda 1: 4 + 1x3 = 7 pontos = 7 corredores. Na onda 4: 4 + 4x3 = 16.
+#   MAIS  -> ondas mais cheias.   Experimenta: ORCAMENTO_BASE = 40
+
+VIDA_EXTRA_POR_ONDA = 0.09
+# Cada onda, os inimigos tem mais esta parte de vida. 0.09 = +9% por onda.
+#   0 -> os inimigos da onda 9 sao iguais aos da onda 1
+
+VELOCIDADE_EXTRA_POR_ONDA = 0.025
+VELOCIDADE_EXTRA_MAXIMA = 1.6
+# Cada onda, os inimigos andam mais 2.5% depressa, ate ao maximo de 1.6
+# vezes a velocidade normal (1.6 = 60% mais rapidos, e nao passam disso).
+
+VIDA_CHEFE = 1100
+# A vida do Saudosista na primeira vez que aparece. Da segunda tem mais 70%.
+#   Experimenta: 50 (cai num instante e ves os creditos)
+
+# --- Os inimigos, um a um ---
+# raio:        o tamanho (e a area onde as balas lhes acertam)
+# vida:        quanto dano aguentam na onda 1 (depois sobe, ver acima)
+# velocidade:  pixeis por segundo (compara com os teus 270)
+# cor:         uma das cores la de cima
+# lados:       3 = triangulo, 4 = quadrado, 6 = hexagono...
+# pontos:      quanto vale para a pontuacao
+# custo:       quanto gasta do orcamento da onda (ver ORCAMENTO_BASE)
+# desde_onda:  a primeira onda em que pode aparecer. None = nunca aparece
+#              sozinho (o "pequeno" so nasce quando um divisor rebenta)
+# O comportamento (o corredor corre para ti, o atirador dispara...) esta
+# na funcao atualizar() da classe Inimigo, e depende do nome.
+PERFIS = {
+    "corredor": {"raio": 12, "vida": 20, "velocidade": 150, "cor": ROSA, "lados": 3,
+                 "pontos": 10, "custo": 1, "desde_onda": 1},
+    "atirador": {"raio": 15, "vida": 34, "velocidade": 90, "cor": LARANJA, "lados": 4,
+                 "pontos": 20, "custo": 2, "desde_onda": 2},
+    "divisor": {"raio": 24, "vida": 60, "velocidade": 60, "cor": VERDE, "lados": 6,
+                "pontos": 25, "custo": 3, "desde_onda": 3},
+    "pequeno": {"raio": 12, "vida": 16, "velocidade": 125, "cor": VERDE, "lados": 6,
+                "pontos": 8, "custo": 0, "desde_onda": None},
+    "investida": {"raio": 14, "vida": 40, "velocidade": 70, "cor": ROXO, "lados": 4,
+                  "pontos": 25, "custo": 2, "desde_onda": 4},
+}
+
+# ======================================================================
+#  OS TEXTOS E AS CARTAS
+# ======================================================================
+
 CORES_RARIDADE = {1: CIANO, 2: ROXO, 3: AMARELO}
 NOMES_RARIDADE = {1: "COMUM", 2: "RARA", 3: "LENDÁRIA"}
 PESOS_RARIDADE = {1: 6, 2: 3, 3: 1}
+# Quantas vezes mais provavel e cada raridade sair nas cartas: em cada 10
+# cartas, mais ou menos 6 comuns, 3 raras e 1 lendaria.
+#   Experimenta: {1: 0, 2: 0, 3: 1} (so lendarias)
 
-# id, nome, descricao, raridade, unica
+# As cartas que aparecem entre ondas. Cada linha tem, por esta ordem:
+#   id:        o nome interno (e o que o codigo procura em escolher())
+#   nome:      o que aparece na carta
+#   descricao: o texto da carta. E so texto! O que a carta FAZ esta na
+#              funcao escolher(), mais abaixo. Se mudares o numero la,
+#              muda tambem a descricao aqui.
+#   raridade:  1 comum, 2 rara, 3 lendaria
+#   unica:     True = so se pode apanhar uma vez
 MELHORIAS = [
     ("guitarra", "Guitarra Portuguesa", "+1 projétil. Doze cordas, doze balas.", 2, False),
     ("cafe", "Café Duplo", "Disparas 20% mais depressa. Não dormes.", 1, False),
@@ -114,15 +244,6 @@ FRASES_ONDA = [
     "Ninguém volta igual de Alfama.",
     "O D. Sebastião não vem ajudar.",
 ]
-
-PERFIS = {
-    # raio, vida, velocidade, cor, lados, pontos
-    "corredor": (12, 20, 150, ROSA, 3, 10),
-    "atirador": (15, 34, 90, LARANJA, 4, 20),
-    "divisor": (24, 60, 60, VERDE, 6, 25),
-    "pequeno": (12, 16, 125, VERDE, 6, 8),
-    "investida": (14, 40, 70, ROXO, 4, 25),
-}
 
 # ======================================================================
 #  SOM: tudo sintetizado amostra a amostra. Sem numpy, sem ficheiros.
@@ -461,28 +582,28 @@ class Jogador:
         self.vel = Vector2()
         self.raio = 10
         self.ang = 0.0
-        self.vida_max = 5
-        self.vida = 5
+        self.vida_max = VIDAS_JOGADOR
+        self.vida = VIDAS_JOGADOR
         self.invulneravel = 0.0
         self.dash_t = 0.0
         self.dash_cd = 0.0
-        self.dash_recarga = 0.6
+        self.dash_recarga = RECARGA_INVESTIDA
         self.dash_dir = Vector2(1, 0)
         self.fantasmas = []
         self.cd_tiro = 0.0
-        self.intervalo = 0.15
+        self.intervalo = TEMPO_ENTRE_TIROS
         self.multi = 1
-        self.dano = 10.0
+        self.dano = float(DANO_BALA)
         self.perfura = 0
         self.ricochete = 0
-        self.critico = 0.05
+        self.critico = CHANCE_CRITICO
         self.tam_bala = 4.0
         self.teleguiada = False
         self.orbes = 0
         self.vira = False
-        self.velocidade = 270.0
+        self.velocidade = float(VELOCIDADE_JOGADOR)
         self.vampiro = 0.0
-        self.laser_duracao = 1.6
+        self.laser_duracao = DURACAO_LASER
         self.farol_ganho = 1.0
         self.coice = 0.0
         self.melhorias = {}
@@ -494,15 +615,16 @@ class Jogador:
 
 class Inimigo:
     def __init__(self, tipo, pos, onda):
-        raio, vida, vel, cor, lados, valor = PERFIS[tipo]
+        perfil = PERFIS[tipo]
         self.tipo = tipo
         self.pos = Vector2(pos)
-        self.raio = raio
-        self.vida_max = self.vida = vida * (1 + 0.09 * (onda - 1))
-        self.velocidade = vel * min(1.6, 1 + 0.025 * (onda - 1))
-        self.cor = cor
-        self.lados = lados
-        self.valor = valor
+        self.raio = perfil["raio"]
+        self.vida_max = self.vida = perfil["vida"] * (1 + VIDA_EXTRA_POR_ONDA * (onda - 1))
+        self.velocidade = perfil["velocidade"] * min(VELOCIDADE_EXTRA_MAXIMA,
+                                                     1 + VELOCIDADE_EXTRA_POR_ONDA * (onda - 1))
+        self.cor = perfil["cor"]
+        self.lados = perfil["lados"]
+        self.valor = perfil["pontos"]
         self.ang = random.uniform(0, TAU)
         self.t = random.uniform(0, 5)
         self.flash = 0.0
@@ -597,7 +719,8 @@ class Chefe(Inimigo):
         self.chefe = True
         self.tipo = "chefe"
         self.raio = 44
-        self.vida_max = self.vida = 1100 * (1 + 0.7 * (onda // 5 - 1))
+        vez = max(1, onda // ONDA_DO_CHEFE)  # 1 = primeira vez que aparece, 2 = segunda...
+        self.vida_max = self.vida = VIDA_CHEFE * (1 + 0.7 * (vez - 1))
         self.vida_rasto = self.vida
         self.cor = ROSA
         self.valor = 1000
@@ -901,7 +1024,7 @@ class Jogo:
         self.spawn_cd = 1.0
         if self.onda == 10:
             self.desbloquear("onda10")
-        if self.onda % 5 == 0:
+        if self.onda % ONDA_DO_CHEFE == 0:
             self.fila = []
             self.chefe = Chefe(self.onda)
             self.inimigos.append(self.chefe)
@@ -910,15 +1033,17 @@ class Jogo:
             tocar("rugido")
             self.trauma = max(self.trauma, 0.5)
         else:
-            orcamento = 4 + self.onda * 3
-            tipos = [("corredor", 1, 1), ("atirador", 2, 2), ("divisor", 3, 3), ("investida", 2, 4)]
+            # A onda "compra" inimigos ao calhas ate gastar o orcamento.
+            orcamento = ORCAMENTO_BASE + self.onda * ORCAMENTO_POR_ONDA
             while orcamento > 0:
-                possiveis = [t for t in tipos if t[2] <= self.onda and t[1] <= orcamento]
+                possiveis = [nome for nome, p in PERFIS.items()
+                             if p["desde_onda"] is not None and p["desde_onda"] <= self.onda
+                             and 0 < p["custo"] <= orcamento]
                 if not possiveis:
                     break
-                t = random.choice(possiveis)
-                self.fila.append(t[0])
-                orcamento -= t[1]
+                nome = random.choice(possiveis)
+                self.fila.append(nome)
+                orcamento -= PERFIS[nome]["custo"]
             tocar("onda")
 
     def desbloquear(self, chave):
@@ -996,7 +1121,7 @@ class Jogo:
         self.combo += 1
         self.combo_t = 2.5
         self.combo_max = max(self.combo_max, self.combo)
-        self.farol = min(1.0, self.farol + 0.06 * self.jogador.farol_ganho)
+        self.farol = min(1.0, self.farol + CARGA_LASER_POR_MORTE * self.jogador.farol_ganho)
         mult = 1 + self.combo // 5
         self.pontos += inimigo.valor * mult
         self.desbloquear("sangue")
@@ -1014,7 +1139,7 @@ class Jogo:
         tocar("explosao", 0.6)
         for _ in range(random.randint(2, 4)):
             self.recompensas.append(Recompensa(inimigo.pos, "nota"))
-        if random.random() < 0.04:
+        if random.random() < CHANCE_CORACAO:
             self.recompensas.append(Recompensa(inimigo.pos, "coracao"))
         j = self.jogador
         if j.vampiro and random.random() < j.vampiro and j.vida < j.vida_max:
@@ -1053,7 +1178,7 @@ class Jogo:
         if j.invulneravel > 0 or j.a_investir or self.fase == "morte":
             return
         j.vida -= 1
-        j.invulneravel = 1.3
+        j.invulneravel = INVULNERAVEL_DEPOIS_DE_DANO
         afastar = j.pos - origem
         if afastar.length() > 0:
             j.vel += afastar.normalize() * 500
@@ -1081,7 +1206,8 @@ class Jogo:
             a = base + (k - (j.multi - 1) / 2) * 8 + random.uniform(-2, 2)
             d = Vector2(1, 0).rotate(a)
             critico = random.random() < j.critico
-            b = Bala(j.pos + d * 14, d * 720, j.dano * (2.5 if critico else 1), j.tam_bala * (1.4 if critico else 1),
+            b = Bala(j.pos + d * 14, d * VELOCIDADE_BALA, j.dano * (DANO_CRITICO if critico else 1),
+                     j.tam_bala * (1.4 if critico else 1),
                      AMARELO if critico else CIANO)
             b.perfura = j.perfura
             b.ricochete = j.ricochete
@@ -1186,6 +1312,8 @@ class Jogo:
         mid = self.cartas[indice][0][0]
         j = self.jogador
         j.melhorias[mid] = j.melhorias.get(mid, 0) + 1
+        # O que cada carta FAZ. Multiplicar por 0.8 e tirar 20%; por 1.3 e
+        # somar 30%. Se mudares um numero aqui, muda a descricao em MELHORIAS.
         if mid == "guitarra":
             j.multi += 1
         elif mid == "cafe":
@@ -1443,7 +1571,7 @@ class Jogo:
             a.t -= dt
             if a.t <= 0:
                 self.inimigos.append(Inimigo(a.tipo, a.pos, self.onda))
-                self.onda_choque(a.pos, PERFIS[a.tipo][3], 40)
+                self.onda_choque(a.pos, PERFIS[a.tipo]["cor"], 40)
                 self.grelha.impulso(a.pos, -200, 80)
         self.avisos = [a for a in self.avisos if a.t > 0]
 
@@ -1707,7 +1835,7 @@ class Jogo:
         j = self.jogador
         for a in self.avisos:
             p = a.pos - cam
-            cor = PERFIS[a.tipo][3]
+            cor = PERFIS[a.tipo]["cor"]
             r = 8 + a.t * 30
             if int(a.t * 12) % 2:
                 pygame.draw.circle(cena, cor, p, r, 2)

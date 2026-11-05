@@ -67,6 +67,22 @@ E o que é **mesmo** novo, para os curiosos:
   esticar (fica desfocado) e soma-se por cima com `BLEND_RGB_ADD`. São cinco
   linhas.
 
+## Mexer nos números (sem ler as 2000 linhas)
+
+Logo no topo do ficheiro há um bloco **AFINAR O JOGO**. Cada número diz o que
+faz, o que acontece se subir ou descer, e um valor para experimentar. Bons
+para começar ao vivo:
+
+| Muda | Para | E acontece |
+|---|---|---|
+| `TEMPO_ENTRE_TIROS` | `0.03` | metralhadora (e ao contrário do que parece: **menos** é mais rápido) |
+| `ONDA_DO_CHEFE` | `1` | só chefes |
+| `ORCAMENTO_BASE` | `40` | o ecrã enche-se de inimigos |
+| `VIDA_CHEFE` | `50` | o Saudosista cai logo e veem-se os créditos |
+
+Os inimigos estão em `PERFIS`, agora com nomes (`"vida"`, `"velocidade"`...) em
+vez de uma fila de números sem nome.
+
 ## Se um aluno perguntar «posso fazer isto no meu projeto?»
 
 Sim, depois de ter um jogo acabado. Antes não. Aponta-lhe para a definição
