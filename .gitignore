@@ -9,6 +9,10 @@ __pycache__/
 # Gerado pelo s03-gerador-personagens/nivel-ouro.py
 party.txt
 
+# Modelo das maos: o s14-maos-ao-ar/maos-ao-ar.py descarrega-o sozinho
+hand_landmarker.task
+hand_landmarker.task.parte
+
 # Sistema
 .DS_Store
 Thumbs.db

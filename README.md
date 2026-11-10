@@ -15,6 +15,9 @@ Materiais de programação para um clube de jovens dos 12 aos 18 anos.
   As sessões 1 a 3 usam apenas a biblioteca padrão: **não é preciso instalar
   nada** até à sessão 7.
 - **Nada mais.** Sem `numpy`, sem `requests`, sem rede. Tudo corre offline.
+  A única exceção é o `s14-maos-ao-ar/`, que se joga com a câmara: precisa do
+  `mediapipe`, instala-o sozinho na primeira vez que corre, e só dessa vez
+  precisa de internet. Ver o `s14-maos-ao-ar/NOTAS.md`.
 
 > **O ambiente virtual não é opcional.** Em macOS com Homebrew e em Linux, o
 > `pip install` no Python do sistema é recusado com
