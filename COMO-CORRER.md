@@ -384,7 +384,55 @@ python3 projeto/mecanica-por-genero/plataformas-gravidade.py
 
 ---
 
-## 6. Correr tudo de uma vez, para verificar
+## 6. Sessão 14 — Mãos ao Ar!, com a câmara
+
+```bash
+python3 s14-maos-ao-ar/maos-ao-ar.py
+```
+
+Um jogo de plataformas que se joga com a mão, à frente da câmara. **É o único
+ficheiro do repositório que precisa de mais do que o `pygame-ce`**: precisa do
+`mediapipe` (que traz o `opencv` e o `numpy`, uns 400 MB) e de um modelo de
+8 MB que reconhece mãos.
+
+**Não é preciso instalar nada à mão.** Na primeira vez que corre, o jogo:
+
+1. vê o que falta e instala-o com o `pip`. Dentro do `.venv` (ou no Windows)
+   instala diretamente. Com o Python do sistema (o do `instalar-mac.sh` e do
+   `instalar-linux.sh`) usa `sudo`, para ficar para todos os utilizadores, e
+   **pede a palavra-passe de administrador no terminal**;
+2. volta a arrancar sozinho;
+3. descarrega o modelo para a pasta `s14-maos-ao-ar/` (não vai para o git).
+
+Essa primeira vez precisa de **internet** e demora uns minutos. Por isso:
+**corre-o uma vez em cada máquina antes da aula.** Daí em diante funciona
+offline.
+
+Abre em **ecrã inteiro** (`F` ou `F11` volta à janela) e começa por um treino
+dos gestos e por um nível 0 onde não se perdem corações.
+
+| | Com a mão | No teclado |
+|---|---|---|
+| andar | mostrar a mão à câmara | (anda sozinho) |
+| parar | tirar a mão da imagem | seta para baixo |
+| virar | levar a mão para o outro lado | setas esquerda / direita |
+| correr | levantar a mão bem alto | **Shift** |
+| saltar | fechar o punho | **Espaço** |
+| disparar | apontar com o indicador | **X** |
+
+Outras teclas: **P** pausa · **T** só teclado · **C** câmara seguinte ·
+**I** treino · **N** passar o nível (atalho do professor) · **Esc** sai.
+
+**Sem câmara, sem internet ou sem `mediapipe` para o Python da máquina, o jogo
+corre na mesma, só com o teclado**, e diz porquê no terminal e no ecrã de
+título. O guião completo está no `s14-maos-ao-ar/NOTAS.md`.
+
+Com o `uv` (o plano B da secção 1), a linha é
+`uv run --with pygame-ce --with mediapipe s14-maos-ao-ar/maos-ao-ar.py`.
+
+---
+
+## 7. Correr tudo de uma vez, para verificar
 
 Este comando abre e fecha **todas** as janelas, uma a uma, e diz se alguma
 rebentou. Cada uma fica aberta uns segundos.
@@ -412,7 +460,7 @@ exatamente o que se quer.
 
 ---
 
-## 7. Assets
+## 8. Assets
 
 As pastas `comum/assets/imagens/` e `comum/assets/sons/` vêm **vazias**, de
 propósito. Ver `comum/assets/LEIA-ME.md`.
@@ -423,7 +471,7 @@ aparece em vez do quadrado azul, **sem mexer numa linha de código**.
 
 ---
 
-## 8. Se alguma coisa correr mal
+## 9. Se alguma coisa correr mal
 
 | Sintoma | Causa |
 |---|---|
@@ -433,12 +481,15 @@ aparece em vez do quadrado azul, **sem mexer numa linha de código**.
 | A janela abre preta | Se for o `s07/erro-proposital.py`, é suposto. Nos outros, é bug |
 | A janela não fecha no X | É bug |
 | Uma imagem não aparece e fica o retângulo | Nome do ficheiro errado, ou pasta errada. É o comportamento normal sem assets |
+| s14: «sem câmara» no título | Lê a linha laranja, que diz o motivo. No Mac, a causa habitual é a permissão: Definições do Sistema → Privacidade e Segurança → Câmara. Depois tecla **C** |
+| s14: abre a câmara errada | Tecla **C**, ou muda a constante `CAMARA` no topo do ficheiro |
+| s14: `Password:` no terminal ao arrancar | É o `sudo` a instalar o `mediapipe` no Python do sistema. Escreve a palavra-passe de administrador (não aparece nada enquanto escreves) |
 | O programa parece bloqueado no terminal | É um `input()` à espera de Enter |
 | Um ciclo não pára | `Ctrl + C` |
 
 ---
 
-## 9. Verificação num servidor, sem ecrã
+## 10. Verificação num servidor, sem ecrã
 
 Em CI ou por SSH, sem monitor, os ficheiros de Pygame precisam de um driver
 falso:
