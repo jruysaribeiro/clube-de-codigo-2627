@@ -38,7 +38,32 @@
   #escolher { padding: 24px 20px 40px; overflow: auto; }
   #escolher h1 { margin: 0 0 4px; font-size: 26px; color: var(--amarelo); letter-spacing: .02em; }
   #escolher > p { margin: 0 0 22px; color: var(--fraco); }
-  .jogo { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 18px; margin-bottom: 18px; }
+  .cartoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 18px; max-width: 1240px; }
+  .cartao {
+    display: flex; flex-direction: column; padding: 0; overflow: hidden; text-align: left;
+    background: var(--painel); border: 1px solid var(--linha); border-radius: 14px;
+    transition: transform .12s, border-color .12s;
+  }
+  .cartao:hover { transform: translateY(-3px); }
+  .cartao .capa { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #10101a; border-bottom: 1px solid var(--linha); }
+  .cartao div.capa { display: grid; place-items: center; font-size: 46px; font-weight: 700; color: var(--linha); }
+  .cartao .dentro { display: flex; flex-direction: column; gap: 5px; padding: 14px 16px 16px; flex: 1; }
+  .cartao strong { font-size: 21px; }
+  .cartao .descricao { color: var(--fraco); }
+  .cartao .tem { margin-top: auto; padding-top: 8px; color: var(--amarelo); font-size: 14px; }
+  .cartao .erro { color: var(--laranja); font-size: 14px; }
+  @media (prefers-reduced-motion: reduce) { .cartao { transition: none; } .cartao:hover { transform: none; } }
+  #todos { margin-bottom: 16px; }
+  .jogo .cabeca { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 18px; }
+  .jogo .cabeca > div { flex: 1; min-width: 220px; }
+  .jogar { border-color: var(--verde); color: var(--verde); font-weight: 600; }
+  .jogar:hover { border-color: var(--verde); background: rgba(95, 208, 122, .12); }
+  .jogo .jogar { font-size: 17px; padding: 10px 18px; }
+  .podes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 4px 0 6px; padding: 0; list-style: none; }
+  .podes li { background: var(--painel-2); border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--fraco); }
+  .podes b { display: block; color: var(--texto); font-size: 15px; margin-bottom: 2px; }
+  .jogo h3 small { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 14px; margin-left: 8px; }
+  .jogo { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 18px; margin-bottom: 18px; max-width: 1240px; }
   .jogo h2 { margin: 0; font-size: 21px; }
   .jogo .descricao { margin: 2px 0 14px; color: var(--fraco); }
   .jogo h3 { margin: 14px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .09em; color: var(--fraco); font-weight: 600; }
@@ -56,6 +81,13 @@
   .lados { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr); }
   .lado-jogo { padding: 14px; overflow: auto; border-right: 1px solid var(--linha); min-width: 0; }
   .lado-codigo { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  /* o jogo inteiro: sem codigo ao lado */
+  .so-jogo .lados { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  .so-jogo .lado-codigo, .so-jogo #jogar-tudo { display: none; }
+  .so-jogo .lado-jogo { border: 0; }
+  #aviso-jogo { margin: 10px auto 0; max-width: 720px; text-align: center; font-size: 15px; color: var(--vermelho); }
+  #aviso-jogo small { display: block; color: var(--fraco); font-family: var(--letra-codigo); font-size: 12px; }
+  #jogar-outra { display: block; margin: 10px auto 0; }
   #jogo { margin: 0 auto; border: 3px solid var(--linha); border-radius: 10px; overflow: hidden; line-height: 0; background: #000; cursor: crosshair; outline: none; }
   #jogo:focus { border-color: var(--amarelo); }
   #imagem { display: block; width: 100%; height: auto; user-select: none; }
@@ -154,7 +186,8 @@
 
 <main id="escolher">
   <h1>Oficina</h1>
-  <p>Escolhe uma coisa para mudar. Vês só o código dela, e o jogo muda enquanto escreves.</p>
+  <p id="lema"></p>
+  <button id="todos" hidden>&larr; Todos os jogos</button>
   <div id="jogos"></div>
 </main>
 
@@ -162,12 +195,15 @@
   <div class="topo">
     <button id="voltar">&larr; Escolher outra coisa</button>
     <h1><small id="nome-jogo"></small><span id="titulo"></span></h1>
+    <button id="jogar-tudo" class="jogar">&#9654; Jogar o jogo inteiro</button>
   </div>
   <div class="lados">
   <section class="lado-jogo">
     <div id="jogo" tabindex="0" aria-label="O jogo"><canvas id="imagem"></canvas></div>
     <p class="foco" id="foco"></p>
     <p class="dica" id="dica"></p>
+    <p id="aviso-jogo" role="status" hidden></p>
+    <button id="jogar-outra" class="jogar" hidden>&#9654; Jogar outra vez</button>
   </section>
   <section class="lado-codigo">
   <details id="caixa-ajuda">
@@ -194,10 +230,10 @@
     <div id="conversa" aria-live="polite"></div>
     <div class="atalhos">
       <button type="button" id="atalho-erro" hidden>Corrige-me este erro</button>
-      <button type="button" id="atalho-explica">O que faz este código?</button>
+      <span id="sugestoes" class="atalhos" style="padding:0"></span>
     </div>
     <form id="perguntar">
-      <input id="pergunta" maxlength="400" autocomplete="off" placeholder="Escreve a tua pergunta…" aria-label="Pergunta ao ajudante">
+      <input id="pergunta" maxlength="400" autocomplete="off" placeholder="Pergunta, ou pede uma mudança: «põe-no mais rápido»" aria-label="Pergunta ao ajudante">
       <button id="enviar-pergunta">Perguntar</button>
     </form>
   </div>
@@ -205,7 +241,7 @@
     <button id="repor">Repor o original</button>
     <button id="guardar">Guardar o meu jogo</button>
     <button id="reabrir" hidden>Pôr o jogo a correr outra vez</button>
-    <button id="pedir-ajuda" hidden>Pedir ajuda</button>
+    <button id="pedir-ajuda" hidden>Pedir ao ajudante</button>
   </div>
   </section>
   </div>
@@ -219,6 +255,11 @@ const $ = id => document.getElementById(id);
 const codigo = $("codigo");
 
 let jogoAberto = null;      // id do jogo
+let jogoVisto = null;       // o jogo cujas coisas estao a vista (null: os cartoes de todos)
+let escolhaAberta = null;   // a coisa aberta no editor
+let aJogarTudo = false;     // esta-se a jogar o jogo inteiro, sem codigo ao lado
+let voltarPara = null;      // a coisa a que se volta ao sair do jogo inteiro
+let haAjudante = false;     // ha computadores ajudantes na sala
 let ultimoPedido = 0;       // numero do ultimo codigo que o jogo aceitou receber
 let desde = 0;              // ultima mensagem do jogo que ja vimos
 let linhaMal = null;
@@ -246,10 +287,34 @@ function elemento(tipo, texto, classe) {
   return e;
 }
 
+function cartaoDoJogo(jogo) {
+  // O cartao de um jogo, na entrada: a fotografia, o nome e o que la ha para mudar.
+  const cartao = elemento("button", "", "cartao");
+  let capa;
+  if (jogo.capa) {
+    capa = elemento("img", "", "capa");
+    capa.src = "/api/capa?jogo=" + encodeURIComponent(jogo.id);
+    capa.alt = "";
+  } else {
+    capa = elemento("div", jogo.nome.slice(0, 1), "capa");
+  }
+  const dentro = elemento("span", "", "dentro");
+  dentro.append(elemento("strong", jogo.nome), elemento("span", jogo.descricao, "descricao"));
+  if (jogo.erro) {
+    dentro.append(elemento("span", jogo.erro, "erro"));
+  } else {
+    const grupos = [...new Set(jogo.escolhas.map(escolha => escolha.grupo))];
+    dentro.append(elemento("span", jogo.escolhas.length + " coisas para mudar: " + grupos.join(", ").toLowerCase(), "tem"));
+  }
+  cartao.append(capa, dentro);
+  cartao.onclick = () => { jogoVisto = jogo.id; mostrarJogos(); };
+  return cartao;
+}
+
 async function mostrarJogos() {
   $("editar").hidden = true;
   $("escolher").hidden = false;
-  history.replaceState(null, "", location.pathname);
+  history.replaceState(null, "", jogoVisto ? "#" + jogoVisto : location.pathname);
   aMostrar = aMostrar + 1;            // deixa de pedir a imagem do jogo
   clearInterval(aVer);
   const caixa = $("jogos");
@@ -261,17 +326,50 @@ async function mostrarJogos() {
     return;
   }
   caixa.textContent = "";
+  if (!jogos.some(jogo => jogo.id === jogoVisto)) jogoVisto = null;
+  $("todos").hidden = !jogoVisto;
+  $("lema").textContent = jogoVisto
+    ? "Escolhe uma coisa para mudar. Vês só o código dela, e o jogo muda enquanto escreves."
+    : "Escolhe um jogo. Lá dentro mudas uma coisa de cada vez, e o jogo muda enquanto escreves.";
+  caixa.className = jogoVisto ? "" : "cartoes";
+  if (!jogoVisto) {
+    for (const jogo of jogos) caixa.append(cartaoDoJogo(jogo));
+    return;
+  }
   for (const jogo of jogos) {
+    if (jogo.id !== jogoVisto) continue;
     const cartao = elemento("section", "", "jogo");
-    cartao.append(elemento("h2", jogo.nome), elemento("p", jogo.descricao, "descricao"));
+    const cabeca = elemento("div", "", "cabeca");
+    const nome = elemento("div");
+    nome.append(elemento("h2", jogo.nome), elemento("p", jogo.descricao, "descricao"));
+    const jogar = elemento("button", "\u25B6 Jogar o jogo inteiro", "jogar");
+    jogar.onclick = () => jogarTudo(jogo.id, null);
+    cabeca.append(nome, jogar);
+    cartao.append(cabeca);
     if (jogo.erro) cartao.append(elemento("p", jogo.erro));
+    // O que se pode fazer aqui, dito logo a entrada.
+    const podes = elemento("ul", "", "podes");
+    const pode = (titulo, texto) => {
+      const li = elemento("li");
+      li.append(elemento("b", titulo), texto);
+      podes.append(li);
+    };
+    pode("Mudar números, cores e nomes", "Escolhe uma coisa aqui em baixo. O jogo muda enquanto escreves.");
+    if (jogo.escolhas.some(escolha => escolha.grupo === "Regras do jogo"))
+      pode("Mudar as regras", "Nas Regras do jogo mudas a maneira como ele se comporta.");
+    pode("Pôr as tuas imagens", "Um desenho ou uma fotografia tua em vez da forma.");
+    if (haAjudante) pode("Pedir ao ajudante", "Pergunta o que não percebes, ou pede-lhe uma mudança.");
+    pode("Jogar o jogo inteiro", "Para veres como ficou com tudo o que mudaste.");
+    cartao.append(podes);
     const grupos = new Map();
     for (const escolha of jogo.escolhas) {
       if (!grupos.has(escolha.grupo)) grupos.set(escolha.grupo, []);
       grupos.get(escolha.grupo).push(escolha);
     }
     for (const [grupo, escolhas] of grupos) {
-      cartao.append(elemento("h3", grupo));
+      const titulo = elemento("h3", grupo);
+      if (jogo.grupos && jogo.grupos[grupo]) titulo.append(elemento("small", jogo.grupos[grupo]));
+      cartao.append(titulo);
       const linha = elemento("div", "", "coisas");
       for (const escolha of escolhas) {
         const botao = elemento("button", escolha.titulo);
@@ -329,6 +427,10 @@ async function abrir(jogo, escolha) {
     return;
   }
   jogoAberto = jogo;
+  jogoVisto = jogo;         // "Escolher outra coisa" volta as coisas deste jogo
+  escolhaAberta = escolha;
+  modoJogo(false);
+  mostrarSugestoes(dados.sugestoes);
   history.replaceState(null, "", "#" + jogo + "/" + escolha);   // recarregar a pagina volta aqui
   desde = dados.desde;
   ultimoPedido = 0;
@@ -350,7 +452,8 @@ async function abrir(jogo, escolha) {
   codigo.setSelectionRange(0, 0);     // senao o Safari abre o codigo ja puxado para a direita
   linhaMal = null;
   pintar();
-  dizer("espera", "Muda um número e vê o que acontece no jogo.");
+  dizer("espera", "Muda qualquer coisa e vê o que acontece no jogo."
+    + (haAjudante ? " Ou carrega em «Pedir ao ajudante» e pede-lhe a mudança." : ""));
   $("escolher").hidden = true;
   $("editar").hidden = false;
   codigo.focus();
@@ -410,6 +513,14 @@ async function verEstado() {
       fala.hidden = false;
       fala.textContent = (fala.textContent + "\n" + m.texto).trim().split("\n").slice(-6).join("\n");
       fala.scrollTop = fala.scrollHeight;
+    } else if (aJogarTudo) {
+      // No jogo inteiro nao ha editor: um erro aparece por baixo do jogo.
+      if (m.tipo === "erro") {
+        const aviso = $("aviso-jogo");
+        aviso.hidden = false;
+        aviso.textContent = "O jogo parou com um erro: " + m.texto;
+        aviso.append(elemento("small", m.detalhe));
+      }
     } else if (m.id === ultimoPedido || (m.tipo === "erro" && m.id == null)) {
       if (m.tipo === "aplicado" || m.tipo === "estavel") {
         const guardado = m.tipo === "estavel" ? " Ficou guardado." : "";
@@ -424,6 +535,7 @@ async function verEstado() {
     }
   }
   $("reabrir").hidden = estado.viva;
+  $("jogar-outra").hidden = estado.viva || !aJogarTudo;
   mostrarImagem(estado.imagem);
 }
 
@@ -464,7 +576,7 @@ function ponto(ev) {
 function mostrarFoco() {
   const noJogo = document.activeElement === jogo;
   $("foco").textContent = noJogo
-    ? "O teclado está no jogo. Clica no código para voltares a escrever."
+    ? (aJogarTudo ? "O teclado está no jogo." : "O teclado está no jogo. Clica no código para voltares a escrever.")
     : "Clica no jogo para jogares nele com o rato e o teclado.";
   $("foco").classList.toggle("no-jogo", noJogo);
 }
@@ -477,8 +589,9 @@ function acertarTamanho(largura, altura) {
   // Nunca mais alto do que o ecra: a largura maxima sai da forma do jogo.
   imagem.width = largura;
   imagem.height = altura;
-  const sobra = window.innerWidth > 860 ? "100vh - 190px" : "42vh";
-  jogo.style.maxWidth = "min(" + largura * 1.5 + "px, calc((" + sobra + ") * " + largura / altura + "))";
+  const inteiro = $("editar").classList.contains("so-jogo");
+  const sobra = inteiro ? "100vh - 150px" : window.innerWidth > 860 ? "100vh - 190px" : "42vh";
+  jogo.style.maxWidth = "min(" + largura * (inteiro ? 2 : 1.5) + "px, calc((" + sobra + ") * " + largura / altura + "))";
 }
 
 async function mostrarVideo() {
@@ -712,7 +825,20 @@ function limparConversa() {
   conversa = [];
   $("conversa").textContent = "";
   $("ajudante").hidden = true;
-  $("pedir-ajuda").textContent = "Pedir ajuda";
+  $("pedir-ajuda").textContent = "Pedir ao ajudante";
+}
+
+function mostrarSugestoes(lista) {
+  // Pedidos ja escritos, para se perceber o que se pode pedir.
+  if (!lista || !lista.length) lista = ["O que posso mudar aqui?", "Dá-me três ideias para experimentar", "O que faz este código?"];
+  const caixa = $("sugestoes");
+  caixa.textContent = "";
+  for (const frase of lista) {
+    const botao = elemento("button", frase);
+    botao.type = "button";
+    botao.onclick = () => perguntar(frase);
+    caixa.append(botao);
+  }
 }
 
 function linhasDe(texto) {
@@ -853,7 +979,7 @@ async function perguntar(texto) {
 $("pedir-ajuda").onclick = () => {
   const painel = $("ajudante");
   painel.hidden = !painel.hidden;
-  $("pedir-ajuda").textContent = painel.hidden ? "Pedir ajuda" : "Fechar a ajuda";
+  $("pedir-ajuda").textContent = painel.hidden ? "Pedir ao ajudante" : "Fechar o ajudante";
   if (!painel.hidden) $("pergunta").focus();
 };
 $("perguntar").onsubmit = evento => {
@@ -864,13 +990,63 @@ $("perguntar").onsubmit = evento => {
   perguntar(texto);
 };
 $("atalho-erro").onclick = () => perguntar("Porque é que dá erro? Corrige-o.");
-$("atalho-explica").onclick = () => perguntar("O que faz este código?");
+/* ---------------- o jogo inteiro ---------------- */
+// O jogo como ele e, do menu ao fim, com tudo o que ja foi mudado. Sem
+// codigo ao lado: e para experimentar a serio.
 
-pedir("/api/ajudante").then(dados => { $("pedir-ajuda").hidden = !dados.ha; }).catch(() => {});
+function modoJogo(inteiro) {
+  aJogarTudo = inteiro;
+  $("editar").classList.toggle("so-jogo", inteiro);
+  $("voltar").textContent = inteiro ? "\u2190 Voltar" : "\u2190 Escolher outra coisa";
+  $("aviso-jogo").hidden = true;
+  $("jogar-outra").hidden = true;
+  imagem.width = 0;          // o tamanho do jogo acerta-se outra vez com o primeiro frame
+}
+
+async function jogarTudo(jogoId, voltar) {
+  clearTimeout(espera);
+  let dados;
+  try {
+    dados = await pedir("/api/jogar", {jogo: jogoId});
+  } catch (erro) {
+    alert(erro.message);
+    return;
+  }
+  jogoAberto = jogoId;
+  jogoVisto = jogoId;
+  voltarPara = voltar;       // a coisa que estava aberta, para la voltar
+  history.replaceState(null, "", "#" + jogoId + "/jogar");
+  desde = dados.desde;
+  ultimoPedido = 0;
+  modoJogo(true);
+  mostrarVideo();
+  $("nome-jogo").textContent = dados.jogo + " \u203A";
+  $("titulo").textContent = "O jogo inteiro";
+  $("dica").textContent = "É o jogo como ele é, com tudo o que já mudaste.";
+  $("escolher").hidden = true;
+  $("editar").hidden = false;
+  jogo.focus();
+  mostrarFoco();
+  clearInterval(aVer);
+  aVer = setInterval(verEstado, 350);
+}
+
+$("jogar-tudo").onclick = () => jogarTudo(jogoAberto, escolhaAberta);
+$("jogar-outra").onclick = async () => {
+  $("jogar-outra").hidden = true;
+  $("aviso-jogo").hidden = true;
+  try { await pedir("/api/reabrir", {}); } catch (erro) { alert(erro.message); }
+  jogo.focus();
+};
 
 $("voltar").onclick = async () => {
   clearTimeout(espera);
   try { await pedir("/api/fechar", {}); } catch (erro) {}
+  if (aJogarTudo && voltarPara) {
+    abrir(jogoAberto, voltarPara);
+    return;
+  }
+  modoJogo(false);
   mostrarJogos();
 };
 $("repor").onclick = async () => {
@@ -895,9 +1071,19 @@ $("reabrir").onclick = async () => {
   }
 };
 
-const [jogoInicial, escolhaInicial] = decodeURIComponent(location.hash.slice(1)).split("/");
-if (jogoInicial && escolhaInicial) abrir(jogoInicial, escolhaInicial);
-else mostrarJogos();
+$("todos").onclick = () => { jogoVisto = null; mostrarJogos(); };
+
+async function arrancar() {
+  try {
+    haAjudante = (await pedir("/api/ajudante")).ha;
+  } catch (erro) {}
+  $("pedir-ajuda").hidden = !haAjudante;
+  const [jogoInicial, escolhaInicial] = decodeURIComponent(location.hash.slice(1)).split("/");
+  if (jogoInicial && escolhaInicial === "jogar") jogarTudo(jogoInicial, null);
+  else if (jogoInicial && escolhaInicial) abrir(jogoInicial, escolhaInicial);
+  else { jogoVisto = jogoInicial || null; mostrarJogos(); }
+}
+arrancar();
 </script>
 </body>
 </html>

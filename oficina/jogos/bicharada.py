@@ -14,6 +14,14 @@ NOME = "Bicharada"
 FICHEIRO = "s12-bicharada/bicharada.py"
 DESCRICAO = "Batalhas por turnos, com bichos muito portugueses."
 
+# Uma frase por grupo, para a pagina do jogo dizer o que la ha.
+SOBRE_OS_GRUPOS = {
+    "Bichos": "Tipo, vida, ataque, forma, cor. Podes pôr uma imagem tua.",
+    "Ataques": "O poder, a precisão e o efeito de cada ataque.",
+    "Treinadores": "Quem enfrentas, o que dizem e que bichos levam.",
+    "Tipos": "As cores dos tipos, e quem é forte contra quem.",
+}
+
 FORMAS = ["circulo", "quadrado", "triangulo", "gota"]
 EFEITOS = ["dano", "cura", "sobe_ataque", "sobe_defesa", "baixa_ataque", "baixa_defesa"]
 

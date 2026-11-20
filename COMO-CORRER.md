@@ -455,6 +455,17 @@ instala nada).
   abrir; com `--porta 9000` usa outra porta.
 - Não precisa de internet.
 
+O botão verde **Jogar o jogo inteiro** abre o jogo como ele é, com tudo o que
+já foi mudado, para experimentar a sério; **Voltar** regressa ao código.
+
+### Regras do jogo (só n'O Cerco, por agora)
+
+Além dos dados, O Cerco abre quatro **regras**: quem a torre ataca, o que
+faz ao disparar, o que acontece a um inimigo atingido e como anda um
+inimigo. São funções pequenas do jogo: é aqui que se escreve (ou se pede ao
+ajudante) um `if` que muda o comportamento. Se a regra nova rebentar, o jogo
+volta à anterior e mostra o erro.
+
 ### Imagens
 
 Nas coisas que no código dizem `"imagem": "soldado.png"` aparece o botão

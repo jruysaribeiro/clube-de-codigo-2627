@@ -23,6 +23,7 @@ import io
 import json
 import os
 import queue
+import re
 import socket
 import struct
 import sys
@@ -101,6 +102,15 @@ def ouvir():
 def explicar(erro):
     if isinstance(erro, KeyError):
         return "Falta " + repr(erro.args[0]) + ". Apagaste-o, ou mudaste-lhe o nome?"
+    if isinstance(erro, UnboundLocalError):
+        nome = re.search(r"variable '(\w+)'", str(erro))
+        nome = nome.group(1) if nome else "esse nome"
+        return ('Para mudar "' + nome + '" dentro de uma função, a primeira linha dela tem de ser '
+                '"global ' + nome + '".')
+    if isinstance(erro, RecursionError):
+        return "Há uma função que se chama a si própria sem nunca parar."
+    if isinstance(erro, AttributeError):
+        return "O código pede uma coisa que não existe: " + str(erro) + "."
     if isinstance(erro, NameError):
         nome = getattr(erro, "name", None) or "?"
         return 'O Python não conhece "' + nome + '". Faltam as aspas, ou está mal escrito?'
@@ -137,6 +147,22 @@ def mensagem_de_erro(erro, ficheiro, numero):
 
 class Sair(BaseException):
     pass
+
+
+JOGAR = "jogar"      # a "escolha" que quer dizer: o jogo inteiro, sem palco nenhum
+
+
+class PalcoLivre:
+    # Para jogar o jogo inteiro, tal como ele e: nao prepara nada, nao
+    # mostra nada por cima, nao verifica nada.
+    def verificar(self, ns):
+        return [], []
+
+    def ao_mudar(self, ns):
+        pass
+
+    def quadro(self, ns, pygame):
+        pass
 
 
 class Corrida:
@@ -178,6 +204,9 @@ class Corrida:
 
         pygame.display.flip = flip
         pygame.display.update = update
+        # Sem janela nao ha ecra inteiro para ligar ou desligar (e ha jogos
+        # que rebentavam ao tentar).
+        pygame.display.toggle_fullscreen = lambda *args, **kwargs: None
         # Nao ha janela, por isso o rato e o teclado sao os da pagina.
         pygame.mouse.get_pos = lambda: corrida.rato
         pygame.mouse.get_pressed = lambda *args, **kwargs: (1 in corrida.botoes, 2 in corrida.botoes, 3 in corrida.botoes)
@@ -256,7 +285,9 @@ class Corrida:
 
         if self.em_prova is not None:
             self.quadros = self.quadros + 1
-            if self.quadros >= QUADROS_DE_PROVA:
+            # (Um palco pode pedir uma prova mais longa: uma regra nova so
+            # mostra o que vale quando chega a vez de ser usada.)
+            if self.quadros >= getattr(self.palco, "quadros_de_prova", QUADROS_DE_PROVA):
                 self.fonte_boa = self.fonte
                 enviar({"tipo": "estavel", "id": self.em_prova})
                 self.em_prova = None
@@ -301,13 +332,19 @@ class Corrida:
             # Uma linha "NOME = ..." apagada nao rebenta logo (o jogo ainda
             # se lembra do valor antigo), mas o ficheiro ficava sem ela e o
             # jogo ja nao abria da proxima vez.
+            antes = ast.parse(self.fonte)
             agora = blocos.nomes_dados(arvore)
-            em_falta = [nome for nome in blocos.nomes_dados(ast.parse(self.fonte)) if nome not in agora]
+            funcoes = blocos.nomes_das_funcoes(arvore)
+            em_falta = ['Falta a linha "' + nome + ' = ...". O jogo precisa dela: '
+                        "escreve-a outra vez, ou carrega em Repor o original."
+                        for nome in blocos.nomes_dados(antes) if nome not in agora]
+            # O mesmo para uma funcao apagada, ou a que mudaram o nome.
+            em_falta += ['Falta a função "' + nome + '". O jogo chama-a por esse nome: '
+                         "não lhe mudes o nome nem a apagues."
+                         for nome in blocos.nomes_das_funcoes(antes) if nome not in funcoes]
+            em_falta += blocos.proibidos(nos)
             if em_falta:
-                enviar({"tipo": "problemas", "id": numero, "avisos": [],
-                        "problemas": ['Falta a linha "' + nome + ' = ...". O jogo precisa dela: '
-                                      "escreve-a outra vez, ou carrega em Repor o original."
-                                      for nome in em_falta]})
+                enviar({"tipo": "problemas", "id": numero, "avisos": [], "problemas": em_falta})
                 return
             codigo = compile(ast.Module(body=nos, type_ignores=[]), self.ficheiro, "exec")
             # Primeiro num rascunho: uma copia dos nomes do jogo. Se o
@@ -334,7 +371,14 @@ class Corrida:
         # ultimo codigo bom e recomeca; a crianca ve o erro no editor.
         while True:
             self.ns = {"__name__": "__main__", "__file__": self.ficheiro}
-            self.palco = self.config.criar_palco(self.escolha)
+            if self.escolha == JOGAR:
+                # (Ha jogos que precisam de um aviso antes de arrancar: o das
+                # maos tem de saber que aqui nao ha camara.)
+                if hasattr(self.config, "antes_de_jogar"):
+                    self.config.antes_de_jogar()
+                self.palco = PalcoLivre()
+            else:
+                self.palco = self.config.criar_palco(self.escolha)
             try:
                 exec(compile(self.fonte, self.ficheiro, "exec"), self.ns)
                 enviar({"tipo": "fechou"})

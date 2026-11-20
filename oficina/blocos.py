@@ -19,6 +19,25 @@ def instrucao(arvore, nome):
     return None
 
 
+def funcao(arvore, nome):
+    # A funcao "def nome(...)" escrita encostada a margem, ou None.
+    for no in arvore.body:
+        if isinstance(no, ast.FunctionDef) and no.name == nome:
+            return no
+    return None
+
+
+def comentarios_a_partir_de(linhas, inicio):
+    # O bloco de comentarios que comeca na linha que diz "inicio", sem os #.
+    for i, linha in enumerate(linhas):
+        if linha.strip() == inicio:
+            fim = i
+            while fim < len(linhas) and linhas[fim].lstrip().startswith("#"):
+                fim = fim + 1
+            return ajuda_acima(linhas, fim + 1)
+    return ""
+
+
 def entradas(no):
     # As entradas de uma lista [...] ou de um dicionario {...}:
     # devolve [(valor_ou_chave, primeira_linha, ultima_linha), ...].
@@ -124,6 +143,41 @@ def nomes_dados(arvore):
                 if isinstance(alvo, ast.Name) and alvo.id not in nomes:
                     nomes.append(alvo.id)
     return nomes
+
+
+def nomes_das_funcoes(arvore):
+    # Os nomes das funcoes escritas encostadas a margem.
+    return [no.name for no in arvore.body if isinstance(no, ast.FunctionDef)]
+
+
+# O que o codigo escrito na Oficina nao pode fazer: ir buscar outros modulos,
+# mexer em ficheiros, correr outros programas. Um jogo nao precisa de nada
+# disto, e um engano (da crianca ou do ajudante) podia estragar o computador.
+# Nao e uma muralha a prova de tudo: e uma vedacao contra o que e obvio.
+NOMES_PROIBIDOS = {
+    "open", "exec", "eval", "compile", "__import__", "input", "breakpoint", "exit", "quit",
+    "globals", "locals", "vars", "getattr", "setattr", "delattr",
+    "os", "sys", "subprocess", "shutil", "socket", "pathlib", "Path", "importlib",
+}
+
+
+def proibidos(nos):
+    # As frases a mostrar, uma por cada coisa proibida que o codigo usa.
+    frases = []
+
+    def juntar(frase):
+        if frase not in frases:
+            frases.append(frase)
+
+    for raiz in nos:
+        for no in ast.walk(raiz):
+            if isinstance(no, (ast.Import, ast.ImportFrom)):
+                juntar('Aqui não se pode usar "import". O jogo já tem tudo o que precisa.')
+            elif isinstance(no, ast.Name) and no.id in NOMES_PROIBIDOS:
+                juntar('Aqui não se pode usar "' + no.id + '": serve para mexer no computador, não no jogo.')
+            elif isinstance(no, ast.Attribute) and no.attr.startswith("__"):
+                juntar('Aqui não se pode usar "' + no.attr + '".')
+    return frases
 
 
 def nos_da_regiao(arvore, inicio, fim):

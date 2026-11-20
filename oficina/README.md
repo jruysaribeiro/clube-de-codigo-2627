@@ -15,12 +15,45 @@ Com o ambiente virtual activado (ver `COMO-CORRER.md`, secção 1):
 python3 oficina/oficina.py
 ```
 
-Abre uma página no browser, com o jogo à esquerda e o código à direita.
+Abre uma página no browser com um cartão por jogo. Dentro de cada jogo
+escolhe-se a coisa a mudar, e fica o jogo à esquerda e o código à direita.
 O jogo é o verdadeiro, a correr no computador: a página mostra a imagem
 dele e passa-lhe o rato e o teclado (clica-se no jogo para jogar, no
 código para escrever). Para fechar: `Ctrl+C` no terminal.
 
 Não precisa de internet nem de instalar mais nada.
+
+## Jogar o jogo inteiro
+
+O botão verde **Jogar o jogo inteiro** (na página de cada jogo e ao lado do
+código) abre o jogo como ele é, do menu ao fim, com tudo o que já foi
+mudado e sem código ao lado. **Voltar** regressa ao bocado que estava
+aberto.
+
+A página de cada jogo diz logo à entrada o que lá se pode fazer, e cada
+grupo de coisas tem uma frase a explicá-lo (`SOBRE_OS_GRUPOS`, no ficheiro
+do jogo em `oficina/jogos/`). O ajudante mostra pedidos já escritos para se
+perceber o que se lhe pode pedir (`SUGESTOES`, no `jogos/o_cerco.py`).
+
+## Regras do jogo
+
+N'O Cerco, além dos dados (inimigos, torres, mapa), abrem-se quatro
+**regras**: quem a torre ataca, o que a torre faz ao disparar, o que acontece
+a um inimigo atingido e como anda um inimigo. Cada uma é uma função pequena
+do jogo; mudá-la muda a maneira como o jogo se comporta. É aqui que se
+escreve um `if` a sério.
+
+- O palco das regras tem uma torre de cada e inimigos já a meio do caminho,
+  e marca com um círculo amarelo quem cada torre escolheu.
+- Uma regra nova é experimentada mais tempo antes de ser guardada. Se
+  rebentar, o jogo volta à anterior e o erro aparece com a linha.
+- O código escrito na Oficina não pode usar `import`, `open` nem outras
+  coisas que mexem no computador em vez de no jogo (lista em `blocos.py`).
+  É uma vedação contra o óbvio, não uma muralha.
+
+Para abrir regras noutro jogo: as funções têm de estar encostadas à margem
+no ficheiro do jogo, e a `regiao` devolve as linhas da função (ver `REGRAS`
+no `jogos/o_cerco.py`).
 
 ## Imagens
 
@@ -100,7 +133,9 @@ Se a coisa puder ter imagem, a `regiao` devolve também `"imagem"` (o nome do
 PNG escrito no código), e o jogo guarda as imagens que já leu num dicionário
 chamado `imagens_carregadas`, que a Oficina esvazia quando a imagem muda.
 
-Depois junta-se o nome à lista em `oficina/jogos/__init__.py`. O editor, o
+Depois junta-se o nome à lista em `oficina/jogos/__init__.py`, e uma
+fotografia do jogo (480×300, PNG) em `oficina/capas/` com o mesmo nome, para
+o cartão dele; sem fotografia o cartão mostra a primeira letra. O editor, o
 servidor e a troca de código ao vivo (`oficina.py`, `palco.py`,
 `editor.html`) são iguais para todos os jogos, e o ajudante (`ajudante.py`)
 também.

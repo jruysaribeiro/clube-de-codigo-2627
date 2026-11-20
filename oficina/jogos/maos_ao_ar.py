@@ -19,6 +19,15 @@ NOME = "Mãos ao Ar!"
 FICHEIRO = "s14-maos-ao-ar/maos-ao-ar.py"
 DESCRICAO = "Um jogo de plataformas. Aqui joga-se com o teclado."
 
+# Uma frase por grupo, para a pagina do jogo dizer o que la ha.
+SOBRE_OS_GRUPOS = {
+    "Inimigos": "Vida, velocidade, tamanho, cor. Podes pôr uma imagem tua.",
+    "O herói": "As cores do Faísca, ou uma imagem tua.",
+    "Mundos": "As cores de cada mundo.",
+    "Afinar o jogo": "Os saltos, as velocidades, as vidas, as cores e os textos.",
+    "Níveis": "Cada nível é desenhado com letras: muda uma letra e muda o nível.",
+}
+
 # As letras que o mapa de um nivel conhece, fora as dos inimigos.
 LETRAS_DO_MAPA = ".#=%BM^~ohPFc"
 JEITOS = ["andar", "saltar", "voar", "carregar", "canhao", "chefe"]
@@ -800,7 +809,11 @@ class Palco:
         return folha
 
 
-def criar_palco(escolha):
+def antes_de_jogar():
     # Isto corre antes do codigo do jogo: e aqui que se lhe diz "so teclado".
     os.environ["MAOS_AO_AR_SO_TECLADO"] = "1"
+
+
+def criar_palco(escolha):
+    antes_de_jogar()
     return Palco(escolha)

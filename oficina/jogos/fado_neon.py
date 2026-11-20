@@ -20,6 +20,15 @@ NOME = "FADO//NEON"
 FICHEIRO = "s10-jogo-do-ano/fado-neon.py"
 DESCRICAO = "Um roguelite de saudade e neon. Jogo do Ano 2026."
 
+# Uma frase por grupo, para a pagina do jogo dizer o que la ha.
+SOBRE_OS_GRUPOS = {
+    "Inimigos": "Tamanho, vida, velocidade, cor. Podes pôr uma imagem tua.",
+    "Tu": "As tuas vidas, os tiros, a investida e o laser.",
+    "Ondas": "Quantas ondas há e como vão ficando mais difíceis.",
+    "Cartas": "As melhorias que aparecem entre as ondas.",
+    "Textos": "As frases que o jogo diz.",
+}
+
 # Os bocados que sao so numeros: cada escolha mostra umas quantas linhas
 # "NOME = numero" seguidas, com a explicacao que o ficheiro ja traz por
 # baixo de cada uma.

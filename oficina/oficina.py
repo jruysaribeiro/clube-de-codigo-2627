@@ -49,6 +49,8 @@ import blocos  # noqa: E402
 from jogos import JOGOS  # noqa: E402
 
 ORIGINAIS = os.path.join(AQUI, ".originais")
+JOGAR = "jogar"               # a "escolha" que quer dizer: o jogo inteiro (ver palco.py)
+CAPAS = os.path.join(AQUI, "capas")       # a fotografia de cada jogo, para o cartao dele
 IMAGENS = os.path.join(RAIZ, "comum", "assets", "imagens")    # onde os jogos procuram as imagens
 NOME_DE_IMAGEM = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,59}\.png", re.IGNORECASE)
 PNG = b"\x89PNG\r\n\x1a\n"       # todos os ficheiros PNG comecam assim
@@ -188,6 +190,8 @@ class Sessao:
 
     def lancar(self):
         self.parar()
+        with self.ha_quadro:
+            self.quadro = None       # senao a pagina mostrava a ultima imagem do jogo anterior
         ambiente = dict(os.environ)
         ambiente["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
         ambiente["PYTHONIOENCODING"] = "utf-8"
@@ -273,7 +277,9 @@ class Sessao:
                 config = configuracao(nome)
             except ImportError:
                 continue        # esse jogo ainda nao tem ficheiro em oficina/jogos/
-            jogo = {"id": nome, "nome": config.NOME, "descricao": config.DESCRICAO, "escolhas": [], "erro": None}
+            jogo = {"id": nome, "nome": config.NOME, "descricao": config.DESCRICAO, "escolhas": [], "erro": None,
+                    "grupos": getattr(config, "SOBRE_OS_GRUPOS", {}),
+                    "capa": os.path.isfile(os.path.join(CAPAS, nome + ".png"))}
             try:
                 fonte, _ = ler(caminho_do_jogo(config))
                 jogo["escolhas"] = config.escolhas(fonte)
@@ -313,11 +319,32 @@ class Sessao:
                 "codigo": "\n".join(blocos.tirar_margem(bloco, self.margem)),
                 "titulo": regiao["titulo"], "ajuda": regiao["ajuda"], "dica": regiao["dica"],
                 "jogo": config.NOME, "desde": self.contador, "imagem": self.estado_da_imagem(),
+                "sugestoes": regiao.get("sugestoes") or [],
             }
+
+    def jogar(self, jogo):
+        # O jogo inteiro, como ele e, com tudo o que ja foi mudado: para
+        # experimentar a serio. Aqui nao ha codigo aberto.
+        with self.tranca:
+            config = configuracao(jogo)
+            self.jogo = jogo
+            self.config = config
+            self.escolha = JOGAR
+            self.antes = []
+            self.depois = []
+            self.margem = ""
+            self.titulo = ""
+            self.ajuda = ""
+            self.imagem = None
+            self.pedidos = {}
+            self.mensagens = []
+            self.a_provar = None
+            self.lancar()
+            return {"jogo": config.NOME, "desde": self.contador}
 
     def codigo(self, texto):
         with self.tranca:
-            if self.config is None:
+            if self.config is None or self.escolha == JOGAR:
                 raise Falha("Ainda não escolheste nada.")
             bloco = texto.replace("\r\n", "\n").rstrip().split("\n")
             inicio = len(self.antes) + 1
@@ -345,7 +372,7 @@ class Sessao:
 
     def original(self):
         with self.tranca:
-            if self.config is None:
+            if self.config is None or self.escolha == JOGAR:
                 raise Falha("Ainda não escolheste nada.")
             fonte, _ = ler(caminho_do_original(self.config))
             regiao = self.config.regiao(fonte, self.escolha)
@@ -367,7 +394,8 @@ class Sessao:
         self.lancar()
         self.receber({
             "tipo": "erro", "id": numero, "linhas": [],
-            "texto": "O jogo ficou preso com este código. Há algum número grande demais? "
+            "texto": "O jogo ficou preso com este código. Há algum número grande demais, "
+                     "ou um ciclo que nunca acaba? "
                      "Voltei a abrir o jogo como estava antes.",
             "detalhe": "sem resposta ao fim de " + str(PACIENCIA) + " segundos",
         })
@@ -480,7 +508,7 @@ class Sessao:
         # Devolve a resposta aos bocadinhos. O codigo e o erro vem da
         # pagina: e o que o aluno esta a ver, mesmo que ainda nao funcione.
         with self.tranca:
-            if self.config is None:
+            if self.config is None or self.escolha == JOGAR:
                 raise Falha("Ainda não escolheste nada.")
             pergunta = str(dados.get("pergunta") or "").strip()
             if pergunta == "":
@@ -573,6 +601,14 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(lambda: sessao.estado(desde))
         elif url.path == "/api/quadro":
             self.quadro(int(parametros.get("depois", ["0"])[0]))
+        elif url.path == "/api/capa":
+            nome = parametros.get("jogo", [""])[0]
+            caminho = os.path.join(CAPAS, nome + ".png")
+            if nome in JOGOS and os.path.isfile(caminho):
+                with open(caminho, "rb") as f:
+                    self.responder(200, f.read(), "image/png")
+            else:
+                self.responder(404, {"falha": "Não existe."})
         elif url.path == "/api/imagem":
             try:
                 self.responder(200, sessao.ler_imagem(), "image/png")
@@ -645,6 +681,8 @@ class Pedido(BaseHTTPRequestHandler):
         caminho = urlparse(self.path).path
         if caminho == "/api/abrir":
             self.tratar(lambda: sessao.abrir(dados.get("jogo"), str(dados.get("escolha"))))
+        elif caminho == "/api/jogar":
+            self.tratar(lambda: sessao.jogar(dados.get("jogo")))
         elif caminho == "/api/codigo":
             self.tratar(lambda: sessao.codigo(str(dados.get("codigo", ""))))
         elif caminho == "/api/original":

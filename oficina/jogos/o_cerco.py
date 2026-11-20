@@ -6,6 +6,7 @@
 # Por isso tudo o que se ve e desenhado pelo codigo do proprio jogo.
 
 import ast
+import inspect
 
 import blocos
 
@@ -13,7 +14,41 @@ NOME = "O Cerco"
 FICHEIRO = "s13-o-cerco/o-cerco.py"
 DESCRICAO = "Um tower defense. Guimarães, 1128."
 
+# Uma frase por grupo, para a pagina do jogo dizer o que la ha.
+SOBRE_OS_GRUPOS = {
+    "Inimigos": "Vida, velocidade, cor, tamanho. Podes pôr uma imagem tua.",
+    "Torres": "Custo, alcance, dano, efeito. Podes pôr uma imagem tua.",
+    "Mapa": "O caminho, desenhado com letras.",
+    "Regras do jogo": "Aqui mudas a maneira como o jogo se comporta: é programar a sério.",
+}
+
+# Pedidos ja escritos para o ajudante, para se perceber o que se pode pedir.
+SUGESTOES = {
+    "inimigo": ["Põe-no mais rápido mas com menos vida", "Muda-lhe a cor para verde", "O que quer dizer cada número?"],
+    "torre": ["Faz esta torre disparar mais depressa", "Dá-lhe mais alcance, mas mais cara", "O que faz o efeito?"],
+    "mapa": ["Como é que desenho um caminho novo?", "O que quer dizer cada letra?"],
+    "escolher_alvo": ["Faz as torres atacarem o inimigo com menos vida", "Faz as torres atacarem o que está mais perto",
+                      "Explica-me esta função linha a linha"],
+    "disparar": ["Faz o Besteiro disparar duas setas de cada vez", "Faz a pedra do Trabuco voar mais depressa",
+                 "Explica-me esta função linha a linha"],
+    "magoar": ["Quero golpes críticos: às vezes o dano conta a dobrar", "Dá 1 de ouro por cada golpe que acerta",
+               "Explica-me esta função linha a linha"],
+    "mover_inimigo": ["Faz os inimigos acelerarem quando têm pouca vida", "Faz os inimigos pararem um bocadinho de vez em quando",
+                      "Explica-me esta função linha a linha"],
+}
+
 EFEITOS = ["tiro", "explosao", "area", "golpe"]
+
+# As regras: funcoes do jogo que se podem mudar. Para cada uma, o titulo que
+# aparece na Oficina, e o que ela recebe (o jogo chama-a assim, por isso nao
+# pode mudar).
+REGRAS = {
+    "escolher_alvo": ("Quem a torre ataca", ["torre"]),
+    "disparar": ("O que a torre faz ao disparar", ["torre", "alvo"]),
+    "magoar": ("O que acontece a um inimigo atingido", ["inimigo", "dano"]),
+    "mover_inimigo": ("Como anda um inimigo", ["inimigo"]),
+}
+INICIO_DAS_REGRAS = "# --- As regras do jogo ---"
 
 DICAS = {
     "inimigo": "O inimigo anda sozinho pelo caminho. "
@@ -22,6 +57,9 @@ DICAS = {
              "Clica na relva para pôr mais; as teclas 1 2 3 4 escolhem outra torre.",
     "mapa": "Cada letra é um quadrado. Muda uma letra e vê o mapa mudar. "
             "Os inimigos andam pelo caminho para veres por onde ele vai.",
+    "regra": "Isto é uma regra do jogo: muda-a e o jogo passa a comportar-se de outra maneira. "
+             "Há uma torre de cada e inimigos de todos, para veres logo a diferença. "
+             "O círculo amarelo marca quem cada torre escolheu.",
 }
 
 
@@ -49,6 +87,10 @@ def escolhas(fonte):
 
     if blocos.instrucao(arvore, "MAPA") is not None:
         lista.append({"id": "mapa", "grupo": "Mapa", "titulo": "O mapa"})
+
+    for nome in REGRAS:
+        if blocos.funcao(arvore, nome) is not None:
+            lista.append({"id": "regra:" + nome, "grupo": "Regras do jogo", "titulo": REGRAS[nome][0]})
     return lista
 
 
@@ -59,13 +101,26 @@ def regiao(fonte, escolha):
     arvore = ast.parse(fonte)
     linhas = fonte.split("\n")
     tipo, _, numero = escolha.partition(":")
+    if tipo == "regra":
+        # Uma regra e uma funcao inteira. A ajuda junta o que se pode usar
+        # dentro de qualquer regra ao que o ficheiro diz sobre esta.
+        no = blocos.funcao(arvore, numero) if numero in REGRAS else None
+        if no is None:
+            return None
+        geral = blocos.comentarios_a_partir_de(linhas, INICIO_DAS_REGRAS)
+        ajuda = blocos.ajuda_acima(linhas, no.lineno)
+        if geral and geral != ajuda:
+            ajuda = ajuda + "\n\n" + geral
+        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda, "dica": DICAS["regra"],
+                "titulo": REGRAS[numero][0], "imagem": None, "sugestoes": SUGESTOES[numero]}
     nomes = {"inimigo": "INIMIGOS", "torre": "TORRES", "mapa": "MAPA"}
     if tipo not in nomes:
         return None
     no = blocos.instrucao(arvore, nomes[tipo])
     if no is None:
         return None
-    resposta = {"ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo], "imagem": None}
+    resposta = {"ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo], "imagem": None,
+                "sugestoes": SUGESTOES[tipo]}
 
     if tipo == "mapa":
         resposta.update(inicio=no.lineno, fim=no.end_lineno, titulo="O mapa")
@@ -258,6 +313,21 @@ def _ver_mapa(ns, problemas, avisos):
         avisos.append("O ecrã só mostra 20 letras de largura e 13 linhas. O resto fica de fora.")
 
 
+def _ver_regras(ns, problemas, avisos):
+    # O jogo chama cada regra pelo nome e da-lhe sempre as mesmas coisas.
+    for nome in REGRAS:
+        esperado = REGRAS[nome][1]
+        funcao = ns.get(nome)
+        como = "def " + nome + "(" + ", ".join(esperado) + "):"
+        if not inspect.isfunction(funcao):
+            problemas.append('"' + nome + '" tem de ser uma função. A primeira linha é: ' + como)
+            continue
+        recebe = list(inspect.signature(funcao).parameters)
+        if len(recebe) != len(esperado):
+            problemas.append("Esta função tem de receber " + ", ".join(esperado) + ", nem mais nem menos. "
+                             "A primeira linha tem de ser: " + como)
+
+
 # =====================================================================
 #                              O PALCO
 # =====================================================================
@@ -272,6 +342,11 @@ class Palco:
         self.espera = 0          # frames ate ao proximo inimigo
         self.vez = 0             # qual o proximo inimigo, quando vem todos
         self.letra = None
+        self.regra = numero if tipo == "regra" else None
+        if tipo == "regra":
+            # Uma regra nova so mostra o que vale quando chega a vez de ser
+            # usada (a torre disparar, o golpe acertar): prova-se mais tempo.
+            self.quadros_de_prova = 150
 
     def verificar(self, ns):
         problemas = []
@@ -279,6 +354,7 @@ class Palco:
         _ver_inimigos(ns, problemas, avisos)
         _ver_torres(ns, problemas, avisos)
         _ver_mapa(ns, problemas, avisos)
+        _ver_regras(ns, problemas, avisos)
         return problemas, avisos
 
     # --- Preparar e voltar a preparar ---
@@ -288,6 +364,8 @@ class Palco:
         self.letra = pygame.font.SysFont(None, 22)
         self.preparado = True
         self.arrumar(ns)
+        if self.tipo == "regra":
+            self.espalhar_inimigos(ns)
 
     def ao_mudar(self, ns):
         # O codigo mudou. Os inimigos que andavam no ecra foram feitos com
@@ -301,6 +379,22 @@ class Palco:
         ns["efeitos"] = []
         self.espera = 0
         self.arrumar(ns)
+        if self.tipo == "regra":
+            self.espalhar_inimigos(ns)
+
+    def espalhar_inimigos(self, ns):
+        # Para a regra nova ter logo trabalho: inimigos ja a meio do caminho,
+        # ao pe das torres, em vez de esperar que eles la cheguem.
+        pontos = ns["CAMINHO_PONTOS"]
+        nomes = list(ns["INIMIGOS"])
+        for i in range(6):
+            indice = min(len(pontos) - 2, int(len(pontos) * (0.08 + 0.13 * i)))
+            inimigo = ns["criar_inimigo"](nomes[i % len(nomes)])
+            inimigo["x"] = pontos[indice][0]
+            inimigo["y"] = pontos[indice][1]
+            inimigo["ponto"] = indice + 1
+            inimigo["andado"] = indice * ns["TILE"]
+            ns["inimigos"].append(inimigo)
 
     def arrumar(self, ns):
         # Tira as torres que ja nao fazem sentido e garante que ha uma.
@@ -315,6 +409,14 @@ class Palco:
 
         if self.tipo == "mapa":
             return
+        if self.tipo == "regra":
+            # Uma torre de cada, espalhadas pelo caminho, prontas a disparar.
+            for tipo in range(min(4, len(ns["TORRES"]))):
+                if len([torre for torre in ns["torres"] if torre["tipo"] == tipo]) == 0:
+                    self.construir(ns, tipo, 0.12 + 0.2 * tipo)
+            for torre in ns["torres"]:
+                torre["recarga"] = min(torre["recarga"], 20)
+            return
         minha = 0
         if self.tipo == "torre":
             minha = min(self.numero, len(ns["TORRES"]) - 1)
@@ -326,12 +428,13 @@ class Palco:
         if self.tipo == "torre" and len(da_minha) > 0:
             ns["torre_escolhida"] = da_minha[0]   # fica com o alcance a vista
 
-    def construir(self, ns, tipo):
+    def construir(self, ns, tipo, onde=0.25):
         # Procura um quadrado de relva colado ao caminho, mais ou menos a
-        # um quarto do percurso, e constroi la com a funcao do jogo.
+        # um quarto do percurso (ou "onde", de 0 a 1), e constroi la com a
+        # funcao do jogo.
         pontos = ns["CAMINHO_PONTOS"]
         ocupados = [(torre["coluna"], torre["linha"]) for torre in ns["torres"]]
-        primeiro = len(pontos) // 4
+        primeiro = int(len(pontos) * onde)
         for i in range(len(pontos)):
             ponto = pontos[(primeiro + i) % len(pontos)]
             coluna = ponto[0] // ns["TILE"]
@@ -400,6 +503,13 @@ class Palco:
             texto = texto + "   efeito " + str(ficha["efeito"])
             modelo = {"tipo": tipo, "nivel": 1, "x": 0, "y": 0, "mira": (1, 0)}
             self.lupa(ns, pygame, ns["desenhar_torre"], modelo, ns["TILE"] + 8)
+        elif self.tipo == "regra":
+            texto = "Regra:   " + REGRAS[self.regra][0] + "   (a função " + self.regra + ")"
+            # Um circulo a volta de quem cada torre escolheu agora.
+            for torre in ns["torres"]:
+                alvo = ns["escolher_alvo"](torre)
+                if isinstance(alvo, dict) and "x" in alvo and "y" in alvo:
+                    pygame.draw.circle(ecra, ns["AMARELO"], (int(alvo["x"]), int(alvo["y"])), 16, 2)
         elif self.tipo == "mapa":
             mapa = ns["MAPA"]
             texto = "Mapa:   " + str(max(len(linha) for linha in mapa)) + " letras de largura   "
