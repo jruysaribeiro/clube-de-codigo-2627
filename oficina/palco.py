@@ -310,9 +310,11 @@ class Corrida:
         # Chegou (ou saiu) uma imagem da pasta. Os jogos guardam as imagens
         # que ja leram em "imagens_carregadas": esvazia-se, e eles voltam a
         # ir busca-las ao disco.
-        guardadas = (self.ns or {}).get("imagens_carregadas")
-        if isinstance(guardadas, dict):
-            guardadas.clear()
+        # (Com os sons e igual, em "sons_carregados".)
+        for nome in ("imagens_carregadas", "sons_carregados"):
+            guardadas = (self.ns or {}).get(nome)
+            if isinstance(guardadas, dict):
+                guardadas.clear()
         if hasattr(self.palco, "ao_mudar_imagens"):
             self.palco.ao_mudar_imagens(self.ns)
 

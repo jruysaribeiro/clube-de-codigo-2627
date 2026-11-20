@@ -51,10 +51,15 @@ from jogos import JOGOS  # noqa: E402
 ORIGINAIS = os.path.join(AQUI, ".originais")
 JOGAR = "jogar"               # a "escolha" que quer dizer: o jogo inteiro (ver palco.py)
 CAPAS = os.path.join(AQUI, "capas")       # a fotografia de cada jogo, para o cartao dele
-IMAGENS = os.path.join(RAIZ, "comum", "assets", "imagens")    # onde os jogos procuram as imagens
-NOME_DE_IMAGEM = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,59}\.png", re.IGNORECASE)
-PNG = b"\x89PNG\r\n\x1a\n"       # todos os ficheiros PNG comecam assim
-IMAGEM_MAXIMA = 1500000           # bytes (a pagina ja a encolhe antes de a mandar)
+# Imagens e sons: a pasta onde os jogos os procuram, como tem de ser o nome,
+# como comeca um ficheiro desses, e um nome de exemplo.
+FICHEIROS = {
+    "imagem": (os.path.join(RAIZ, "comum", "assets", "imagens"),
+               re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,59}\.png", re.IGNORECASE), b"\x89PNG\r\n\x1a\n", "dragao.png"),
+    "som": (os.path.join(RAIZ, "comum", "assets", "sons"),
+            re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,59}\.wav", re.IGNORECASE), b"RIFF", "explosao.wav"),
+}
+FICHEIRO_MAXIMO = 1500000         # bytes (a pagina ja os encolhe antes de os mandar)
 PACIENCIA = 6                 # segundos a espera de um jogo que nao responde
 
 
@@ -139,6 +144,7 @@ class Sessao:
         self.titulo = ""
         self.ajuda = ""
         self.imagem = None           # o nome do PNG que o bocado aberto usa, se usar
+        self.som = None              # e o do WAV
         self.ajudante = modulo_do_ajudante.Ajudante()
         self.fim_de_linha = "\n"
         self.processo = None
@@ -279,6 +285,7 @@ class Sessao:
                 continue        # esse jogo ainda nao tem ficheiro em oficina/jogos/
             jogo = {"id": nome, "nome": config.NOME, "descricao": config.DESCRICAO, "escolhas": [], "erro": None,
                     "grupos": getattr(config, "SOBRE_OS_GRUPOS", {}),
+                    "criaveis": getattr(config, "CRIAVEIS", {}),
                     "capa": os.path.isfile(os.path.join(CAPAS, nome + ".png"))}
             try:
                 fonte, _ = ler(caminho_do_jogo(config))
@@ -311,6 +318,7 @@ class Sessao:
             self.titulo = regiao["titulo"]
             self.ajuda = regiao["ajuda"]
             self.imagem = regiao.get("imagem")
+            self.som = regiao.get("som")
             self.pedidos = {}
             self.mensagens = []
             self.a_provar = None
@@ -319,6 +327,7 @@ class Sessao:
                 "codigo": "\n".join(blocos.tirar_margem(bloco, self.margem)),
                 "titulo": regiao["titulo"], "ajuda": regiao["ajuda"], "dica": regiao["dica"],
                 "jogo": config.NOME, "desde": self.contador, "imagem": self.estado_da_imagem(),
+                "som": self.estado_do_ficheiro("som"),
                 "sugestoes": regiao.get("sugestoes") or [],
             }
 
@@ -336,6 +345,7 @@ class Sessao:
             self.titulo = ""
             self.ajuda = ""
             self.imagem = None
+            self.som = None
             self.pedidos = {}
             self.mensagens = []
             self.a_provar = None
@@ -407,6 +417,7 @@ class Sessao:
                 "mensagens": [m for m in self.mensagens if m["n"] > desde],
                 "viva": self.viva(),
                 "imagem": self.estado_da_imagem(),
+                "som": self.estado_do_ficheiro("som"),
             }
 
     def entrada(self, eventos):
@@ -429,78 +440,111 @@ class Sessao:
             self.config = None
             return {"ok": True}
 
-    # --- A imagem do bocado aberto ---
-    # Ha coisas que no codigo dizem "imagem": "soldado.png". O jogo procura
-    # esse ficheiro em comum/assets/imagens/ e, se o encontrar, desenha a
-    # imagem em vez da forma. A crianca escolhe uma imagem na pagina e ela
-    # e guardada la, com esse nome.
+    # --- A imagem e o som do bocado aberto ---
+    # Ha coisas que no codigo dizem "imagem": "soldado.png" ou "som":
+    # "soldado.wav". O jogo procura esses ficheiros em comum/assets/ e, se os
+    # encontrar, mostra a imagem em vez da forma e toca o som. A crianca
+    # escolhe (ou desenha, ou grava) na pagina, e fica guardado la com esse nome.
 
     def ver_imagem(self, fonte):
+        # (Tambem ve o som: os dois nomes vem do mesmo sitio.)
         try:
             regiao = self.config.regiao(fonte, self.escolha)
         except (SyntaxError, ValueError):
             return
         self.imagem = regiao.get("imagem") if regiao else None
+        self.som = regiao.get("som") if regiao else None
+
+    def estado_do_ficheiro(self, tipo):
+        # None: este bocado nao usa imagem (ou som) nenhuma.
+        pasta, forma, _, exemplo = FICHEIROS[tipo]
+        nome = self.imagem if tipo == "imagem" else self.som
+        if self.config is None or not isinstance(nome, str):
+            return None
+        if not forma.fullmatch(nome):
+            return {"nome": nome, "ha": False, "versao": 0,
+                    "erro": "O nome tem de acabar em " + exemplo[-4:] + " e só pode ter letras sem acentos, "
+                            'números, - e _ (por exemplo "' + exemplo + '").'}
+        caminho = os.path.join(pasta, nome)
+        if not os.path.isfile(caminho):
+            return {"nome": nome, "ha": False, "versao": 0, "erro": None}
+        return {"nome": nome, "ha": True, "versao": os.stat(caminho).st_mtime_ns, "erro": None}
 
     def estado_da_imagem(self):
-        # None: este bocado nao usa imagem nenhuma.
-        if self.config is None or not isinstance(self.imagem, str):
-            return None
-        if not NOME_DE_IMAGEM.fullmatch(self.imagem):
-            return {"nome": self.imagem, "ha": False, "versao": 0,
-                    "erro": 'O nome da imagem tem de acabar em .png e só pode ter letras sem acentos, '
-                            'números, - e _ (por exemplo "dragao.png").'}
-        caminho = os.path.join(IMAGENS, self.imagem)
-        if not os.path.isfile(caminho):
-            return {"nome": self.imagem, "ha": False, "versao": 0, "erro": None}
-        return {"nome": self.imagem, "ha": True, "versao": os.stat(caminho).st_mtime_ns, "erro": None}
+        return self.estado_do_ficheiro("imagem")
 
-    def caminho_da_imagem(self):
-        estado = self.estado_da_imagem()
+    def caminho_do_ficheiro(self, tipo):
+        estado = self.estado_do_ficheiro(tipo)
         if estado is None:
-            raise Falha("Este bocado não usa nenhuma imagem.")
+            raise Falha("Este bocado não usa " + ("nenhuma imagem." if tipo == "imagem" else "nenhum som."))
         if estado["erro"]:
             raise Falha(estado["erro"])
-        return os.path.join(IMAGENS, estado["nome"])
+        return os.path.join(FICHEIROS[tipo][0], estado["nome"])
 
-    def avisar_das_imagens(self):
+    def avisar_dos_ficheiros(self):
         if self.viva():
             self.dizer({"tipo": "imagens"})
 
-    def por_imagem(self, dados):
-        # A pagina manda sempre um PNG, ja pequeno, escrito em base64.
+    def por_ficheiro(self, tipo, dados):
+        # A pagina manda sempre um PNG pequeno (ou um WAV curto), em base64.
         with self.tranca:
-            caminho = self.caminho_da_imagem()
+            caminho = self.caminho_do_ficheiro(tipo)
+            pasta, _, inicio, _ = FICHEIROS[tipo]
             try:
-                imagem = base64.b64decode(str(dados or ""), validate=True)
+                conteudo = base64.b64decode(str(dados or ""), validate=True)
             except ValueError:
-                raise Falha("A imagem chegou estragada. Tenta outra vez.")
-            if not imagem.startswith(PNG):
-                raise Falha("Isso não é uma imagem que eu saiba ler.")
-            if len(imagem) > IMAGEM_MAXIMA:
-                raise Falha("Essa imagem é grande demais.")
-            os.makedirs(IMAGENS, exist_ok=True)
+                raise Falha("O ficheiro chegou estragado. Tenta outra vez.")
+            if not conteudo.startswith(inicio) or (tipo == "som" and conteudo[8:12] != b"WAVE"):
+                raise Falha("Isso não é " + ("uma imagem" if tipo == "imagem" else "um som") + " que eu saiba ler.")
+            if len(conteudo) > FICHEIRO_MAXIMO:
+                raise Falha("Esse ficheiro é grande demais.")
+            os.makedirs(pasta, exist_ok=True)
             with open(caminho + ".novo", "wb") as f:
-                f.write(imagem)
+                f.write(conteudo)
             os.replace(caminho + ".novo", caminho)
-            self.avisar_das_imagens()
-            return {"imagem": self.estado_da_imagem()}
+            self.avisar_dos_ficheiros()
+            return {tipo: self.estado_do_ficheiro(tipo)}
 
-    def tirar_imagem(self):
+    def tirar_ficheiro(self, tipo):
         with self.tranca:
-            caminho = self.caminho_da_imagem()
+            caminho = self.caminho_do_ficheiro(tipo)
             if os.path.isfile(caminho):
                 os.remove(caminho)
-            self.avisar_das_imagens()
-            return {"imagem": self.estado_da_imagem()}
+            self.avisar_dos_ficheiros()
+            return {tipo: self.estado_do_ficheiro(tipo)}
 
-    def ler_imagem(self):
+    def ler_ficheiro(self, tipo):
         with self.tranca:
-            caminho = self.caminho_da_imagem()
+            caminho = self.caminho_do_ficheiro(tipo)
             if not os.path.isfile(caminho):
-                raise Falha("Ainda não há imagem.")
+                raise Falha("Ainda não há.")
             with open(caminho, "rb") as f:
                 return f.read()
+
+    # --- Criar uma coisa nova ---
+
+    def criar(self, jogo, grupo):
+        # Um inimigo novo, uma torre nova: quem sabe faze-los e o ficheiro
+        # do jogo em oficina/jogos/, que devolve o ficheiro ja com a coisa
+        # nova la dentro (uma copia de uma que ja existia, com outro nome).
+        with self.tranca:
+            config = configuracao(jogo)
+            if grupo not in getattr(config, "CRIAVEIS", {}):
+                raise Falha("Aqui não dá para criar isso.")
+            guardar_original(config)
+            caminho = caminho_do_jogo(config)
+            fonte, fim_de_linha = ler(caminho)
+            try:
+                nova, escolha, aviso = config.novo(fonte, grupo)
+                compile(nova, config.FICHEIRO, "exec")
+                if escolha not in [e["id"] for e in config.escolhas(nova)]:
+                    raise ValueError("a coisa nova não apareceu")
+            except (SyntaxError, ValueError) as erro:
+                raise Falha("Não consegui criar: " + str(erro))
+            self.parar()
+            self.config = None
+            escrever(caminho, nova, fim_de_linha)
+            return {"escolha": escolha, "aviso": aviso}
 
     # --- O ajudante ---
 
@@ -609,9 +653,10 @@ class Pedido(BaseHTTPRequestHandler):
                     self.responder(200, f.read(), "image/png")
             else:
                 self.responder(404, {"falha": "Não existe."})
-        elif url.path == "/api/imagem":
+        elif url.path in ("/api/imagem", "/api/som"):
+            tipo = url.path[5:]
             try:
-                self.responder(200, sessao.ler_imagem(), "image/png")
+                self.responder(200, sessao.ler_ficheiro(tipo), "image/png" if tipo == "imagem" else "audio/wav")
             except Falha as falha:
                 self.responder(404, {"falha": str(falha)})
         elif url.path == "/api/descarregar":
@@ -693,10 +738,12 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(sessao.reabrir)
         elif caminho == "/api/fechar":
             self.tratar(sessao.fechar)
-        elif caminho == "/api/imagem":
-            self.tratar(lambda: sessao.por_imagem(dados.get("dados")))
-        elif caminho == "/api/tirar-imagem":
-            self.tratar(sessao.tirar_imagem)
+        elif caminho in ("/api/imagem", "/api/som"):
+            self.tratar(lambda: sessao.por_ficheiro(caminho[5:], dados.get("dados")))
+        elif caminho in ("/api/tirar-imagem", "/api/tirar-som"):
+            self.tratar(lambda: sessao.tirar_ficheiro(caminho[11:]))
+        elif caminho == "/api/criar":
+            self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo"))))
         elif caminho == "/api/pergunta":
             self.pergunta(dados)
         elif caminho == "/api/carregar":

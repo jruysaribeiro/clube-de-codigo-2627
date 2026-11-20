@@ -7,6 +7,7 @@
 
 import ast
 import inspect
+import re
 
 import blocos
 
@@ -19,8 +20,14 @@ SOBRE_OS_GRUPOS = {
     "Inimigos": "Vida, velocidade, cor, tamanho. Podes pôr uma imagem tua.",
     "Torres": "Custo, alcance, dano, efeito. Podes pôr uma imagem tua.",
     "Mapa": "O caminho, desenhado com letras.",
+    "Ondas": "Que inimigos vêm em cada onda, e quantos.",
     "Regras do jogo": "Aqui mudas a maneira como o jogo se comporta: é programar a sério.",
+    "Acontecimentos": "Estão vazios: o que lá escreveres passa a acontecer nesse momento. É aqui que se inventa.",
+    "Desenhos": "Como se desenha uma torre e um inimigo, com círculos, retângulos e linhas.",
 }
+
+# Os grupos onde se pode criar uma coisa nova, e o que diz o botao.
+CRIAVEIS = {"Inimigos": "Novo inimigo", "Torres": "Nova torre"}
 
 # Pedidos ja escritos para o ajudante, para se perceber o que se pode pedir.
 SUGESTOES = {
@@ -35,6 +42,20 @@ SUGESTOES = {
                "Explica-me esta função linha a linha"],
     "mover_inimigo": ["Faz os inimigos acelerarem quando têm pouca vida", "Faz os inimigos pararem um bocadinho de vez em quando",
                       "Explica-me esta função linha a linha"],
+    "ondas": ["Acrescenta uma onda só de Cavaleiros", "Faz a primeira onda mais fácil", "Como é que se lê uma onda?"],
+    "ao_comecar_onda": ["Dá 50 de ouro de 3 em 3 ondas", "Mostra um texto a dizer o número da onda", "O que posso fazer aqui?"],
+    "ao_cair_inimigo": ["Quando um inimigo cai, rebenta e magoa os que estão perto",
+                        "Um Aríete que ao cair larga dois Soldados", "O que posso fazer aqui?"],
+    "ao_chegar_ao_castelo": ["Quando um inimigo chega ao castelo, os outros perdem 20 de vida",
+                             "Dá 10 de ouro de consolação", "O que posso fazer aqui?"],
+    "ao_construir": ["Mostra um círculo a crescer onde a torre aparece", "A primeira torre de cada jogo nasce no nível 2",
+                     "O que posso fazer aqui?"],
+    "ao_carregar_tecla": ["A tecla B magoa todos os inimigos, mas só uma vez por onda", "A tecla G dá 100 de ouro",
+                          "O que posso fazer aqui?"],
+    "a_cada_frame": ["Dá 1 de ouro a cada segundo", "Os inimigos perdem vida aos poucos", "O que posso fazer aqui?"],
+    "desenhar_torre": ["Põe uma bandeira no topo da torre", "Faz a torre mudar de cor com o nível", "Explica-me este desenho linha a linha"],
+    "desenhar_inimigo": ["Dá olhos ao inimigo", "Faz o inimigo ficar vermelho quando tem pouca vida",
+                         "Explica-me este desenho linha a linha"],
 }
 
 EFEITOS = ["tiro", "explosao", "area", "golpe"]
@@ -50,6 +71,31 @@ REGRAS = {
 }
 INICIO_DAS_REGRAS = "# --- As regras do jogo ---"
 
+# Os acontecimentos: funcoes que o jogo chama em certos momentos, e que vem
+# vazias. E os desenhos. Tudo isto sao funcoes, como as regras.
+ACONTECIMENTOS = {
+    "ao_comecar_onda": ("Quando começa uma onda", ["numero"]),
+    "ao_cair_inimigo": ("Quando um inimigo cai", ["inimigo"]),
+    "ao_chegar_ao_castelo": ("Quando um inimigo chega ao castelo", ["inimigo"]),
+    "ao_construir": ("Quando se constrói uma torre", ["torre"]),
+    "ao_carregar_tecla": ("Quando se carrega numa tecla", ["tecla"]),
+    "a_cada_frame": ("A cada frame", []),
+}
+INICIO_DOS_ACONTECIMENTOS = "# --- Os acontecimentos ---"
+DESENHOS = {
+    "desenhar_torre": ("O desenho de uma torre", ["torre"]),
+    "desenhar_inimigo": ("O desenho de um inimigo", ["inimigo"]),
+}
+INICIO_DOS_DESENHOS = "# --- Os desenhos ---"
+
+# tipo da escolha -> (as funcoes desse tipo, o grupo onde aparecem, as
+# explicacoes gerais que se juntam a ajuda de cada uma)
+FUNCOES = {
+    "regra": (REGRAS, "Regras do jogo", [INICIO_DAS_REGRAS]),
+    "evento": (ACONTECIMENTOS, "Acontecimentos", [INICIO_DOS_ACONTECIMENTOS, INICIO_DAS_REGRAS]),
+    "desenho": (DESENHOS, "Desenhos", [INICIO_DOS_DESENHOS]),
+}
+
 DICAS = {
     "inimigo": "O inimigo anda sozinho pelo caminho. "
                "Clica na relva para pôr mais torres e ver quanto ele aguenta.",
@@ -60,6 +106,11 @@ DICAS = {
     "regra": "Isto é uma regra do jogo: muda-a e o jogo passa a comportar-se de outra maneira. "
              "Há uma torre de cada e inimigos de todos, para veres logo a diferença. "
              "O círculo amarelo marca quem cada torre escolheu.",
+    "evento": "O jogo joga-se sozinho, onda atrás de onda, para veres o teu acontecimento a acontecer. "
+              "Tira o pass e escreve o que queres que aconteça. Clica no jogo para carregares em teclas.",
+    "desenho": "Isto é o desenho: muda-o e vês logo, no jogo e aumentado no canto. "
+               "Experimenta mudar um número, ou acrescentar um círculo.",
+    "ondas": "O jogo joga-se sozinho desde a primeira onda, para veres as ondas como as escreveste.",
 }
 
 
@@ -88,42 +139,51 @@ def escolhas(fonte):
     if blocos.instrucao(arvore, "MAPA") is not None:
         lista.append({"id": "mapa", "grupo": "Mapa", "titulo": "O mapa"})
 
-    for nome in REGRAS:
-        if blocos.funcao(arvore, nome) is not None:
-            lista.append({"id": "regra:" + nome, "grupo": "Regras do jogo", "titulo": REGRAS[nome][0]})
+    if blocos.instrucao(arvore, "ONDAS") is not None:
+        lista.append({"id": "ondas", "grupo": "Ondas", "titulo": "As ondas"})
+
+    for tipo in FUNCOES:
+        funcoes, grupo, _ = FUNCOES[tipo]
+        for nome in funcoes:
+            if blocos.funcao(arvore, nome) is not None:
+                lista.append({"id": tipo + ":" + nome, "grupo": grupo, "titulo": funcoes[nome][0]})
     return lista
 
 
 def regiao(fonte, escolha):
-    # Devolve {"inicio", "fim", "ajuda", "titulo", "dica", "imagem"} ou None.
+    # Devolve {"inicio", "fim", "ajuda", "titulo", "dica", "imagem", "som"} ou None.
     # "imagem" e o nome do PNG que essa coisa usa (None se nao usa nenhum):
-    # e com ele que a Oficina sabe onde guardar a imagem que a crianca escolher.
+    # e com ele que a Oficina sabe onde guardar a imagem que a crianca
+    # escolher. "som" e o mesmo, para o WAV.
     arvore = ast.parse(fonte)
     linhas = fonte.split("\n")
     tipo, _, numero = escolha.partition(":")
-    if tipo == "regra":
-        # Uma regra e uma funcao inteira. A ajuda junta o que se pode usar
-        # dentro de qualquer regra ao que o ficheiro diz sobre esta.
-        no = blocos.funcao(arvore, numero) if numero in REGRAS else None
+    if tipo in FUNCOES:
+        # Uma regra, um acontecimento ou um desenho: e uma funcao inteira. A
+        # ajuda junta o que o ficheiro diz sobre ela ao que se pode usar
+        # dentro de qualquer funcao desse genero.
+        funcoes, _, gerais = FUNCOES[tipo]
+        no = blocos.funcao(arvore, numero) if numero in funcoes else None
         if no is None:
             return None
-        geral = blocos.comentarios_a_partir_de(linhas, INICIO_DAS_REGRAS)
         ajuda = blocos.ajuda_acima(linhas, no.lineno)
-        if geral and geral != ajuda:
-            ajuda = ajuda + "\n\n" + geral
-        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda, "dica": DICAS["regra"],
-                "titulo": REGRAS[numero][0], "imagem": None, "sugestoes": SUGESTOES[numero]}
-    nomes = {"inimigo": "INIMIGOS", "torre": "TORRES", "mapa": "MAPA"}
+        for inicio in gerais:
+            geral = blocos.comentarios_a_partir_de(linhas, inicio)
+            if geral and geral != ajuda:
+                ajuda = ajuda + "\n\n" + geral
+        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda, "dica": DICAS[tipo],
+                "titulo": funcoes[numero][0], "imagem": None, "som": None, "sugestoes": SUGESTOES[numero]}
+    nomes = {"inimigo": "INIMIGOS", "torre": "TORRES", "mapa": "MAPA", "ondas": "ONDAS"}
     if tipo not in nomes:
         return None
     no = blocos.instrucao(arvore, nomes[tipo])
     if no is None:
         return None
-    resposta = {"ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo], "imagem": None,
+    resposta = {"ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo], "imagem": None, "som": None,
                 "sugestoes": SUGESTOES[tipo]}
 
-    if tipo == "mapa":
-        resposta.update(inicio=no.lineno, fim=no.end_lineno, titulo="O mapa")
+    if tipo == "mapa" or tipo == "ondas":
+        resposta.update(inicio=no.lineno, fim=no.end_lineno, titulo="O mapa" if tipo == "mapa" else "As ondas")
         return resposta
 
     partes = blocos.entradas(no)
@@ -136,8 +196,103 @@ def regiao(fonte, escolha):
         titulo = blocos.valor_da_chave(parte, "nome")
     ficha = blocos.valor_da_entrada(no, int(numero))
     resposta.update(inicio=inicio, fim=fim, titulo=titulo or escolha,
-                    imagem=blocos.valor_da_chave(ficha, "imagem"))
+                    imagem=blocos.valor_da_chave(ficha, "imagem"), som=blocos.valor_da_chave(ficha, "som"))
     return resposta
+
+
+# =====================================================================
+#                        CRIAR UMA COISA NOVA
+# =====================================================================
+# Um inimigo novo ou uma torre nova nascem como copia do primeiro que la
+# esta (o mais simples), com outro nome, e ficam no fim da lista. Devolve o ficheiro inteiro ja com a coisa nova, a
+# escolha a abrir, e uma frase a contar o que se fez.
+
+def _nome_livre(base, existentes):
+    nome = base
+    numero = 2
+    while nome in existentes:
+        nome = base + " " + str(numero)
+        numero = numero + 1
+    return nome
+
+
+def _ficheiro(nome):
+    # "Inimigo novo 2" -> "inimigo-novo-2"
+    return nome.lower().replace(" ", "-")
+
+
+def _copiar_entrada(linhas, inicio, fim, antigo, nome, ultima):
+    # As linhas de uma entrada, outra vez, com o nome, a imagem e o som
+    # novos. "ultima" e a linha onde acaba a ultima entrada: a copia vai a seguir.
+    texto = "\n".join(linhas[inicio - 1:fim])
+    texto = texto.replace('"' + antigo + '"', '"' + nome + '"', 1)
+    texto = re.sub(r'"imagem": "[^"]*"', '"imagem": "' + _ficheiro(nome) + '.png"', texto)
+    texto = re.sub(r'"som": "[^"]*"', '"som": "' + _ficheiro(nome) + '.wav"', texto)
+    if not texto.rstrip().endswith(","):
+        texto = texto.rstrip() + ","
+    if not linhas[ultima - 1].rstrip().endswith(","):
+        linhas[ultima - 1] = linhas[ultima - 1].rstrip() + ","
+    return texto.split("\n")
+
+
+def _por_na_primeira_onda(fonte, nome):
+    # Sem isto o inimigo novo existia mas nunca aparecia no jogo.
+    no = blocos.instrucao(ast.parse(fonte), "ONDAS")
+    if no is None or not isinstance(no.value, ast.List) or len(no.value.elts) == 0:
+        return fonte, False
+    onda = no.value.elts[0]
+    if not isinstance(onda, ast.List):
+        return fonte, False
+    linhas = fonte.split("\n")
+    linha = linhas[onda.end_lineno - 1]
+    # (O Python conta as colunas em bytes: com acentos nao e o mesmo que letras.)
+    corte = len(linha.encode("utf-8")[:onda.end_col_offset - 1].decode("utf-8"))
+    antes = linha[:corte].rstrip()
+    grupo = '{"inimigo": "' + nome + '", "quantos": 3, "intervalo": 60}'
+    if len(onda.elts) > 0 and not antes.endswith(","):
+        grupo = ", " + grupo
+    linhas[onda.end_lineno - 1] = antes + grupo + linha[corte:]
+    return "\n".join(linhas), True
+
+
+def novo(fonte, grupo):
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    if grupo == "Inimigos":
+        no = blocos.instrucao(arvore, "INIMIGOS")
+        partes = blocos.entradas(no) if no is not None else None
+        if not partes:
+            raise ValueError("não encontrei os INIMIGOS no ficheiro.")
+        chave, inicio, fim = partes[0]
+        ultima = partes[-1][2]
+        antigo = blocos.texto_constante(chave)
+        nome = _nome_livre("Inimigo novo", [blocos.texto_constante(c) for c, _, _ in partes])
+        copia = _copiar_entrada(linhas, inicio, fim, antigo, nome, ultima)
+        nova = "\n".join(linhas[:ultima] + copia + linhas[ultima:])
+        nova, posto = _por_na_primeira_onda(nova, nome)
+        aviso = 'Criei o "' + nome + '", igual ao ' + str(antigo) + ". Muda-lhe o nome e os números."
+        if posto:
+            aviso = aviso + " Pus 3 na primeira onda: em Ondas podes mudar isso."
+        return nova, "inimigo:" + str(len(partes)), aviso
+    if grupo == "Torres":
+        no = blocos.instrucao(arvore, "TORRES")
+        partes = blocos.entradas(no) if no is not None else None
+        if not partes:
+            raise ValueError("não encontrei as TORRES no ficheiro.")
+        if len(partes) >= 9:
+            raise ValueError("já há 9 torres, e só há 9 teclas com números.")
+        elemento, inicio, fim = partes[0]
+        ultima = partes[-1][2]
+        antigo = blocos.valor_da_chave(elemento, "nome")
+        nome = _nome_livre("Torre nova", [blocos.valor_da_chave(e, "nome") for e, _, _ in partes])
+        copia = _copiar_entrada(linhas, inicio, fim, antigo, nome, ultima)
+        tecla = str(len(partes) + 1)
+        copia = [re.sub(r"pygame\.K_\w+", "pygame.K_" + tecla, linha) for linha in copia]
+        nova = "\n".join(linhas[:ultima] + copia + linhas[ultima:])
+        aviso = ('Criei a "' + nome + '", igual ao ' + str(antigo) + ". Escolhe-se com a tecla " + tecla
+                 + ". Muda-lhe o nome e os números.")
+        return nova, "torre:" + str(len(partes)), aviso
+    raise ValueError("aqui não dá para criar isso.")
 
 
 # =====================================================================
@@ -185,6 +340,36 @@ def _ver_cor(ficha, quem, problemas):
 def _ver_imagem(ficha, quem, problemas):
     if "imagem" in ficha and not isinstance(ficha["imagem"], str):
         problemas.append(quem + ': a "imagem" é o nome de um ficheiro, entre aspas, como "soldado.png".')
+    if "som" in ficha and not isinstance(ficha["som"], str):
+        problemas.append(quem + ': o "som" é o nome de um ficheiro, entre aspas, como "soldado.wav".')
+
+
+def _ver_ondas(ns, problemas, avisos):
+    ondas = ns.get("ONDAS")
+    if not isinstance(ondas, list) or len(ondas) == 0:
+        problemas.append("Tem de haver pelo menos uma onda: uma linha [ ... ] dentro de ONDAS.")
+        return
+    numero = 0
+    for onda in ondas:
+        numero = numero + 1
+        quem = "Onda " + str(numero)
+        if not isinstance(onda, list) or len(onda) == 0:
+            problemas.append(quem + ": tem de ser uma lista [ ... ] com pelo menos um grupo { ... }.")
+            continue
+        for grupo in onda:
+            if not isinstance(grupo, dict):
+                problemas.append(quem + ": cada grupo tem de estar entre { }.")
+                continue
+            if not isinstance(grupo.get("inimigo"), str):
+                problemas.append(quem + ': falta o "inimigo", com o nome entre aspas.')
+            for chave, maximo in (("quantos", 300), ("intervalo", 6000)):
+                valor = grupo.get(chave)
+                if not isinstance(valor, int) or isinstance(valor, bool):
+                    problemas.append(quem + ': "' + chave + '" tem de ser um número inteiro, sem aspas.')
+                elif valor < 1:
+                    problemas.append(quem + ': "' + chave + '" tem de ser pelo menos 1.')
+                elif valor > maximo:
+                    problemas.append(quem + ': "' + chave + '" é grande demais. O máximo é ' + str(maximo) + ".")
 
 
 def _ver_inimigos(ns, problemas, avisos):
@@ -314,9 +499,12 @@ def _ver_mapa(ns, problemas, avisos):
 
 
 def _ver_regras(ns, problemas, avisos):
-    # O jogo chama cada regra pelo nome e da-lhe sempre as mesmas coisas.
-    for nome in REGRAS:
-        esperado = REGRAS[nome][1]
+    # O jogo chama cada funcao pelo nome e da-lhe sempre as mesmas coisas.
+    todas = {}
+    for tipo in FUNCOES:
+        todas.update(FUNCOES[tipo][0])
+    for nome in todas:
+        esperado = todas[nome][1]
         funcao = ns.get(nome)
         como = "def " + nome + "(" + ", ".join(esperado) + "):"
         if not inspect.isfunction(funcao):
@@ -324,7 +512,8 @@ def _ver_regras(ns, problemas, avisos):
             continue
         recebe = list(inspect.signature(funcao).parameters)
         if len(recebe) != len(esperado):
-            problemas.append("Esta função tem de receber " + ", ".join(esperado) + ", nem mais nem menos. "
+            problemas.append("A função " + nome + " tem de receber "
+                             + (", ".join(esperado) if esperado else "nada, só ( )") + ", nem mais nem menos. "
                              "A primeira linha tem de ser: " + como)
 
 
@@ -342,8 +531,13 @@ class Palco:
         self.espera = 0          # frames ate ao proximo inimigo
         self.vez = 0             # qual o proximo inimigo, quando vem todos
         self.letra = None
-        self.regra = numero if tipo == "regra" else None
-        if tipo == "regra":
+        self.regra = numero if tipo in FUNCOES else None
+        # Nos acontecimentos e nas ondas o jogo joga-se sozinho, onda atras
+        # de onda; nas regras e nos desenhos ha inimigos sempre a passar.
+        self.sozinho = tipo in ("evento", "ondas")
+        self.passeio = tipo in ("regra", "desenho")
+        self.pausa_entre_ondas = 0
+        if tipo in FUNCOES:
             # Uma regra nova so mostra o que vale quando chega a vez de ser
             # usada (a torre disparar, o golpe acertar): prova-se mais tempo.
             self.quadros_de_prova = 150
@@ -354,6 +548,7 @@ class Palco:
         _ver_inimigos(ns, problemas, avisos)
         _ver_torres(ns, problemas, avisos)
         _ver_mapa(ns, problemas, avisos)
+        _ver_ondas(ns, problemas, avisos)
         _ver_regras(ns, problemas, avisos)
         return problemas, avisos
 
@@ -364,8 +559,10 @@ class Palco:
         self.letra = pygame.font.SysFont(None, 22)
         self.preparado = True
         self.arrumar(ns)
-        if self.tipo == "regra":
+        if self.passeio:
             self.espalhar_inimigos(ns)
+        if self.sozinho:
+            ns["ouro"] = 300
 
     def ao_mudar(self, ns):
         # O codigo mudou. Os inimigos que andavam no ecra foram feitos com
@@ -374,12 +571,25 @@ class Palco:
             return
         if self.tipo == "mapa":
             ns["CAMINHO_PONTOS"] = ns["encontrar_caminho"]()
+        if self.sozinho:
+            # O jogo continua como ia. So recomeca a onda quando isso e
+            # preciso para se ver a mudanca: as ondas novas desde a primeira,
+            # e "quando comeca uma onda" a acontecer outra vez, ja.
+            if self.tipo == "ondas" or self.regra == "ao_comecar_onda":
+                ns["inimigos"] = []
+                ns["projeteis"] = []
+                ns["a_por_sair"] = []
+                ns["onda_a_decorrer"] = False
+                ns["numero_onda"] = 0 if self.tipo == "ondas" else max(0, ns["numero_onda"] - 1)
+                self.pausa_entre_ondas = 0
+            self.arrumar(ns)
+            return
         ns["inimigos"] = []
         ns["projeteis"] = []
         ns["efeitos"] = []
         self.espera = 0
         self.arrumar(ns)
-        if self.tipo == "regra":
+        if self.passeio:
             self.espalhar_inimigos(ns)
 
     def espalhar_inimigos(self, ns):
@@ -409,7 +619,7 @@ class Palco:
 
         if self.tipo == "mapa":
             return
-        if self.tipo == "regra":
+        if self.passeio or self.sozinho:
             # Uma torre de cada, espalhadas pelo caminho, prontas a disparar.
             for tipo in range(min(4, len(ns["TORRES"]))):
                 if len([torre for torre in ns["torres"] if torre["tipo"] == tipo]) == 0:
@@ -444,10 +654,13 @@ class Palco:
                 l = linha + passo[1]
                 if 0 <= c < 20 and 0 <= l < 13 and ns["letra_do_mapa"](c, l) == "." and (c, l) not in ocupados:
                     antes = ns["torre_para_construir"]
+                    ouro = ns["ouro"]
                     ns["torre_para_construir"] = tipo
                     ns["ouro"] = 99999
                     ns["construir"](c, l)
                     ns["torre_para_construir"] = antes
+                    if self.sozinho:
+                        ns["ouro"] = ouro      # estas torres sao oferta: o ouro fica como estava
                     return
 
     # --- Todos os frames ---
@@ -455,6 +668,10 @@ class Palco:
     def quadro(self, ns, pygame):
         if not self.preparado:
             self.preparar(ns, pygame)
+
+        if self.sozinho:
+            self.jogar_sozinho(ns)
+            return
 
         # O jogo fica sempre "a meio": sem menu, sem ondas, sem perder.
         ns["estado"] = "jogo"
@@ -482,6 +699,23 @@ class Palco:
 
         self.desenhar(ns, pygame, nomes)
 
+    def jogar_sozinho(self, ns):
+        # O jogo verdadeiro, com as ondas a comecarem sozinhas e sem se
+        # perder. O ouro e as vidas ficam como o jogo (e o codigo da
+        # crianca) os deixar, e a barra de cima do jogo fica a vista.
+        ns["estado"] = "jogo"
+        if ns["vidas"] < 5:
+            ns["vidas"] = ns["VIDAS_INICIAIS"]
+        if ns["onda_a_decorrer"]:
+            self.pausa_entre_ondas = 0
+            return
+        self.pausa_entre_ondas = self.pausa_entre_ondas + 1
+        if self.pausa_entre_ondas > 50:
+            if ns["numero_onda"] >= len(ns["ONDAS"]):
+                ns["numero_onda"] = 0          # acabaram: volta a primeira
+            ns["comecar_onda"]()
+            self.pausa_entre_ondas = 0
+
     def desenhar(self, ns, pygame, nomes):
         ecra = ns["ecra"]
         pygame.draw.rect(ecra, ns["PAINEL"], (0, 0, ns["LARGURA"], ns["TOPO"]))
@@ -503,6 +737,17 @@ class Palco:
             texto = texto + "   efeito " + str(ficha["efeito"])
             modelo = {"tipo": tipo, "nivel": 1, "x": 0, "y": 0, "mira": (1, 0)}
             self.lupa(ns, pygame, ns["desenhar_torre"], modelo, ns["TILE"] + 8)
+        elif self.tipo == "desenho":
+            texto = "Desenho:   " + DESENHOS[self.regra][0] + "   (a função " + self.regra + ")"
+            # No canto, aumentado: um de cada, a vez.
+            self.vez_da_lupa = getattr(self, "vez_da_lupa", 0) + 1
+            if self.regra == "desenhar_inimigo":
+                nome = nomes[(self.vez_da_lupa // 120) % len(nomes)]
+                self.lupa(ns, pygame, ns["desenhar_inimigo"], ns["criar_inimigo"](nome), ns["INIMIGOS"][nome]["tamanho"] + 16)
+            else:
+                tipo = (self.vez_da_lupa // 120) % len(ns["TORRES"])
+                modelo = {"tipo": tipo, "nivel": 1 + (self.vez_da_lupa // 40) % 3, "x": 0, "y": 0, "mira": (1, 0)}
+                self.lupa(ns, pygame, ns["desenhar_torre"], modelo, ns["TILE"] + 8)
         elif self.tipo == "regra":
             texto = "Regra:   " + REGRAS[self.regra][0] + "   (a função " + self.regra + ")"
             # Um circulo a volta de quem cada torre escolheu agora.

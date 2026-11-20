@@ -37,7 +37,7 @@ perceber o que se lhe pode pedir (`SUGESTOES`, no `jogos/o_cerco.py`).
 
 ## Regras do jogo
 
-N'O Cerco, além dos dados (inimigos, torres, mapa), abrem-se quatro
+N'O Cerco, além dos dados (inimigos, torres, mapa, ondas), abrem-se quatro
 **regras**: quem a torre ataca, o que a torre faz ao disparar, o que acontece
 a um inimigo atingido e como anda um inimigo. Cada uma é uma função pequena
 do jogo; mudá-la muda a maneira como o jogo se comporta. É aqui que se
@@ -55,12 +55,33 @@ Para abrir regras noutro jogo: as funções têm de estar encostadas à margem
 no ficheiro do jogo, e a `regiao` devolve as linhas da função (ver `REGRAS`
 no `jogos/o_cerco.py`).
 
-## Imagens
+## Acontecimentos, desenhos e coisas novas
+
+Também n'O Cerco:
+
+- **Acontecimentos**: seis funções que vêm vazias e que o jogo chama quando
+  começa uma onda, cai um inimigo, um inimigo chega ao castelo, se constrói
+  uma torre, se carrega numa tecla, e a cada frame. O que lá se escrever
+  passa a acontecer nesse momento; há um dicionário `memoria` para guardar
+  coisas de um frame para o outro. É aqui que se acrescenta ao jogo algo que
+  ele não tinha. No palco o jogo joga-se sozinho, onda atrás de onda.
+- **Desenhos**: as funções que desenham uma torre e um inimigo.
+- **+ Novo inimigo / + Nova torre**: cria uma cópia do primeiro, com outro
+  nome, no fim da lista. O inimigo novo entra logo na primeira onda. (No
+  ficheiro do jogo em `oficina/jogos/`: `CRIAVEIS` e `novo()`.)
+
+## Imagens e sons
 
 Há coisas que no código dizem `"imagem": "soldado.png"`. Quando se abre uma
-dessas, aparece por cima do código o botão **Escolher uma imagem**: a
-criança escolhe um ficheiro do computador (PNG, JPG, uma fotografia) e o jogo
-passa a desenhá-lo em vez da forma. **Tirar a imagem** volta à forma.
+dessas, aparecem por cima do código os botões **Desenhar** (uma grelha de
+16×16 quadradinhos para pintar ali mesmo) e **Escolher uma imagem** (um
+ficheiro do computador: PNG, JPG, uma fotografia). O jogo passa a mostrar a
+imagem em vez da forma. **Tirar a imagem** volta à forma.
+
+Com `"som": "soldado.wav"` é igual: **Escolher um som** ou **Gravar** (com o
+microfone, até 3 segundos; o browser pede autorização da primeira vez). Os
+sons ficam em `comum/assets/sons/`, e o jogo guarda os que já leu em
+`sons_carregados`, como faz com as imagens.
 
 - A imagem é encolhida para um quadrado pequeno e guardada em
   `comum/assets/imagens/`, com o nome que está no código. Mudar o nome no

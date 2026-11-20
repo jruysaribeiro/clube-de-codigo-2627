@@ -25,3 +25,5 @@ oficina/.originais/
 # As imagens que as criancas escolhem na Oficina ficam so no computador delas
 comum/assets/imagens/*.png
 comum/assets/imagens/*.novo
+comum/assets/sons/*.wav
+comum/assets/sons/*.novo

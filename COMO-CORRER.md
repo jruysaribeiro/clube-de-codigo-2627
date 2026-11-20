@@ -458,20 +458,24 @@ instala nada).
 O botão verde **Jogar o jogo inteiro** abre o jogo como ele é, com tudo o que
 já foi mudado, para experimentar a sério; **Voltar** regressa ao código.
 
-### Regras do jogo (só n'O Cerco, por agora)
+### Regras, acontecimentos e desenhos (só n'O Cerco, por agora)
 
-Além dos dados, O Cerco abre quatro **regras**: quem a torre ataca, o que
-faz ao disparar, o que acontece a um inimigo atingido e como anda um
-inimigo. São funções pequenas do jogo: é aqui que se escreve (ou se pede ao
-ajudante) um `if` que muda o comportamento. Se a regra nova rebentar, o jogo
-volta à anterior e mostra o erro.
+Além dos dados, O Cerco abre **regras** (quem a torre ataca, o que faz ao
+disparar...), **acontecimentos** (funções vazias que o jogo chama quando cai
+um inimigo, começa uma onda, se carrega numa tecla...) e **desenhos**. São
+funções pequenas: é aqui que se escreve, ou se pede ao ajudante, código que
+muda o comportamento do jogo ou lhe acrescenta coisas. Se rebentar, o jogo
+volta ao que estava e mostra o erro. Os botões **+ Novo inimigo** e **+ Nova
+torre** criam uma cópia para mudar.
 
-### Imagens
+### Imagens e sons
 
-Nas coisas que no código dizem `"imagem": "soldado.png"` aparece o botão
-**Escolher uma imagem**. A imagem escolhida fica em `comum/assets/imagens/`
-com esse nome e o jogo mostra-a logo. Fica só nesse computador: não vai para
-o git nem dentro do ficheiro que o **Guardar o meu jogo** dá.
+Nas coisas que no código dizem `"imagem": "soldado.png"` aparecem os botões
+**Desenhar** (pinta-se ali mesmo, em quadradinhos) e **Escolher uma imagem**.
+Com `"som": "soldado.wav"` há **Escolher um som** e **Gravar**, com o
+microfone. Ficam em `comum/assets/imagens/` e `comum/assets/sons/` com esses
+nomes, e o jogo usa-os logo. Ficam só nesse computador: não vão para o git
+nem dentro do ficheiro que o **Guardar o meu jogo** dá.
 
 ### O ajudante (o botão «Pedir ajuda»)
 

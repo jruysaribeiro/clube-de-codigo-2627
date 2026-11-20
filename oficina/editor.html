@@ -105,16 +105,34 @@
   #ajuda { margin: 0; padding: 0 14px 12px; max-height: 30vh; overflow: auto; white-space: pre; color: #cfcfe0; font: 12.5px/1.5 var(--letra-codigo); }
 
   /* ---------- a imagem do bocado ---------- */
-  #barra-imagem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); font-size: 14px; }
-  #barra-imagem button { font-size: 14px; }
+  #barra-imagem, #barra-som { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); font-size: 14px; }
+  #barra-imagem button, #barra-som button { font-size: 14px; }
+  #gravar-som.a-gravar { border-color: var(--vermelho); color: var(--vermelho); }
   #miniatura {
     width: 40px; height: 40px; flex: none; border: 1px solid var(--linha); border-radius: 6px;
     image-rendering: pixelated; object-fit: contain;
     background: repeating-conic-gradient(#2c2c44 0% 25%, #1e1e30 0% 50%) 50% / 12px 12px;
   }
-  #texto-imagem { flex: 1; min-width: 150px; color: var(--fraco); }
-  #texto-imagem b { color: var(--texto); font-weight: 600; font-family: var(--letra-codigo); }
-  #texto-imagem.mal { color: var(--laranja); }
+  #texto-imagem, #texto-som { flex: 1; min-width: 150px; color: var(--fraco); }
+  #texto-imagem b, #texto-som b { color: var(--texto); font-weight: 600; font-family: var(--letra-codigo); }
+  #texto-imagem.mal, #texto-som.mal { color: var(--laranja); }
+
+  /* ---------- desenhar uma imagem ---------- */
+  #desenho { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(10, 10, 18, .8); padding: 12px; overflow: auto; }
+  #desenho .folha { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; max-width: 760px; }
+  #desenho h2 { margin: 0 0 4px; font-size: 19px; flex-basis: 100%; }
+  #desenho h2 small { color: var(--fraco); font-weight: 400; font-size: 14px; margin-left: 6px; }
+  #grelha { width: min(384px, 80vw); height: auto; aspect-ratio: 1; border: 1px solid var(--linha); border-radius: 6px; cursor: crosshair; touch-action: none; image-rendering: pixelated; }
+  #desenho .lado { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 200px; }
+  #paleta { display: grid; grid-template-columns: repeat(6, 30px); gap: 6px; }
+  #paleta button { width: 30px; height: 30px; padding: 0; border-radius: 6px; border: 2px solid var(--linha); }
+  #paleta button.escolhida, #desenho .ferramentas button.escolhida { border-color: var(--amarelo); box-shadow: 0 0 0 2px var(--amarelo); }
+  #desenho .ferramentas { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+  #desenho .ferramentas button { font-size: 14px; }
+  #cor-livre { width: 44px; height: 32px; padding: 0; border: 1px solid var(--linha); border-radius: 6px; background: none; }
+  #desenho .fim { margin-top: auto; display: flex; gap: 8px; }
+  #guardar-desenho { border-color: var(--verde); color: var(--verde); font-weight: 600; }
+  .coisas button.novo { border-style: dashed; color: var(--amarelo); }
 
   .caixa { flex: 1; min-height: 140px; display: flex; background: #10101a; overflow: hidden; }
   #numeros {
@@ -213,8 +231,16 @@
   <div id="barra-imagem" hidden>
     <img id="miniatura" alt="" hidden>
     <span id="texto-imagem"></span>
+    <button type="button" id="desenhar-imagem">Desenhar</button>
     <button type="button" id="por-imagem">Escolher uma imagem</button>
     <button type="button" id="tirar-imagem" hidden>Tirar a imagem</button>
+  </div>
+  <div id="barra-som" hidden>
+    <span id="texto-som"></span>
+    <button type="button" id="ouvir-som" hidden>Ouvir</button>
+    <button type="button" id="gravar-som">Gravar</button>
+    <button type="button" id="por-som">Escolher um som</button>
+    <button type="button" id="tirar-som" hidden>Tirar o som</button>
   </div>
   <div class="caixa">
     <pre id="numeros" aria-hidden="true"></pre>
@@ -249,6 +275,30 @@
 
 <input type="file" id="escolher-ficheiro" accept=".py,text/x-python,text/plain" hidden>
 <input type="file" id="escolher-imagem" accept="image/*" hidden>
+<input type="file" id="escolher-som" accept="audio/*" hidden>
+
+<div id="desenho" hidden>
+  <div class="folha" role="dialog" aria-label="Desenhar uma imagem">
+    <h2>Desenhar <small id="nome-desenho"></small></h2>
+    <canvas id="grelha" width="384" height="384"></canvas>
+    <div class="lado">
+      <div id="paleta"></div>
+      <div class="ferramentas">
+        <label>Outra cor <input type="color" id="cor-livre" value="#ff8800"></label>
+      </div>
+      <div class="ferramentas">
+        <button type="button" id="lapis" class="escolhida">Lápis</button>
+        <button type="button" id="balde">Balde</button>
+        <button type="button" id="borracha">Borracha</button>
+        <button type="button" id="limpar-desenho">Apagar tudo</button>
+      </div>
+      <div class="fim">
+        <button type="button" id="guardar-desenho">Pôr no jogo</button>
+        <button type="button" id="fechar-desenho">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -357,7 +407,11 @@ async function mostrarJogos() {
     pode("Mudar números, cores e nomes", "Escolhe uma coisa aqui em baixo. O jogo muda enquanto escreves.");
     if (jogo.escolhas.some(escolha => escolha.grupo === "Regras do jogo"))
       pode("Mudar as regras", "Nas Regras do jogo mudas a maneira como ele se comporta.");
-    pode("Pôr as tuas imagens", "Um desenho ou uma fotografia tua em vez da forma.");
+    if (jogo.escolhas.some(escolha => escolha.grupo === "Acontecimentos"))
+      pode("Inventar coisas novas", "Nos Acontecimentos escreves o que acontece quando, por exemplo, um inimigo cai.");
+    if (jogo.criaveis && Object.keys(jogo.criaveis).length)
+      pode("Criar coisas novas", "Os botões com + fazem um inimigo novo, uma torre nova... para mudares à tua maneira.");
+    pode("Pôr as tuas imagens e sons", "Desenha aqui mesmo, escolhe um ficheiro, ou grava um som com o microfone.");
     if (haAjudante) pode("Pedir ao ajudante", "Pergunta o que não percebes, ou pede-lhe uma mudança.");
     pode("Jogar o jogo inteiro", "Para veres como ficou com tudo o que mudaste.");
     cartao.append(podes);
@@ -376,6 +430,11 @@ async function mostrarJogos() {
         botao.onclick = () => abrir(jogo.id, escolha.id);
         linha.append(botao);
       }
+      if (jogo.criaveis && jogo.criaveis[grupo]) {
+        const novo = elemento("button", "+ " + jogo.criaveis[grupo], "novo");
+        novo.onclick = () => criarNovo(jogo.id, grupo);
+        linha.append(novo);
+      }
       cartao.append(linha);
     }
     const ficheiro = elemento("div", "", "ficheiro");
@@ -388,6 +447,18 @@ async function mostrarJogos() {
     cartao.append(ficheiro);
     caixa.append(cartao);
   }
+}
+
+async function criarNovo(jogo, grupo) {
+  // Uma coisa nova no jogo: nasce como copia de uma que ja la estava.
+  let dados;
+  try {
+    dados = await pedir("/api/criar", {jogo, grupo});
+  } catch (erro) {
+    alert(erro.message);
+    return;
+  }
+  abrir(jogo, dados.escolha, dados.aviso);
 }
 
 function guardarJogo(jogo) {
@@ -418,7 +489,7 @@ function trazerJogo(jogo, nome) {
 
 /* ---------------- editar ---------------- */
 
-async function abrir(jogo, escolha) {
+async function abrir(jogo, escolha, recado) {
   let dados;
   try {
     dados = await pedir("/api/abrir", {jogo, escolha});
@@ -448,11 +519,13 @@ async function abrir(jogo, escolha) {
   limparConversa();
   imagemAVista = undefined;
   mostrarImagem(dados.imagem);
+  somAVista = undefined;
+  mostrarSom(dados.som);
   codigo.value = dados.codigo;
   codigo.setSelectionRange(0, 0);     // senao o Safari abre o codigo ja puxado para a direita
   linhaMal = null;
   pintar();
-  dizer("espera", "Muda qualquer coisa e vê o que acontece no jogo."
+  dizer("espera", recado || "Muda qualquer coisa e vê o que acontece no jogo."
     + (haAjudante ? " Ou carrega em «Pedir ao ajudante» e pede-lhe a mudança." : ""));
   $("escolher").hidden = true;
   $("editar").hidden = false;
@@ -537,6 +610,7 @@ async function verEstado() {
   $("reabrir").hidden = estado.viva;
   $("jogar-outra").hidden = estado.viva || !aJogarTudo;
   mostrarImagem(estado.imagem);
+  mostrarSom(estado.som);
 }
 
 /* ---------------- o jogo, dentro da pagina ---------------- */
@@ -735,6 +809,7 @@ codigo.addEventListener("keydown", evento => {
 
 const LADO_DA_IMAGEM = 256;     // as imagens vao sempre quadradas e pequenas
 let imagemAVista;               // o que a barra mostra agora, para nao a redesenhar sem precisar
+let imagemAtual = null;         // a imagem do bocado aberto (nome, se ja existe...)
 
 function mostrarImagem(imagem) {
   const chave = JSON.stringify(imagem || null);
@@ -756,6 +831,9 @@ function mostrarImagem(imagem) {
   $("miniatura").hidden = !imagem.ha;
   if (imagem.ha) $("miniatura").src = "/api/imagem?v=" + imagem.versao;
   $("por-imagem").hidden = Boolean(imagem.erro);
+  $("desenhar-imagem").hidden = Boolean(imagem.erro);
+  $("desenhar-imagem").textContent = imagem.ha ? "Retocar" : "Desenhar";
+  imagemAtual = imagem;
   $("por-imagem").textContent = imagem.ha ? "Trocar a imagem" : "Escolher uma imagem";
   $("tirar-imagem").hidden = !imagem.ha;
 }
@@ -806,6 +884,249 @@ $("tirar-imagem").onclick = async () => {
   } catch (erro) {
     alert(erro.message);
   }
+};
+
+/* ---------------- desenhar uma imagem ---------------- */
+// Uma grelha de quadradinhos para pintar. O desenho vai para o jogo pelo
+// mesmo caminho de uma imagem escolhida do computador.
+
+const QUADRADINHOS = 16;
+const CORES_DA_PALETA = ["#000000", "#ffffff", "#9a9ab4", "#5a3c28", "#e03c3c", "#ff8a3c", "#f0c846", "#5fd07a",
+                         "#2e8b57", "#46b4e6", "#3c5adc", "#9b5ade", "#ff78b4", "#ffd2aa", "#784628", "#283250"];
+let pixeis = [];               // a cor de cada quadradinho, ou null (transparente)
+let corDoLapis = CORES_DA_PALETA[4];
+let ferramenta = "lapis";
+let aPintar = false;
+
+function desenharGrelha() {
+  const tela = $("grelha");
+  const pincel = tela.getContext("2d");
+  const lado = tela.width / QUADRADINHOS;
+  for (let i = 0; i < QUADRADINHOS * QUADRADINHOS; i++) {
+    const x = i % QUADRADINHOS, y = Math.floor(i / QUADRADINHOS);
+    // sem cor: um xadrez, para se ver que e transparente
+    pincel.fillStyle = pixeis[i] || ((x + y) % 2 ? "#2c2c44" : "#1e1e30");
+    pincel.fillRect(x * lado, y * lado, lado, lado);
+  }
+}
+
+function encher(inicio, cor) {
+  // O balde: pinta o quadradinho e todos os vizinhos da mesma cor.
+  const antiga = pixeis[inicio];
+  if (antiga === cor) return;
+  const fila = [inicio];
+  while (fila.length) {
+    const i = fila.pop();
+    if (pixeis[i] !== antiga) continue;
+    pixeis[i] = cor;
+    const x = i % QUADRADINHOS;
+    if (x > 0) fila.push(i - 1);
+    if (x < QUADRADINHOS - 1) fila.push(i + 1);
+    if (i >= QUADRADINHOS) fila.push(i - QUADRADINHOS);
+    if (i < QUADRADINHOS * (QUADRADINHOS - 1)) fila.push(i + QUADRADINHOS);
+  }
+}
+
+function pintar_quadradinho(ev) {
+  const caixa = $("grelha").getBoundingClientRect();
+  const x = Math.floor((ev.clientX - caixa.left) * QUADRADINHOS / caixa.width);
+  const y = Math.floor((ev.clientY - caixa.top) * QUADRADINHOS / caixa.height);
+  if (x < 0 || y < 0 || x >= QUADRADINHOS || y >= QUADRADINHOS) return;
+  const i = y * QUADRADINHOS + x;
+  if (ferramenta === "balde") encher(i, corDoLapis);
+  else pixeis[i] = ferramenta === "borracha" ? null : corDoLapis;
+  desenharGrelha();
+}
+
+function escolherFerramenta(nome) {
+  ferramenta = nome;
+  for (const id of ["lapis", "balde", "borracha"]) $(id).classList.toggle("escolhida", id === nome);
+}
+
+function escolherCor(cor) {
+  corDoLapis = cor;
+  for (const botao of $("paleta").children) botao.classList.toggle("escolhida", botao.dataset.cor === cor);
+  if (ferramenta === "borracha") escolherFerramenta("lapis");
+}
+
+async function abrirDesenho() {
+  pixeis = new Array(QUADRADINHOS * QUADRADINHOS).fill(null);
+  if (imagemAtual && imagemAtual.ha) {
+    // Ja ha imagem: comeca-se por ela, encolhida para a grelha.
+    try {
+      const atual = await createImageBitmap(await (await fetch("/api/imagem?v=" + imagemAtual.versao)).blob());
+      const tela = document.createElement("canvas");
+      tela.width = tela.height = QUADRADINHOS;
+      const pincel = tela.getContext("2d");
+      pincel.imageSmoothingEnabled = atual.width > QUADRADINHOS * 8;
+      pincel.drawImage(atual, 0, 0, QUADRADINHOS, QUADRADINHOS);
+      const dados = pincel.getImageData(0, 0, QUADRADINHOS, QUADRADINHOS).data;
+      for (let i = 0; i < pixeis.length; i++) {
+        if (dados[i * 4 + 3] > 127) pixeis[i] = "rgb(" + dados[i * 4] + "," + dados[i * 4 + 1] + "," + dados[i * 4 + 2] + ")";
+      }
+    } catch (erro) {}
+  }
+  $("nome-desenho").textContent = imagemAtual ? imagemAtual.nome : "";
+  desenharGrelha();
+  $("desenho").hidden = false;
+}
+
+async function guardarDesenho() {
+  if (pixeis.every(cor => cor === null)) {
+    alert("O desenho está vazio. Pinta alguns quadradinhos primeiro.");
+    return;
+  }
+  // Um PNG pequenino com um pixel por quadradinho, depois aumentado sem esborratar.
+  const pequeno = document.createElement("canvas");
+  pequeno.width = pequeno.height = QUADRADINHOS;
+  const pincel = pequeno.getContext("2d");
+  pixeis.forEach((cor, i) => {
+    if (cor) { pincel.fillStyle = cor; pincel.fillRect(i % QUADRADINHOS, Math.floor(i / QUADRADINHOS), 1, 1); }
+  });
+  const grande = document.createElement("canvas");
+  grande.width = grande.height = QUADRADINHOS * 8;
+  const pincelGrande = grande.getContext("2d");
+  pincelGrande.imageSmoothingEnabled = false;
+  pincelGrande.drawImage(pequeno, 0, 0, grande.width, grande.height);
+  try {
+    mostrarImagem((await pedir("/api/imagem", {dados: grande.toDataURL("image/png").split(",")[1]})).imagem);
+    $("desenho").hidden = true;
+  } catch (erro) {
+    alert(erro.message);
+  }
+}
+
+for (const cor of CORES_DA_PALETA) {
+  const botao = elemento("button");
+  botao.type = "button";
+  botao.style.background = cor;
+  botao.dataset.cor = cor;
+  botao.setAttribute("aria-label", "Cor " + cor);
+  botao.onclick = () => escolherCor(cor);
+  $("paleta").append(botao);
+}
+escolherCor(corDoLapis);
+$("cor-livre").oninput = () => escolherCor($("cor-livre").value);
+$("lapis").onclick = () => escolherFerramenta("lapis");
+$("balde").onclick = () => escolherFerramenta("balde");
+$("borracha").onclick = () => escolherFerramenta("borracha");
+$("limpar-desenho").onclick = () => { pixeis.fill(null); desenharGrelha(); };
+$("guardar-desenho").onclick = guardarDesenho;
+$("fechar-desenho").onclick = () => { $("desenho").hidden = true; };
+$("desenhar-imagem").onclick = abrirDesenho;
+$("grelha").addEventListener("pointerdown", ev => { aPintar = true; $("grelha").setPointerCapture(ev.pointerId); pintar_quadradinho(ev); });
+$("grelha").addEventListener("pointermove", ev => { if (aPintar && ferramenta !== "balde") pintar_quadradinho(ev); });
+$("grelha").addEventListener("pointerup", () => { aPintar = false; });
+$("grelha").addEventListener("pointercancel", () => { aPintar = false; });
+
+/* ---------------- o som do bocado ---------------- */
+// Como as imagens: ha coisas que dizem "som": "soldado.wav". Aqui escolhe-se
+// um ficheiro, ou grava-se com o microfone, e fica com esse nome.
+
+const SEGUNDOS_DE_SOM = 3;      // os sons de um jogo sao curtos
+const TAXA_DO_SOM = 22050;
+let somAVista;
+let somAtual = null;
+let gravador = null;
+
+function mostrarSom(som) {
+  const chave = JSON.stringify(som || null);
+  if (chave === somAVista) return;
+  somAVista = chave;
+  somAtual = som;
+  $("barra-som").hidden = !som;
+  if (!som) return;
+  const texto = $("texto-som");
+  texto.className = som.erro ? "mal" : "";
+  texto.textContent = "";
+  if (som.erro) texto.textContent = som.erro;
+  else if (som.ha) texto.append("O jogo está a usar o som ", elemento("b", som.nome), ".");
+  else texto.append("Sem som. O que escolheres ou gravares fica como ", elemento("b", som.nome), ".");
+  $("ouvir-som").hidden = !som.ha;
+  $("tirar-som").hidden = !som.ha;
+  $("por-som").hidden = $("gravar-som").hidden = Boolean(som.erro);
+  $("por-som").textContent = som.ha ? "Trocar o som" : "Escolher um som";
+}
+
+async function paraWav(ficheiro) {
+  // Qualquer som (MP3, WAV, uma gravacao) passa a um WAV curto, com um so
+  // canal: e o que os jogos sabem tocar, e fica pequeno.
+  const Contexto = window.AudioContext || window.webkitAudioContext;
+  const contexto = new Contexto();
+  const original = await contexto.decodeAudioData(await ficheiro.arrayBuffer());
+  contexto.close();
+  const amostras = Math.max(1, Math.min(Math.round(original.duration * TAXA_DO_SOM), SEGUNDOS_DE_SOM * TAXA_DO_SOM));
+  const fora = new OfflineAudioContext(1, amostras, TAXA_DO_SOM);
+  const fonte = fora.createBufferSource();
+  fonte.buffer = original;
+  fonte.connect(fora.destination);
+  fonte.start();
+  let onda = (await fora.startRendering()).getChannelData(0);
+  // Tira o silencio do inicio (numa gravacao ha sempre um bocadinho).
+  let inicio = 0;
+  while (inicio < onda.length - 1 && Math.abs(onda[inicio]) < 0.02) inicio++;
+  onda = onda.subarray(Math.max(0, inicio - 200));
+  const wav = new DataView(new ArrayBuffer(44 + onda.length * 2));
+  const escreve = (onde, texto) => { for (let i = 0; i < texto.length; i++) wav.setUint8(onde + i, texto.charCodeAt(i)); };
+  escreve(0, "RIFF"); wav.setUint32(4, 36 + onda.length * 2, true); escreve(8, "WAVE");
+  escreve(12, "fmt "); wav.setUint32(16, 16, true); wav.setUint16(20, 1, true); wav.setUint16(22, 1, true);
+  wav.setUint32(24, TAXA_DO_SOM, true); wav.setUint32(28, TAXA_DO_SOM * 2, true); wav.setUint16(32, 2, true); wav.setUint16(34, 16, true);
+  escreve(36, "data"); wav.setUint32(40, onda.length * 2, true);
+  for (let i = 0; i < onda.length; i++) wav.setInt16(44 + i * 2, Math.max(-1, Math.min(1, onda[i])) * 32767, true);
+  let letras = "";
+  const bytes = new Uint8Array(wav.buffer);
+  for (let i = 0; i < bytes.length; i += 8192) letras += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(letras);
+}
+
+async function mandarSom(ficheiro) {
+  let dados;
+  try {
+    dados = await paraWav(ficheiro);
+  } catch (erro) {
+    alert("Não consegui abrir isso como som. Experimenta um MP3 ou um WAV.");
+    return;
+  }
+  try {
+    mostrarSom((await pedir("/api/som", {dados})).som);
+    new Audio("/api/som?v=" + Date.now()).play().catch(() => {});
+  } catch (erro) {
+    alert(erro.message);
+  }
+}
+
+$("por-som").onclick = () => { $("escolher-som").value = ""; $("escolher-som").click(); };
+$("escolher-som").onchange = () => { if ($("escolher-som").files[0]) mandarSom($("escolher-som").files[0]); };
+$("ouvir-som").onclick = () => { new Audio("/api/som?v=" + (somAtual ? somAtual.versao : 0)).play().catch(() => {}); };
+$("tirar-som").onclick = async () => {
+  if (!confirm("Tirar o som?\n\nO ficheiro do som é apagado.")) return;
+  try { mostrarSom((await pedir("/api/tirar-som", {})).som); } catch (erro) { alert(erro.message); }
+};
+$("gravar-som").onclick = async () => {
+  if (gravador) { gravador.stop(); return; }       // segundo clique: parar
+  let microfone;
+  try {
+    microfone = await navigator.mediaDevices.getUserMedia({audio: true});
+  } catch (erro) {
+    alert("Não consegui usar o microfone. O browser pediu autorização? Tens de dizer que sim.");
+    return;
+  }
+  const pedacos = [];
+  gravador = new MediaRecorder(microfone);
+  gravador.ondataavailable = ev => pedacos.push(ev.data);
+  gravador.onstop = () => {
+    for (const pista of microfone.getTracks()) pista.stop();
+    $("gravar-som").classList.remove("a-gravar");
+    $("gravar-som").textContent = "Gravar";
+    const tipo = gravador.mimeType;
+    gravador = null;
+    mandarSom(new Blob(pedacos, {type: tipo}));
+  };
+  $("gravar-som").classList.add("a-gravar");
+  $("gravar-som").textContent = "A gravar… (carrega para parar)";
+  gravador.start();
+  const este = gravador;
+  setTimeout(() => { if (gravador === este) este.stop(); }, SEGUNDOS_DE_SOM * 1000 + 300);
 };
 
 /* ---------------- o ajudante ---------------- */
