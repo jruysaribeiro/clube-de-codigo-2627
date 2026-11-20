@@ -432,7 +432,68 @@ Com o `uv` (o plano B da secção 1), a linha é
 
 ---
 
-## 7. Correr tudo de uma vez, para verificar
+## 7. A Oficina — mudar um jogo e vê-lo mudar
+
+```bash
+python3 oficina/oficina.py
+```
+
+Com o `.venv` activado, como tudo o resto do Pygame (secção 1). Abre uma
+página no browser: escolhe-se um jogo e **uma coisa** dele (um inimigo, uma
+torre, um nível), e fica o código dessa coisa de um lado e o jogo a correr do
+outro, a mudar enquanto se escreve. Para fechar: `Ctrl + C` no terminal.
+
+Abre quatro jogos: **FADO//NEON** (s10), **Bicharada** (s12), **O Cerco**
+(s13) e **Mãos ao Ar!** (s14, aqui só com o teclado: não liga a câmara nem
+instala nada).
+
+- A Oficina mexe no **ficheiro verdadeiro** do jogo, e só guarda código que
+  correu sem rebentar. **Repor o original** desfaz um bocado; **Guardar o meu
+  jogo** dá o ficheiro para levar.
+- Se o browser não abrir sozinho, abre o endereço que o terminal mostra
+  (costuma ser `http://127.0.0.1:8765`). Com `--sem-navegador` não tenta
+  abrir; com `--porta 9000` usa outra porta.
+- Não precisa de internet.
+
+### Imagens
+
+Nas coisas que no código dizem `"imagem": "soldado.png"` aparece o botão
+**Escolher uma imagem**. A imagem escolhida fica em `comum/assets/imagens/`
+com esse nome e o jogo mostra-a logo. Fica só nesse computador: não vai para
+o git nem dentro do ficheiro que o **Guardar o meu jogo** dá.
+
+### O ajudante (o botão «Pedir ajuda»)
+
+Só aparece se a Oficina souber de um computador da sala a servir um modelo
+de linguagem. Os endereços estão em `oficina/servidores.txt`, que já traz os
+quatro computadores do centro (`cicf-1` a `cicf-4`). Fora do centro o botão
+aparece na mesma, mas quem perguntar recebe «O ajudante não responde agora»;
+para o esconder, põe um `#` à frente dessas linhas.
+
+A criança pergunta, ou pede uma mudança («põe-no mais rápido», «corrige-me
+este erro»). Quando é uma mudança, o ajudante mostra o bocado já mudado e um
+botão **Aplicar no meu código**, com **Desfazer**. Com mapas feitos de letras
+engana-se quase sempre: esses mudam-se à mão.
+
+**Antes e depois de cada sessão**, do portátil do professor:
+
+```bash
+python3 oficina/ajudante.py acordar     # antes: põe o modelo na memória dos quatro
+python3 oficina/ajudante.py adormecer   # no fim: liberta as placas gráficas
+python3 oficina/ajudante.py ver         # só mostra como estão
+```
+
+Estes três não precisam do `.venv`. Um computador que diga `NÃO RESPONDE`
+está desligado, ou ligado sem a sessão do Windows iniciada (o Ollama só
+arranca depois de alguém entrar na conta).
+
+Para preparar um computador novo como ajudante: corre nele o
+`instalar-servidor-windows.bat` e junta o endereço que ele mostra no fim ao
+`oficina/servidores.txt`. Mais pormenores no `oficina/README.md`.
+
+---
+
+## 8. Correr tudo de uma vez, para verificar
 
 Este comando abre e fecha **todas** as janelas, uma a uma, e diz se alguma
 rebentou. Cada uma fica aberta uns segundos.
@@ -460,7 +521,7 @@ exatamente o que se quer.
 
 ---
 
-## 8. Assets
+## 9. Assets
 
 As pastas `comum/assets/imagens/` e `comum/assets/sons/` vêm **vazias**, de
 propósito. Ver `comum/assets/LEIA-ME.md`.
@@ -471,7 +532,7 @@ aparece em vez do quadrado azul, **sem mexer numa linha de código**.
 
 ---
 
-## 9. Se alguma coisa correr mal
+## 10. Se alguma coisa correr mal
 
 | Sintoma | Causa |
 |---|---|
@@ -484,12 +545,15 @@ aparece em vez do quadrado azul, **sem mexer numa linha de código**.
 | s14: «sem câmara» no título | Lê a linha laranja, que diz o motivo. No Mac, a causa habitual é a permissão: Definições do Sistema → Privacidade e Segurança → Câmara. Depois tecla **C** |
 | s14: abre a câmara errada | Tecla **C**, ou muda a constante `CAMARA` no topo do ficheiro |
 | s14: `Password:` no terminal ao arrancar | É o `sudo` a instalar o `mediapipe` no Python do sistema. Escreve a palavra-passe de administrador (não aparece nada enquanto escreves) |
+| Oficina: não há botão «Pedir ajuda» | O `oficina/servidores.txt` não tem nenhum endereço sem `#` à frente |
+| Oficina: «O ajudante não responde agora» | Nenhum dos computadores ajudantes atendeu. `python3 oficina/ajudante.py ver` diz qual está em baixo; o motivo de cada um fica também no terminal da Oficina |
+| Oficina: a primeira resposta do ajudante demora muito | O modelo ainda estava a ir para a memória. Corre o `acordar` antes da sessão |
 | O programa parece bloqueado no terminal | É um `input()` à espera de Enter |
 | Um ciclo não pára | `Ctrl + C` |
 
 ---
 
-## 10. Verificação num servidor, sem ecrã
+## 11. Verificação num servidor, sem ecrã
 
 Em CI ou por SSH, sem monitor, os ficheiros de Pygame precisam de um driver
 falso:
