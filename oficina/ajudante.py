@@ -4,8 +4,8 @@
 # aberto a rede: ver instalar-servidor-windows.bat).
 #
 # Os enderecos desses computadores estao em oficina/servidores.txt. Havendo
-# varios, cada pergunta vai para um diferente, a vez; se um nao atender,
-# passa-se ao seguinte. Sem enderecos nao ha ajudante, e a Oficina funciona
+# varios, cada pergunta vai para um diferente, a vez; se esse nao atender, ou
+# estiver ocupado com a pergunta de outro aluno, passa-se ao seguinte. Sem enderecos nao ha ajudante, e a Oficina funciona
 # como sempre.
 #
 # So usa o que ja vem com o Python.
@@ -23,7 +23,9 @@
 import http.client
 import json
 import os
+import queue
 import random
+import socket
 import sys
 import threading
 import time
@@ -37,6 +39,7 @@ LIGAR = 3                 # segundos para um servidor atender
 ESPERAR = 180             # segundos a espera da resposta (a primeira demora: o modelo vai para a memoria)
 CARREGAR = 300            # segundos que um servidor pode levar a por o modelo na memoria
 DESCANSO = 30             # segundos sem voltar a tentar um servidor que falhou
+PRESSA = 4                # segundos sem comecar a escrever: esta ocupado, pergunta-se tambem a outro
 VALIDADE = 15             # segundos que vale a ultima vez que se viu quem esta ligado
 RESPOSTA_MAXIMA = 3000    # tokens: trava um modelo que nao se cala
 CODIGO_MAXIMO = 6000      # letras do codigo que se mandam ao modelo
@@ -61,6 +64,11 @@ Regras:
 
 class Indisponivel(Exception):
     # Nao ha ajudante, ou nenhum servidor respondeu. O texto e para o aluno.
+    pass
+
+
+class Calado(Exception):
+    # Um servidor que comecou a responder e se calou sem dizer nada.
     pass
 
 
@@ -237,75 +245,150 @@ class Ajudante:
                 return nome
         raise OSError("sem nenhum modelo para conversar")
 
+    def comecar(self, tentativa, mensagens, fila):
+        # (Corre a parte.) Faz a pergunta a um servidor e espera que ele
+        # comece a escrever. Um servidor ocupado com outra pergunta so comeca
+        # quando chegar a nossa vez. No fim poe a tentativa na fila.
+        servidor = tentativa["servidor"]
+        try:
+            modelo = self.modelo_de(servidor)
+            ligacao = self.ligar(servidor, ESPERAR)
+            tentativa["ligacao"] = ligacao
+            if tentativa["largada"]:
+                raise OSError("ja nao e precisa")
+            corpo = {"model": modelo, "messages": mensagens, "stream": True,
+                     "options": {"temperature": 0.3, "num_predict": RESPOSTA_MAXIMA}}
+            if modelo.startswith("gpt-oss"):
+                # Este modelo pensa antes de responder, e a pensar muito
+                # gasta as palavras todas sem chegar a dizer nada.
+                corpo["think"] = "low"
+            ligacao.request("POST", "/api/chat", body=json.dumps(corpo).encode("utf-8"),
+                            headers={"Content-Type": "application/json"})
+            resposta = ligacao.getresponse()
+            if resposta.status != 200:
+                detalhe = resposta.read(300).decode("utf-8", "replace")
+                raise OSError("resposta " + str(resposta.status) + " " + detalhe)
+            linha = b""
+            while linha.strip() == b"":
+                linha = resposta.readline()
+                if linha == b"":
+                    raise OSError("a ligação fechou antes do fim")
+            tentativa["resposta"] = resposta
+            tentativa["linha"] = linha
+        except (OSError, http.client.HTTPException, ValueError, AttributeError) as erro:
+            tentativa["erro"] = erro
+        if tentativa["largada"]:
+            self.largar(tentativa)
+        fila.put(tentativa)
+
+    def largar(self, tentativa):
+        # Fecha a ligacao: o servidor deixa de escrever (ou tira a pergunta
+        # da fila dele) e fica livre para os outros.
+        tentativa["largada"] = True
+        ligacao = tentativa.get("ligacao")
+        if ligacao is not None:
+            try:
+                if ligacao.sock is not None:
+                    # Acorda quem estiver a espera de ler desta ligacao.
+                    ligacao.sock.shutdown(socket.SHUT_RDWR)
+            except (OSError, AttributeError):
+                pass
+            try:
+                ligacao.close()
+            except (OSError, AttributeError):
+                pass
+
+    def ler(self, tentativa):
+        # Da o texto da resposta de quem comecou a escrever, aos bocadinhos.
+        servidor = tentativa["servidor"]
+        resposta = tentativa["resposta"]
+        linha = tentativa["linha"]
+        disse = False        # ja mandou algum texto
+        try:
+            while True:
+                if linha == b"":
+                    raise OSError("a ligação fechou antes do fim")
+                if linha.strip() != b"":
+                    parte = json.loads(linha)
+                    if parte.get("error"):
+                        raise OSError(str(parte["error"]))
+                    # (O que um modelo "pensa" antes de responder vem
+                    # noutro campo, e nao se mostra.)
+                    texto = (parte.get("message") or {}).get("content")
+                    if texto:
+                        disse = True
+                        yield texto
+                    if parte.get("done"):
+                        break
+                linha = resposta.readline()
+        except (OSError, http.client.HTTPException, ValueError) as erro:
+            if disse:
+                raise Indisponivel("O ajudante deixou de responder a meio. Pergunta outra vez.") from erro
+            raise Calado(str(erro) or type(erro).__name__) from erro
+        if not disse:
+            # Acontece: o modelo gasta as palavras todas a pensar.
+            print("Ajudante: " + servidor + " acabou sem dizer nada (" + str(parte.get("done_reason"))
+                  + ", " + str(parte.get("eval_count")) + " tokens).")
+            raise Indisponivel("O ajudante ficou a pensar e não chegou a responder. "
+                               "Pede-lhe uma coisa mais pequena, ou pergunta de outra maneira.")
+
     def perguntar(self, mensagens):
         # Da a resposta aos bocadinhos, a medida que o modelo a escreve.
+        #
+        # Pergunta-se ao servidor da vez. Se ele nao comecar a escrever em
+        # PRESSA segundos e porque esta ocupado com a pergunta de outro
+        # aluno: faz-se a mesma pergunta tambem ao seguinte, e assim por
+        # diante. Fica-se com o primeiro que comecar e largam-se os outros.
         if not self.ha():
             raise Indisponivel("Esta Oficina não tem ajudante ligado.")
+        por_tentar = self.ordem()
+        a_espera = []        # tentativas que ainda nao comecaram a escrever
+        fila = queue.Queue()
         falhas = []
-        for servidor in self.ordem():
-            ligacao = None
-            try:
+
+        def falhou(servidor, erro):
+            # Este nao serve agora: descansa um bocado.
+            falhas.append(servidor + ": " + (str(erro) or type(erro).__name__))
+            self.modelos.pop(servidor, None)
+            self.de_castigo[servidor] = time.time() + DESCANSO
+
+        try:
+            while por_tentar or a_espera:
+                if por_tentar:
+                    tentativa = {"servidor": por_tentar.pop(0), "largada": False}
+                    a_espera.append(tentativa)
+                    threading.Thread(target=self.comecar, args=(tentativa, mensagens, fila), daemon=True).start()
                 try:
-                    modelo = self.modelo_de(servidor)
-                    ligacao = self.ligar(servidor, ESPERAR)
-                    corpo = {"model": modelo, "messages": mensagens, "stream": True,
-                             "options": {"temperature": 0.3, "num_predict": RESPOSTA_MAXIMA}}
-                    if modelo.startswith("gpt-oss"):
-                        # Este modelo pensa antes de responder, e a pensar muito
-                        # gasta as palavras todas sem chegar a dizer nada.
-                        corpo["think"] = "low"
-                    ligacao.request("POST", "/api/chat", body=json.dumps(corpo).encode("utf-8"),
-                                    headers={"Content-Type": "application/json"})
-                    resposta = ligacao.getresponse()
-                    if resposta.status != 200:
-                        detalhe = resposta.read(300).decode("utf-8", "replace")
-                        raise OSError("resposta " + str(resposta.status) + " " + detalhe)
-                except (OSError, http.client.HTTPException, ValueError) as erro:
-                    # Este nao serve agora: descansa um bocado e tenta-se o seguinte.
-                    falhas.append(servidor + ": " + (str(erro) or type(erro).__name__))
-                    self.modelos.pop(servidor, None)
-                    self.de_castigo[servidor] = time.time() + DESCANSO
+                    pronta = fila.get(timeout=PRESSA if por_tentar else None)
+                except queue.Empty:
+                    continue         # ocupado: pergunta-se tambem ao seguinte
+                if pronta not in a_espera:
+                    continue         # uma que ja tinha sido largada
+                a_espera.remove(pronta)
+                if "erro" in pronta:
+                    self.largar(pronta)
+                    falhou(pronta["servidor"], pronta["erro"])
                     continue
-                self.de_castigo.pop(servidor, None)
-                disse = False        # ja mandou algum texto
-                acabou = False       # chegou ao fim da resposta
+                # Este comecou a escrever: e com ele que se fica. Os outros
+                # ficam livres (e voltam a lista, para o caso de este se calar).
+                for outra in a_espera:
+                    self.largar(outra)
+                    por_tentar.append(outra["servidor"])
+                a_espera = [pronta]
+                self.de_castigo.pop(pronta["servidor"], None)
                 try:
-                    for linha in resposta:
-                        if linha.strip() == b"":
-                            continue
-                        parte = json.loads(linha)
-                        if parte.get("error"):
-                            raise OSError(str(parte["error"]))
-                        # (O que um modelo "pensa" antes de responder vem
-                        # noutro campo, e nao se mostra.)
-                        texto = (parte.get("message") or {}).get("content")
-                        if texto:
-                            disse = True
-                            yield texto
-                        if parte.get("done"):
-                            acabou = True
-                            break
-                    if not acabou:
-                        raise OSError("a ligação fechou antes do fim")
-                    if not disse:
-                        # Acontece: o modelo gasta as palavras todas a pensar.
-                        print("Ajudante: " + servidor + " acabou sem dizer nada (" + str(parte.get("done_reason"))
-                              + ", " + str(parte.get("eval_count")) + " tokens).")
-                        raise Indisponivel("O ajudante ficou a pensar e não chegou a responder. "
-                                           "Pede-lhe uma coisa mais pequena, ou pergunta de outra maneira.")
-                except (OSError, http.client.HTTPException, ValueError) as erro:
-                    if disse:
-                        raise Indisponivel("O ajudante deixou de responder a meio. Pergunta outra vez.") from erro
-                    # Calou-se sem dizer nada (desligaram-no?): tenta-se o seguinte.
-                    falhas.append(servidor + ": " + (str(erro) or type(erro).__name__))
-                    self.de_castigo[servidor] = time.time() + DESCANSO
-                    continue
-                return
-            finally:
-                # Tambem quando o aluno fecha a pagina a meio: o servidor
-                # deixa de escrever uma resposta que ja ninguem le.
-                if ligacao is not None:
-                    ligacao.close()
+                    yield from self.ler(pronta)
+                    return
+                except Calado as erro:
+                    # Calou-se sem dizer nada (desligaram-no?): tenta-se outro.
+                    falhou(pronta["servidor"], erro)
+                    self.largar(pronta)
+                    a_espera = []
+        finally:
+            # Tambem quando o aluno fecha a pagina a meio: os servidores
+            # deixam de escrever uma resposta que ja ninguem le.
+            for tentativa in a_espera:
+                self.largar(tentativa)
         print("Ajudante: nenhum servidor respondeu.")
         for falha in falhas:
             print("    " + falha)

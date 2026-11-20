@@ -114,7 +114,10 @@ estiver à vista; nada sai da rede da sala.
 2. Escrevem-se esses endereços em `oficina/servidores.txt`, um por linha.
 
 Com vários endereços, as perguntas espalham-se por todos, e um computador
-desligado é saltado. Sem endereços, o botão não aparece e o resto funciona
+desligado é saltado. Cada computador responde a uma pergunta de cada vez:
+se o da vez não começar a escrever em 4 segundos é porque está ocupado, e a
+mesma pergunta vai também para o seguinte; fica-se com o primeiro que
+começar. Sem endereços, o botão não aparece e o resto funciona
 como sempre. Para experimentar sem mexer no ficheiro:
 
 ```bash
