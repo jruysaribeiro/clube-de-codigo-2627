@@ -17,7 +17,8 @@
 #   F                velocidade a dobrar        P   pausa
 #
 # Zero assets: tudo e desenhado com formas. Se puseres um PNG com o nome
-# que esta em "imagem" na pasta comum/assets/imagens/, aparece a imagem.
+# que esta em "imagem" na pasta comum/assets/imagens/, aparece a imagem; e
+# um WAV com o nome que esta em "som" em comum/assets/sons/ passa a ouvir-se.
 
 import math
 import random
@@ -148,6 +149,8 @@ MAPA = [
 # cor:        (vermelho, verde, azul), cada um de 0 a 255
 # imagem:     o nome de um PNG. Se ele existir em comum/assets/imagens/,
 #             a torre aparece com essa imagem; se nao, fica a forma.
+# som:        o nome de um WAV. Se ele existir em comum/assets/sons/,
+#             ouve-se cada vez que a torre dispara.
 #
 # Para inventar uma torre: copia um bloco { ... }, cola por baixo, muda o
 # nome, a tecla e os numeros. So cabem 4 botoes na barra de baixo.
@@ -156,21 +159,25 @@ TORRES = [
         "nome": "Besteiro", "tecla": pygame.K_1, "custo": 50,
         "alcance": 120, "dano": 7, "cadencia": 35, "efeito": "tiro",
         "cor": (70, 110, 200), "imagem": "besteiro.png",
+        "som": "besteiro.wav",
     },
     {
         "nome": "Trabuco", "tecla": pygame.K_2, "custo": 100,
         "alcance": 170, "dano": 22, "cadencia": 100, "efeito": "explosao",
         "raio_explosao": 55, "cor": (140, 100, 70), "imagem": "trabuco.png",
+        "som": "trabuco.wav",
     },
     {
         "nome": "Caldeirão", "tecla": pygame.K_3, "custo": 75,
         "alcance": 75, "dano": 2, "cadencia": 45, "efeito": "area",
         "lentidao": 0.45, "cor": (220, 170, 40), "imagem": "caldeirao.png",
+        "som": "caldeirao.wav",
     },
     {
         "nome": "Padeira", "tecla": pygame.K_4, "custo": 130,
         "alcance": 65, "dano": 30, "cadencia": 60, "efeito": "golpe",
         "cor": (230, 220, 200), "imagem": "padeira.png",
+        "som": "padeira.wav",
     },
 ]
 
@@ -185,19 +192,21 @@ TORRES = [
 # forma:      "circulo" ou "quadrado"
 # imagem:     o nome de um PNG. Se ele existir em comum/assets/imagens/,
 #             o inimigo aparece com essa imagem; se nao, fica a forma.
+# som:        o nome de um WAV. Se ele existir em comum/assets/sons/,
+#             ouve-se quando o inimigo cai.
 INIMIGOS = {
     "Soldado": {"vida": 40, "velocidade": 1.2, "recompensa": 5, "estrago": 1,
                 "tamanho": 16, "cor": (200, 60, 60), "forma": "circulo",
-                "imagem": "soldado.png"},
+                "imagem": "soldado.png", "som": "soldado.wav"},
     "Cavaleiro": {"vida": 35, "velocidade": 2.4, "recompensa": 7, "estrago": 1,
                   "tamanho": 18, "cor": (230, 140, 60), "forma": "circulo",
-                  "imagem": "cavaleiro.png"},
+                  "imagem": "cavaleiro.png", "som": "cavaleiro.wav"},
     "Aríete": {"vida": 220, "velocidade": 0.6, "recompensa": 20, "estrago": 3,
                "tamanho": 26, "cor": (110, 75, 45), "forma": "quadrado",
-               "imagem": "ariete.png"},
+               "imagem": "ariete.png", "som": "ariete.wav"},
     "General": {"vida": 1500, "velocidade": 0.7, "recompensa": 100, "estrago": 10,
                 "tamanho": 32, "cor": (120, 40, 140), "forma": "quadrado",
-                "imagem": "general.png"},
+                "imagem": "general.png", "som": "general.wav"},
 }
 
 # --- As ondas ---
@@ -259,6 +268,25 @@ def obter_imagem(nome_ficheiro, tamanho):
         else:
             imagens_carregadas[chave] = None
     return imagens_carregadas[chave]
+
+
+# Com os sons e igual: ficam aqui depois de lidos, e None quer dizer "nao ha".
+sons_carregados = {}
+
+
+def tocar_som(nome_ficheiro):
+    # Toca o som com esse nome, se ele existir em comum/assets/sons/.
+    if nome_ficheiro not in sons_carregados:
+        caminho = PASTA_ASSETS / "sons" / nome_ficheiro
+        som = None
+        if caminho.is_file() and pygame.mixer.get_init():
+            try:
+                som = pygame.mixer.Sound(str(caminho))
+            except pygame.error:
+                som = None       # o ficheiro existe mas nao e um som que se perceba
+        sons_carregados[nome_ficheiro] = som
+    if sons_carregados[nome_ficheiro] is not None:
+        sons_carregados[nome_ficheiro].play()
 
 # Uma folha transparente, do tamanho do ecra, para desenhar os alcances
 # meio a ver-se. O pygame.draw normal nao sabe fazer transparencias.
@@ -377,6 +405,7 @@ def comecar_jogo():
     torre_escolhida = None
     velocidade_jogo = 1
     pausa = False
+    memoria.clear()
 
 
 def comecar_onda():
@@ -393,6 +422,7 @@ def comecar_onda():
     numero_onda = numero_onda + 1
     onda_a_decorrer = True
     espera_saida = 0
+    ao_comecar_onda(numero_onda)
 
 
 def criar_inimigo(nome):
@@ -439,6 +469,7 @@ def construir(coluna, linha):
         "mira": (centro[0] + 1, centro[1]),
     })
     torre_escolhida = None
+    ao_construir(torres[len(torres) - 1])
 
 
 def valor_da_torre(torre, chave):
@@ -489,6 +520,82 @@ def circulo_a_crescer(x, y, cor, raio):
 
 def texto_a_voar(texto, x, y, cor):
     return {"tipo": "texto", "x": x, "y": y, "cor": cor, "texto": texto, "tempo": 45, "tempo_max": 45}
+
+
+# =====================================================================
+#                          ACONTECIMENTOS
+# =====================================================================
+
+# --- Os acontecimentos ---
+# O jogo chama cada uma destas funcoes quando acontece o que o nome diz.
+# Estao vazias (so tem "pass"): o que la escreveres passa a acontecer nesse
+# momento. E aqui que se INVENTA: uma bomba, um poder, um premio.
+#
+# Alem do que as regras do jogo podem usar (ver mais abaixo), tens:
+#   memoria                     um dicionario so teu, para guardares o que
+#                               quiseres de um frame para o outro:
+#                               memoria["bombas"] = 3
+#                               (fica vazio cada vez que o jogo recomeca)
+#   inimigos.append(criar_inimigo("Soldado"))    manda vir mais um inimigo
+#   magoar(inimigo, 50)         tira 50 de vida a um inimigo
+#   numero_onda, ouro, vidas    para os MUDAR, a primeira linha da funcao
+#                               tem de ser "global ouro" (ou "global vidas")
+memoria = {}
+
+
+# QUANDO COMECA UMA ONDA
+# numero: 1 na primeira onda, 2 na segunda, e por ai fora.
+# Ideias: dar 50 de ouro de 3 em 3 ondas; avisar com um texto_a_voar que vem
+# ai uma onda dificil; mandar vir um General de surpresa na onda 5.
+def ao_comecar_onda(numero):
+    pass
+
+
+# QUANDO UM INIMIGO CAI
+# inimigo: o que acabou de cair. inimigo["x"], inimigo["y"] dizem onde foi, e
+# inimigo["nome"] diz qual era, escrito tal e qual como em INIMIGOS, com os
+# acentos: "Soldado", "Cavaleiro", "Aríete", "General".
+# Ideias: rebentar e magoar os que estao perto; de vez em quando deixar ouro
+# a dobrar; um Ariete que ao cair larga dois Soldados.
+def ao_cair_inimigo(inimigo):
+    pass
+
+
+# QUANDO UM INIMIGO CHEGA AO CASTELO
+# inimigo: o que acabou de entrar no castelo (as vidas ja foram tiradas).
+# Ideias: dar um bocadinho de ouro de consolacao; magoar todos os outros
+# inimigos, como se o castelo se defendesse.
+def ao_chegar_ao_castelo(inimigo):
+    pass
+
+
+# QUANDO SE CONSTROI UMA TORRE
+# torre: a que acabou de ser construida. torre["x"], torre["y"] dizem onde, e
+# TORRES[torre["tipo"]]["nome"] diz qual e. torre["nivel"] e o nivel dela.
+# Ideias: a primeira torre de cada jogo ja nascer no nivel 2; um circulo a
+# crescer no sitio onde ela aparece.
+def ao_construir(torre):
+    pass
+
+
+# QUANDO SE CARREGA NUMA TECLA
+# tecla: a tecla em que se carregou. pygame.K_b e a tecla B, pygame.K_m a M.
+# (As teclas 1 2 3 4, Espaco, U, V, F e P ja fazem coisas no jogo.)
+# Para uma coisa so poder ser usada uma vez por onda, guarda na memoria o
+# numero da onda em que foi usada e compara com numero_onda.
+# Ideias: a tecla B magoa todos os inimigos, mas so uma vez por onda (usa a
+# memoria para te lembrares se ja foi usada); a tecla G da ouro (batota!).
+def ao_carregar_tecla(tecla):
+    pass
+
+
+# A CADA FRAME
+# Corre 60 vezes por segundo enquanto se joga. Cuidado: o que aqui puseres
+# acontece MUITAS vezes.
+# Ideias: 1 de ouro a cada segundo (conta os frames na memoria); os inimigos
+# perderem vida aos poucos.
+def a_cada_frame():
+    pass
 
 
 # =====================================================================
@@ -559,6 +666,8 @@ def disparar(torre, alvo):
     dano = valor_da_torre(torre, "dano")
     torre["recarga"] = modelo["cadencia"]
     torre["mira"] = (alvo["x"], alvo["y"])
+    if "som" in modelo:
+        tocar_som(modelo["som"])
 
     if modelo["efeito"] == "tiro" or modelo["efeito"] == "explosao":
         raio = 0
@@ -665,18 +774,30 @@ def atualizar_inimigos():
     # A receita dos sobreviventes: quem morreu ou chegou ao castelo nao
     # passa para a lista nova.
     sobreviventes = []
+    caidos = []
+    chegados = []
     for inimigo in inimigos:
         dados = INIMIGOS[inimigo["nome"]]
         if inimigo["vida"] <= 0:
             ouro = ouro + dados["recompensa"]
             efeitos.append(texto_a_voar("+" + str(dados["recompensa"]), inimigo["x"] - 10, inimigo["y"] - 20, AMARELO))
             efeitos.append(circulo_a_crescer(inimigo["x"], inimigo["y"], dados["cor"], dados["tamanho"]))
+            if "som" in dados:
+                tocar_som(dados["som"])
+            caidos.append(inimigo)
         elif inimigo["chegou"]:
             vidas = vidas - dados["estrago"]
             efeitos.append(texto_a_voar("-" + str(dados["estrago"]), inimigo["x"] - 10, inimigo["y"] - 30, VERMELHO))
+            chegados.append(inimigo)
         else:
             sobreviventes.append(inimigo)
     inimigos = sobreviventes
+    # So agora, com a lista ja arrumada, se avisa de quem caiu e de quem
+    # chegou: assim esses acontecimentos podem mexer nos inimigos a vontade.
+    for inimigo in caidos:
+        ao_cair_inimigo(inimigo)
+    for inimigo in chegados:
+        ao_chegar_ao_castelo(inimigo)
 
 
 def atualizar_ondas():
@@ -712,6 +833,7 @@ def atualizar_efeitos():
 
 def um_passo():
     global estado
+    a_cada_frame()
     atualizar_ondas()
     atualizar_inimigos()
     atualizar_torres()
@@ -756,6 +878,26 @@ def desenhar_mapa():
     pygame.draw.polygon(ecra, (40, 90, 200), [(muralha.centerx, muralha.y - 30), (muralha.centerx + 16, muralha.y - 24), (muralha.centerx, muralha.y - 18)])
 
 
+# --- Os desenhos ---
+# As duas funcoes que se seguem desenham uma torre e um inimigo. Desenha-se
+# com formas do pygame, sempre no "ecra":
+#   pygame.draw.circle(ecra, cor, (x, y), raio)
+#   pygame.draw.rect(ecra, cor, (x, y, largura, altura))
+#   pygame.draw.line(ecra, cor, (x1, y1), (x2, y2), grossura)
+#   pygame.draw.polygon(ecra, cor, [(x1, y1), (x2, y2), (x3, y3)])
+# O x cresce para a direita e o y cresce para BAIXO. Uma cor sao tres
+# numeros (vermelho, verde, azul), de 0 a 255. O que se desenha depois fica
+# por cima do que se desenhou antes. escurecer(cor, 0.5) da a mesma cor, mais
+# escura.
+
+# O DESENHO DE UMA TORRE
+# torre["x"], torre["y"]   o centro do quadrado onde ela esta (o quadrado
+#                          tem TILE pixeis de lado)
+# torre["mira"]            o ponto (x, y) para onde aponta
+# torre["nivel"]           1, 2 ou 3
+# modelo["cor"]            a cor da ficha dela em TORRES
+# Ideias: uma bandeira no topo; uma torre que muda de cor com o nivel; dois
+# canos em vez de um.
 def desenhar_torre(torre):
     modelo = TORRES[torre["tipo"]]
     base = pygame.Rect(0, 0, TILE - 6, TILE - 6)
@@ -782,6 +924,12 @@ def desenhar_torre(torre):
         pontinho = pontinho + 1
 
 
+# O DESENHO DE UM INIMIGO
+# x, y        o centro do inimigo         tamanho   o "tamanho" da ficha dele
+# cor         a cor da ficha (mais clara enquanto esta lento)
+# inimigo["vida"], inimigo["vida_max"]    para a barra de vida
+# Ideias: dar-lhe olhos; um chapeu ao General; ficar vermelho quando ja tem
+# pouca vida.
 def desenhar_inimigo(inimigo):
     dados = INIMIGOS[inimigo["nome"]]
     tamanho = dados["tamanho"]
@@ -953,6 +1101,7 @@ while a_correr:
                     pausa = not pausa
                 if evento.key == pygame.K_ESCAPE:
                     torre_escolhida = None
+                ao_carregar_tecla(evento.key)
 
         if evento.type == pygame.MOUSEBUTTONDOWN and estado == "jogo":
             if evento.button == 3:
