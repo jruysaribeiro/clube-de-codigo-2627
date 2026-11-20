@@ -173,6 +173,12 @@
   /* ---------- o ajudante ---------- */
   #ajudante { display: flex; flex-direction: column; min-height: 0; max-height: 45%; border-top: 1px solid var(--linha); background: var(--painel); }
   #ajudante .nota { margin: 0; padding: 8px 14px 0; font-size: 13px; color: var(--fraco); }
+  /* a luzinha: verde se algum computador ajudante atende, vermelha se nenhum */
+  .luz { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--fraco); margin-right: 6px; vertical-align: baseline; }
+  .luz.verde { background: var(--verde); box-shadow: 0 0 6px var(--verde); }
+  .luz.vermelha { background: var(--vermelho); box-shadow: 0 0 6px var(--vermelho); }
+  #ligacao { margin: 0; padding: 8px 14px 0; font-size: 13px; color: var(--fraco); }
+  #ligacao.mal { color: var(--vermelho); }
   #conversa { flex: 1; min-height: 0; overflow: auto; padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; }
   #conversa:empty { display: none; }
   #conversa div { padding: 8px 11px; border-radius: 10px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 92%; }
@@ -252,6 +258,7 @@
   <div id="estado" class="espera" role="status"></div>
   <div id="fala" hidden></div>
   <div id="ajudante" hidden>
+    <p id="ligacao" role="status"><span class="luz"></span><span id="texto-ligacao">A ver se os computadores ajudantes estão ligados…</span></p>
     <p class="nota">O ajudante é um programa: às vezes engana-se. Lê o que ele muda e experimenta no jogo.</p>
     <div id="conversa" aria-live="polite"></div>
     <div class="atalhos">
@@ -267,7 +274,7 @@
     <button id="repor">Repor o original</button>
     <button id="guardar">Guardar o meu jogo</button>
     <button id="reabrir" hidden>Pôr o jogo a correr outra vez</button>
-    <button id="pedir-ajuda" hidden>Pedir ao ajudante</button>
+    <button id="pedir-ajuda" hidden><span class="luz" id="luz-do-botao"></span><span id="texto-do-botao">Pedir ao ajudante</span></button>
   </div>
   </section>
   </div>
@@ -1146,7 +1153,30 @@ function limparConversa() {
   conversa = [];
   $("conversa").textContent = "";
   $("ajudante").hidden = true;
-  $("pedir-ajuda").textContent = "Pedir ao ajudante";
+  $("texto-do-botao").textContent = "Pedir ao ajudante";
+}
+
+async function verLigacao() {
+  // A luzinha: quantos computadores ajudantes estao a atender agora.
+  let dados;
+  try {
+    dados = await pedir("/api/ajudante");
+  } catch (erro) {
+    return;
+  }
+  if (!dados.ha) return;
+  const cor = dados.ligados === null ? "" : dados.ligados > 0 ? "verde" : "vermelha";
+  for (const luz of document.querySelectorAll(".luz")) luz.className = "luz " + cor;
+  let texto = "A ver se os computadores ajudantes estão ligados…";
+  if (dados.ligados === 0) texto = "Nenhum computador ajudante está ligado. Chama o professor.";
+  else if (dados.ligados !== null) {
+    texto = dados.ligados + " de " + dados.total + (dados.total === 1 ? " computador ajudante ligado." : " computadores ajudantes ligados.");
+  }
+  $("texto-ligacao").textContent = texto;
+  $("ligacao").classList.toggle("mal", dados.ligados === 0);
+  $("pedir-ajuda").title = texto;
+  // (A primeira resposta vem sem numero: a Oficina ainda esta a ver.)
+  if (dados.ligados === null) setTimeout(verLigacao, 1500);
 }
 
 function mostrarSugestoes(lista) {
@@ -1300,7 +1330,8 @@ async function perguntar(texto) {
 $("pedir-ajuda").onclick = () => {
   const painel = $("ajudante");
   painel.hidden = !painel.hidden;
-  $("pedir-ajuda").textContent = painel.hidden ? "Pedir ao ajudante" : "Fechar o ajudante";
+  $("texto-do-botao").textContent = painel.hidden ? "Pedir ao ajudante" : "Fechar o ajudante";
+  if (!painel.hidden) verLigacao();
   if (!painel.hidden) $("pergunta").focus();
 };
 $("perguntar").onsubmit = evento => {
@@ -1399,6 +1430,10 @@ async function arrancar() {
     haAjudante = (await pedir("/api/ajudante")).ha;
   } catch (erro) {}
   $("pedir-ajuda").hidden = !haAjudante;
+  if (haAjudante) {
+    verLigacao();
+    setInterval(verLigacao, 20000);
+  }
   const [jogoInicial, escolhaInicial] = decodeURIComponent(location.hash.slice(1)).split("/");
   if (jogoInicial && escolhaInicial === "jogar") jogarTudo(jogoInicial, null);
   else if (jogoInicial && escolhaInicial) abrir(jogoInicial, escolhaInicial);

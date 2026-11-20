@@ -37,6 +37,7 @@ LIGAR = 3                 # segundos para um servidor atender
 ESPERAR = 180             # segundos a espera da resposta (a primeira demora: o modelo vai para a memoria)
 CARREGAR = 300            # segundos que um servidor pode levar a por o modelo na memoria
 DESCANSO = 30             # segundos sem voltar a tentar um servidor que falhou
+VALIDADE = 15             # segundos que vale a ultima vez que se viu quem esta ligado
 RESPOSTA_MAXIMA = 3000    # tokens: trava um modelo que nao se cala
 CODIGO_MAXIMO = 6000      # letras do codigo que se mandam ao modelo
 TEXTO_MAXIMO = 1500       # letras de cada pergunta, erro ou resposta antiga
@@ -145,9 +146,44 @@ class Ajudante:
         self.vez = random.randrange(len(self.servidores)) if self.servidores else 0
         self.de_castigo = {}      # servidor -> hora ate a qual nao vale a pena tentar
         self.modelos = {}         # servidor -> modelo que ele tem
+        self.ligados = None       # quantos servidores atenderam da ultima vez (None: ainda nao se viu)
+        self.visto = 0            # quando foi isso
+        self.a_ver = False
 
     def ha(self):
         return len(self.servidores) > 0
+
+    def quantos_ligados(self):
+        # Quantos servidores estao a atender, para a luzinha da pagina. Ver
+        # isso pode demorar uns segundos (um computador desligado nao
+        # responde logo), por isso faz-se a parte: aqui devolve-se o que se
+        # viu da ultima vez e, se ja for velho, manda-se ver outra vez.
+        with self.tranca:
+            velho = time.time() - self.visto > VALIDADE
+            if self.ha() and velho and not self.a_ver:
+                self.a_ver = True
+                threading.Thread(target=self.ver_ligados, daemon=True).start()
+            return self.ligados
+
+    def ver_ligados(self):
+        atendeu = []
+
+        def um(servidor):
+            try:
+                self.pedir(servidor, "GET", "/api/version", espera=LIGAR)
+                atendeu.append(servidor)
+            except (OSError, http.client.HTTPException, ValueError):
+                pass
+
+        fios = [threading.Thread(target=um, args=(servidor,)) for servidor in self.servidores]
+        for fio in fios:
+            fio.start()
+        for fio in fios:
+            fio.join()
+        with self.tranca:
+            self.ligados = len(atendeu)
+            self.visto = time.time()
+            self.a_ver = False
 
     def ordem(self):
         # Os servidores pela ordem em que se vao tentar: a vez de cada um,

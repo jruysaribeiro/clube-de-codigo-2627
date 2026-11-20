@@ -639,7 +639,10 @@ class Pedido(BaseHTTPRequestHandler):
         elif url.path == "/api/jogos":
             self.tratar(sessao.lista_de_jogos)
         elif url.path == "/api/ajudante":
-            self.responder(200, {"ha": sessao.ajudante.ha()})
+            # "ligados": quantos computadores ajudantes estao a atender
+            # (None enquanto ainda se esta a ver).
+            self.responder(200, {"ha": sessao.ajudante.ha(), "total": len(sessao.ajudante.servidores),
+                                 "ligados": sessao.ajudante.quantos_ligados()})
         elif url.path == "/api/estado":
             desde = int(parametros.get("desde", ["0"])[0])
             self.tratar(lambda: sessao.estado(desde))
