@@ -458,15 +458,16 @@ instala nada).
 O botão verde **Jogar o jogo inteiro** abre o jogo como ele é, com tudo o que
 já foi mudado, para experimentar a sério; **Voltar** regressa ao código.
 
-### Regras, acontecimentos e desenhos (só n'O Cerco, por agora)
+### Regras, acontecimentos e desenhos
 
-Além dos dados, O Cerco abre **regras** (quem a torre ataca, o que faz ao
-disparar...), **acontecimentos** (funções vazias que o jogo chama quando cai
-um inimigo, começa uma onda, se carrega numa tecla...) e **desenhos**. São
-funções pequenas: é aqui que se escreve, ou se pede ao ajudante, código que
-muda o comportamento do jogo ou lhe acrescenta coisas. Se rebentar, o jogo
-volta ao que estava e mostra o erro. Os botões **+ Novo inimigo** e **+ Nova
-torre** criam uma cópia para mudar.
+Além dos dados, os quatro jogos abrem **regras** (n'O Cerco: quem a torre
+ataca, o que faz ao disparar...), **acontecimentos** (funções vazias que o
+jogo chama quando cai um inimigo, começa uma onda, se carrega numa tecla...)
+e **desenhos**. São funções pequenas: é aqui que se escreve, ou se pede ao
+ajudante, código que muda o comportamento do jogo ou lhe acrescenta coisas.
+Se rebentar, o jogo volta ao que estava e mostra o erro. Os botões com **+**
+(novo inimigo, nova torre, novo bicho, novo nível...) criam uma cópia para
+mudar.
 
 ### Imagens e sons
 

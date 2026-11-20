@@ -11,7 +11,9 @@
 # de ele arrancar (ver criar_palco, no fim, e SO_TECLADO no jogo).
 
 import ast
+import inspect
 import os
+import re
 
 import blocos
 
@@ -21,16 +23,66 @@ DESCRICAO = "Um jogo de plataformas. Aqui joga-se com o teclado."
 
 # Uma frase por grupo, para a pagina do jogo dizer o que la ha.
 SOBRE_OS_GRUPOS = {
-    "Inimigos": "Vida, velocidade, tamanho, cor. Podes pôr uma imagem tua.",
-    "O herói": "As cores do Faísca, ou uma imagem tua.",
+    "Inimigos": "Vida, velocidade, tamanho, cor. Podes pôr uma imagem e um som teus.",
+    "O herói": "As cores do Faísca e do tiro dele, ou uma imagem e sons teus.",
     "Mundos": "As cores de cada mundo.",
     "Afinar o jogo": "Os saltos, as velocidades, as vidas, as cores e os textos.",
+    "Regras do jogo": "Aqui mudas a maneira como o jogo se comporta: é programar a sério.",
+    "Acontecimentos": "Estão vazios: o que lá escreveres passa a acontecer nesse momento. É aqui que se inventa.",
+    "Desenhos": "Como se desenham o Faísca e os inimigos, com círculos, retângulos e linhas.",
     "Níveis": "Cada nível é desenhado com letras: muda uma letra e muda o nível.",
+}
+
+# Os grupos onde se pode criar uma coisa nova, e o que diz o botao.
+CRIAVEIS = {"Inimigos": "Novo inimigo", "Níveis": "Novo nível"}
+
+# Pedidos ja escritos para o ajudante, para se perceber o que se pode pedir.
+# Nos niveis so ha perguntas: o ajudante engana-se a mexer em mapas de letras.
+EXPLICA = "Explica-me esta função linha a linha"
+QUE_POSSO = "O que posso fazer aqui?"
+SUGESTOES = {
+    "inimigo": ["Põe-no mais rápido e com mais vida", "Muda-lhe a cor para roxo", "O que quer dizer cada coisa da ficha?"],
+    "heroi": ["Põe o Faísca verde, com o contorno verde-escuro", "Põe o Faísca cor-de-rosa",
+              "Como é que ponho uma imagem minha no Faísca?"],
+    "tiro": ["Muda a cor do tiro para vermelho", "Põe o tiro azul-claro", "Como é que ponho um som meu no tiro?"],
+    "mundo": ["Põe o céu cor de laranja, como ao pôr do sol", "Faz este mundo de noite, com estrelas", "O que é cada cor?"],
+    "numeros": ["Faz o Faísca saltar mais alto", "Põe os tiros mais rápidos e a irem mais longe",
+                "O que quer dizer cada número?"],
+    "cores": ["Muda a cor das moedas para verde", "Põe a lava roxa", "Como é que três números fazem uma cor?"],
+    "textos": ["Muda o título do jogo para ROBOT AO AR!", "Inventa outro texto de vitória", "Para que serve cada texto?"],
+    "nivel": ["O que quer dizer cada letra do mapa?", "Como é que ponho mais um inimigo neste nível?",
+              "Porque é que as linhas têm de ter todas o mesmo tamanho?"],
+    "saltar": ["Faz o Faísca saltar mais alto quando vai a correr", "Quero um salto duplo: poder saltar mais uma vez no ar",
+               EXPLICA],
+    "tocar_num_inimigo": ["Faz o Faísca ressaltar muito mais alto quando pisa um inimigo",
+                          "Dá uma moeda por cada inimigo pisado", EXPLICA],
+    "acertar_tiro": ["Faz cada tiro tirar 2 de vida", "Quero golpes críticos: às vezes o tiro tira 3 de vida", EXPLICA],
+    "mexer_saltador": ["Faz o sapo saltar mais alto", "Faz o sapo fugir do Faísca em vez de ir atrás dele", EXPLICA],
+    "mexer_voador": ["Faz o morcego voar mais longe para os lados", "Faz o morcego voar às voltas, num círculo", EXPLICA],
+    "ao_saltar": ["Solta faíscas amarelas nos pés quando ele salta", "De 5 em 5 saltos, dá um salto gigante", QUE_POSSO],
+    "ao_apanhar_moeda": ["Dá mais um coração de 10 em 10 moedas", "Solta muitas faíscas no sítio da moeda", QUE_POSSO],
+    "ao_perder_coracao": ["Dá uma segunda oportunidade: se ficar com 0 corações volta a ter 1, uma vez por nível",
+                          "Quando ele perde um coração, perde também 3 moedas", QUE_POSSO],
+    "ao_derrotar_inimigo": ["Deixa uma moeda no sítio onde o inimigo caiu", "Dá um coração por cada 3 inimigos derrotados",
+                            QUE_POSSO],
+    "ao_carregar_tecla": ["A tecla B dá um super salto, mas só 3 vezes por nível", "A tecla G liga e desliga o turbo",
+                          QUE_POSSO],
+    "a_cada_frame": ["Faz um íman de moedas: as moedas perto do Faísca andam para ele",
+                     "Faz o Faísca cair devagar, como um paraquedas", QUE_POSSO],
+    "desenhar_robot": ["Põe um chapéu ao Faísca", "Faz o Faísca ficar vermelho quando só tem um coração",
+                       "Explica-me este desenho linha a linha"],
+    "desenhar_lesma": ["Dá dois olhos à lesma", "Pinta a casca da lesma de azul", "Explica-me este desenho linha a linha"],
+    "desenhar_inimigo_novo": ["Dá-lhe dois olhos e uma boca", "Põe-lhe dois chifres",
+                              "Explica-me este desenho linha a linha"],
 }
 
 # As letras que o mapa de um nivel conhece, fora as dos inimigos.
 LETRAS_DO_MAPA = ".#=%BM^~ohPFc"
 JEITOS = ["andar", "saltar", "voar", "carregar", "canhao", "chefe"]
+# Os inimigos que o jogo desenha com desenhar_inimigo_novo: os que nao tem
+# uma destas letras nem um destes jeitos (ver desenhar_inimigo, no jogo).
+LETRAS_COM_DESENHO = "ae"
+JEITOS_COM_DESENHO = ["saltar", "voar", "carregar", "canhao", "chefe"]
 # Em que lista do jogo esta cada tipo de coisa.
 LISTAS = {"inimigo": "INIMIGOS", "mundo": "MUNDOS", "nivel": "NIVEIS"}
 
@@ -41,13 +93,55 @@ CORES = ["BRANCO", "PRETO", "CINZA", "AMARELO", "VERMELHO", "VERDE", "AZUL", "LA
          "COR_HEROI", "COR_HEROI_ESCURA", "COR_TIRO", "COR_MOEDA", "COR_MADEIRA",
          "COR_PONTE_PODRE", "COR_LAVA", "COR_ESPINHO"]
 TEXTOS = ["TITULO", "SUBTITULO", "NOME_DO_HEROI", "TEXTO_VITORIA"]
+SONS = ["SOM_DO_SALTO", "SOM_DO_TIRO"]
 GRUPOS = {
-    "heroi": ["IMAGEM_DO_HEROI", "COR_HEROI", "COR_HEROI_ESCURA"],
+    "heroi": ["IMAGEM_DO_HEROI", "COR_HEROI", "COR_HEROI_ESCURA", "SOM_DO_SALTO"],
+    "tiro": ["COR_TIRO", "SOM_DO_TIRO"],
     "numeros": NUMEROS,
     "cores": CORES,
     "textos": TEXTOS,
 }
-TITULOS = {"numeros": "Os números do jogo", "cores": "As cores", "textos": "Os textos"}
+TITULOS = {"numeros": "Os números do jogo", "cores": "As cores", "textos": "Os textos", "tiro": "O tiro"}
+# A constante que diz o nome do WAV de cada um destes.
+SOM_DE = {"heroi": "SOM_DO_SALTO", "tiro": "SOM_DO_TIRO"}
+
+# As regras: funcoes do jogo que se podem mudar. Para cada uma, o titulo que
+# aparece na Oficina, e o que ela recebe (o jogo chama-a assim, por isso nao
+# pode mudar).
+REGRAS = {
+    "saltar": ("Como o Faísca salta", []),
+    "tocar_num_inimigo": ("Quando o Faísca toca num inimigo", ["inimigo", "por_cima"]),
+    "acertar_tiro": ("Quando um tiro acerta num inimigo", ["inimigo", "tiro"]),
+    "mexer_saltador": ("Como se mexe um inimigo que salta", ["inimigo", "velocidade"]),
+    "mexer_voador": ("Como se mexe um inimigo que voa", ["inimigo", "velocidade"]),
+}
+INICIO_DAS_REGRAS = "# --- As regras do jogo ---"
+
+# Os acontecimentos: funcoes que o jogo chama em certos momentos, e que vem
+# vazias. E os desenhos. Tudo isto sao funcoes, como as regras.
+ACONTECIMENTOS = {
+    "ao_saltar": ("Quando o Faísca salta", []),
+    "ao_apanhar_moeda": ("Quando apanha uma moeda", ["x", "y"]),
+    "ao_perder_coracao": ("Quando perde um coração", []),
+    "ao_derrotar_inimigo": ("Quando um inimigo é derrotado", ["inimigo"]),
+    "ao_carregar_tecla": ("Quando se carrega numa tecla", ["tecla"]),
+    "a_cada_frame": ("A cada frame", []),
+}
+INICIO_DOS_ACONTECIMENTOS = "# --- Os acontecimentos ---"
+DESENHOS = {
+    "desenhar_robot": ("O desenho do Faísca", ["x", "y", "v"]),
+    "desenhar_lesma": ("O desenho da Lesma", ["inimigo", "x", "y", "cor"]),
+    "desenhar_inimigo_novo": ("O desenho de um inimigo novo", ["inimigo", "x", "y", "cor"]),
+}
+INICIO_DOS_DESENHOS = "# --- Os desenhos ---"
+
+# tipo da escolha -> (as funcoes desse tipo, o grupo onde aparecem, as
+# explicacoes gerais que se juntam a ajuda de cada uma)
+FUNCOES = {
+    "regra": (REGRAS, "Regras do jogo", [INICIO_DAS_REGRAS]),
+    "evento": (ACONTECIMENTOS, "Acontecimentos", [INICIO_DOS_ACONTECIMENTOS, INICIO_DAS_REGRAS]),
+    "desenho": (DESENHOS, "Desenhos", [INICIO_DOS_DESENHOS]),
+}
 
 # Cada numero: (nome, minimo, maximo, tem de ser inteiro)
 LIMITES = [
@@ -77,12 +171,47 @@ DICAS = {
     "cores": TECLAS + "Está aqui um bocadinho de tudo o que tem cor. A cor do tiro só se vê quando disparas.",
     "textos": "Vês o título como ele aparece no jogo; os outros dois textos estão na faixa de baixo. "
               "Aqui o jogo não começa.",
+    "tiro": TECLAS + "A cor do tiro vê-se quando disparas (X). O som ouve-se no jogo inteiro.",
+}
+# As funcoes tem cada uma a sua dica, porque cada uma tem o seu palco.
+JOGA_TU = ("Setas: virar. Seta para baixo: parar. Espaço: saltar. X: disparar. "
+           "Clica no jogo para ele ouvir as teclas. ")
+VAZIO = "Está vazio: tira o pass e escreve o que queres que aconteça. "
+DICAS_DAS_FUNCOES = {
+    "saltar": "Isto é uma regra do jogo: muda-a e o Faísca passa a saltar de outra maneira. "
+              "Quando mudas o código ele dá um salto sozinho, para veres logo. " + JOGA_TU + "Q e E: andar um ecrã.",
+    "tocar_num_inimigo": "Isto é uma regra do jogo. O Faísca vai contra os inimigos sozinho: vê o que acontece "
+                         "de lado, e salta-lhes para cima (Espaço) para veres a diferença. Aqui os corações voltam sempre.",
+    "acertar_tiro": "Isto é uma regra do jogo. Aqui o Faísca fica parado e dispara sozinho, para veres logo o que "
+                    "faz um tiro certeiro. Com as setas carregadas ele anda. Os inimigos voltam quando caem todos.",
+    "mexer_saltador": "Isto é uma regra do jogo: muda-a e os inimigos que saltam passam a mexer-se de outra maneira. "
+                      + TECLAS + "O Faísca está atrás de um caixote.",
+    "mexer_voador": "Isto é uma regra do jogo: muda-a e os inimigos que voam passam a mexer-se de outra maneira. "
+                    + TECLAS + "O Faísca está atrás de um caixote.",
+    "ao_saltar": VAZIO + "Quando mudas o código o Faísca volta ao início e dá um salto sozinho. " + JOGA_TU,
+    "ao_apanhar_moeda": VAZIO + "Quando mudas o código o Faísca volta ao início e vai apanhar as três moedas. "
+                        "As moedas voltam quando acabam. " + JOGA_TU,
+    "ao_perder_coracao": VAZIO + "O Faísca anda sozinho contra a lesma e para a lava, por isso perde corações "
+                         "depressa. Quando fica sem nenhum, voltam todos. " + JOGA_TU,
+    "ao_derrotar_inimigo": VAZIO + "Aqui o Faísca dispara sozinho contra a lesma, e ela volta pouco depois de cair. "
+                           + JOGA_TU,
+    "ao_carregar_tecla": VAZIO + "Depois clica no jogo e carrega na tua tecla. " + JOGA_TU,
+    "a_cada_frame": VAZIO + "Corre 60 vezes por segundo. A faixa de baixo mostra o que está na memoria. " + JOGA_TU,
+    "desenhar_robot": "Isto é o desenho do Faísca: muda-o e vês logo, no jogo e aumentado no canto. "
+                      "Experimenta mudar um número, ou acrescentar um círculo. " + TECLAS,
+    "desenhar_lesma": "Isto é o desenho da Lesma: muda-o e vês logo, no jogo e aumentado no canto. "
+                      "Experimenta mudar um número, ou acrescentar um círculo.",
+    "desenhar_inimigo_novo": "É assim que aparece um inimigo que criares com o botão Novo inimigo. "
+                             "Muda o desenho e vês logo, no jogo e aumentado no canto.",
 }
 AJUDAS = {
     "numeros": "Os números que mandam no Faísca. As velocidades são em pixeis por frame "
                "(60 frames = um segundo) e cada quadrado do mapa tem 48 pixeis.",
     "textos": "O que o jogo escreve no ecrã. Os textos ficam entre aspas.",
 }
+# O que se junta a ajuda quando a coisa pode ter um som.
+AJUDA_DO_SOM = ('O "som" é o nome de um ficheiro WAV. Com o botão do som, por cima do código, gravas ou escolhes '
+                "um, e o jogo passa a tocá-lo em vez do som de sempre.")
 
 
 # =====================================================================
@@ -130,15 +259,20 @@ def _constantes(arvore, nomes):
     return [no for no in nos if no is not None]
 
 
-def _ajuda(linhas, primeira_linha):
-    # A explicacao que o ficheiro traz por cima, sem as linhas so de tracos.
+def _sem_tracos(texto):
+    # Uma explicacao tirada do ficheiro, sem os tracos dos titulos.
     ajuda = []
-    for linha in blocos.ajuda_acima(linhas, primeira_linha).split("\n"):
+    for linha in texto.split("\n"):
         if linha.startswith("---"):
             linha = linha.strip("- ")
         if linha != "" or (len(ajuda) > 0 and ajuda[-1] != ""):
             ajuda.append(linha)
     return "\n".join(ajuda).strip("\n")
+
+
+def _ajuda(linhas, primeira_linha):
+    # A explicacao que o ficheiro traz por cima de uma instrucao.
+    return _sem_tracos(blocos.ajuda_acima(linhas, primeira_linha))
 
 
 def escolhas(fonte):
@@ -153,6 +287,8 @@ def escolhas(fonte):
         no = blocos.instrucao(arvore, "NOME_DO_HEROI")
         nome = blocos.texto_constante(no.value) if no is not None else None
         lista.append({"id": "heroi", "grupo": "O herói", "titulo": "O " + (nome or "herói")})
+    if len(_constantes(arvore, GRUPOS["tiro"])) > 0:
+        lista.append({"id": "tiro", "grupo": "O herói", "titulo": TITULOS["tiro"]})
 
     for i, (_, ficha, _, _) in enumerate(_fichas(arvore, "MUNDOS")):
         nome = _valor(ficha, "nome") or "Mundo " + str(i + 1)
@@ -162,6 +298,12 @@ def escolhas(fonte):
         if len(_constantes(arvore, GRUPOS[tipo])) > 0:
             lista.append({"id": tipo, "grupo": "Afinar o jogo", "titulo": TITULOS[tipo]})
 
+    for tipo in FUNCOES:
+        funcoes, grupo, _ = FUNCOES[tipo]
+        for nome in funcoes:
+            if blocos.funcao(arvore, nome) is not None:
+                lista.append({"id": tipo + ":" + nome, "grupo": grupo, "titulo": funcoes[nome][0]})
+
     fichas = _fichas(arvore, "NIVEIS")
     for i in range(len(fichas)):
         lista.append({"id": "nivel:" + str(i), "grupo": "Níveis", "titulo": _nome_do_nivel(fichas, i)})
@@ -169,15 +311,31 @@ def escolhas(fonte):
 
 
 def regiao(fonte, escolha):
-    # Devolve {"inicio", "fim", "ajuda", "titulo", "dica", "imagem"} ou None.
-    # "imagem" e o nome do PNG que essa coisa usa (None se nao usa nenhum):
-    # e com ele que a Oficina sabe onde guardar a imagem que a crianca escolher.
+    # Devolve {"inicio", "fim", "ajuda", "titulo", "dica", "imagem", "som",
+    # "sugestoes"} ou None. "imagem" e o nome do PNG que essa coisa usa (None
+    # se nao usa nenhum): e com ele que a Oficina sabe onde guardar a imagem
+    # que a crianca escolher. "som" e o mesmo, para o WAV.
     arvore = ast.parse(fonte)
     linhas = fonte.split("\n")
     tipo, _, numero = escolha.partition(":")
+    if tipo in FUNCOES:
+        # Uma regra, um acontecimento ou um desenho: e uma funcao inteira. A
+        # ajuda junta o que o ficheiro diz sobre ela ao que se pode usar
+        # dentro de qualquer funcao desse genero.
+        funcoes, _, gerais = FUNCOES[tipo]
+        no = blocos.funcao(arvore, numero) if numero in funcoes else None
+        if no is None:
+            return None
+        ajuda = _ajuda(linhas, no.lineno)
+        for inicio in gerais:
+            geral = _sem_tracos(blocos.comentarios_a_partir_de(linhas, inicio))
+            if geral and geral != ajuda:
+                ajuda = ajuda + "\n\n" + geral
+        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda, "dica": DICAS_DAS_FUNCOES[numero],
+                "titulo": funcoes[numero][0], "imagem": None, "som": None, "sugestoes": SUGESTOES[numero]}
     if tipo not in DICAS:
         return None
-    resposta = {"dica": DICAS[tipo], "imagem": None}
+    resposta = {"dica": DICAS[tipo], "imagem": None, "som": None, "sugestoes": SUGESTOES[tipo]}
 
     if tipo in GRUPOS:
         # Varias constantes seguidas: da primeira linha a ultima.
@@ -193,8 +351,13 @@ def regiao(fonte, escolha):
             no = blocos.instrucao(arvore, "IMAGEM_DO_HEROI")
             if no is not None:
                 resposta["imagem"] = blocos.texto_constante(no.value)
-        resposta.update(inicio=inicio, fim=fim, titulo=titulo,
-                        ajuda=AJUDAS.get(tipo) or _ajuda(linhas, inicio))
+        ajuda = AJUDAS.get(tipo) or _ajuda(linhas, inicio)
+        if tipo in SOM_DE:
+            no = blocos.instrucao(arvore, SOM_DE[tipo])
+            if no is not None:
+                resposta["som"] = blocos.texto_constante(no.value)
+                ajuda = ajuda + "\n\n" + AJUDA_DO_SOM
+        resposta.update(inicio=inicio, fim=fim, titulo=titulo, ajuda=ajuda)
         return resposta
 
     fichas = _fichas(arvore, LISTAS[tipo])
@@ -207,9 +370,172 @@ def regiao(fonte, escolha):
         titulo = _valor(ficha, "nome") or blocos.texto_constante(chave) or escolha
     if tipo == "inimigo":
         resposta["imagem"] = blocos.valor_da_chave(ficha, "imagem")
+        resposta["som"] = blocos.valor_da_chave(ficha, "som")
     no = blocos.instrucao(arvore, LISTAS[tipo])
     resposta.update(inicio=inicio, fim=fim, titulo=str(titulo), ajuda=_ajuda(linhas, no.lineno))
     return resposta
+
+
+# =====================================================================
+#                        CRIAR UMA COISA NOVA
+# =====================================================================
+# Um inimigo novo e um nivel novo nascem como copia de um que ja la esta (o
+# mais simples), com outro nome, e ficam no fim da lista. Devolve o ficheiro
+# inteiro ja com a coisa nova, a escolha a abrir, e uma frase a contar o que
+# se fez.
+
+# As letras que um inimigo novo pode ter no mapa, por ordem de preferencia.
+LETRAS_LIVRES = "nbdgikpqruvwyzfl"
+
+
+def _nome_livre(base, existentes):
+    nome = base
+    numero = 2
+    while nome in existentes:
+        nome = base + " " + str(numero)
+        numero = numero + 1
+    return nome
+
+
+def _ficheiro(nome):
+    # "Inimigo novo 2" -> "inimigo-novo-2"
+    return nome.lower().replace(" ", "-")
+
+
+def _letras(linha, bytes_):
+    # O Python conta as colunas em bytes: com acentos nao e o mesmo que letras.
+    return len(linha.encode("utf-8")[:bytes_].decode("utf-8"))
+
+
+def _mapa(ficha):
+    # As linhas do "mapa" de um nivel, como estao escritas no codigo: a lista
+    # dos textos entre aspas. None se nao der para as ler assim.
+    if not isinstance(ficha, ast.Dict):
+        return None
+    for k, v in zip(ficha.keys, ficha.values):
+        if blocos.texto_constante(k) == "mapa" and isinstance(v, ast.List):
+            if all(blocos.texto_constante(fila) is not None for fila in v.elts):
+                return v.elts
+    return None
+
+
+def _letras_usadas(arvore):
+    # Todas as letras que aparecem nos mapas dos niveis.
+    usadas = set()
+    for _, ficha, _, _ in _fichas(arvore, "NIVEIS"):
+        for fila in _mapa(ficha) or []:
+            usadas.update(fila.value)
+    return usadas
+
+
+def _acrescentar(linhas, copia, ultima):
+    # Poe as linhas da copia a seguir a ultima entrada da lista, com as
+    # virgulas que forem precisas. Devolve o ficheiro inteiro.
+    copia[-1] = copia[-1].rstrip()
+    if not copia[-1].endswith(","):
+        copia[-1] = copia[-1] + ","
+    if not linhas[ultima - 1].rstrip().endswith(","):
+        linhas[ultima - 1] = linhas[ultima - 1].rstrip() + ","
+    return "\n".join(linhas[:ultima] + copia + linhas[ultima:])
+
+
+def _por_no_mapa(fonte, letra):
+    # Escreve a letra no chao do primeiro nivel, uns quadrados a frente do
+    # Faisca: sem isto o inimigo novo existia mas nunca aparecia no jogo.
+    # Devolve o ficheiro e o nome desse nivel (None se nao houve sitio).
+    fichas = _fichas(ast.parse(fonte), "NIVEIS")
+    filas = _mapa(fichas[0][1]) if fichas else None
+    if not filas:
+        return fonte, None
+    textos = [fila.value for fila in filas]
+    linhas = fonte.split("\n")
+    for f in range(len(textos) - 1):
+        if "P" not in textos[f]:
+            continue
+        for c in range(textos[f].index("P") + 12, len(textos[f]) - 1):
+            livre = textos[f][c - 1:c + 2] == "..." and (f == 0 or textos[f - 1][c:c + 1] == ".")
+            if not livre or textos[f + 1][c - 1:c + 2] != "###":
+                continue
+            # O sitio da letra na linha do ficheiro: a seguir as aspas.
+            linha = linhas[filas[f].lineno - 1]
+            aspas = _letras(linha, filas[f].col_offset)
+            if filas[f].lineno != filas[f].end_lineno or linha[aspas + 1:aspas + 1 + len(textos[f])] != textos[f]:
+                return fonte, None
+            sitio = aspas + 1 + c
+            linhas[filas[f].lineno - 1] = linha[:sitio] + letra + linha[sitio + 1:]
+            return "\n".join(linhas), _valor(fichas[0][1], "nome") or "sem nome"
+    return fonte, None
+
+
+def _novo_inimigo(fonte):
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    fichas = _fichas(arvore, "INIMIGOS")
+    if not fichas:
+        raise ValueError("não encontrei os INIMIGOS no ficheiro.")
+    ocupadas = _letras_usadas(arvore) | set(LETRAS_DO_MAPA)
+    ocupadas.update(blocos.texto_constante(chave) or "" for chave, _, _, _ in fichas)
+    livres = [letra for letra in LETRAS_LIVRES if letra not in ocupadas]
+    if not livres:
+        raise ValueError("já não há letras livres para mais um inimigo.")
+    letra = livres[0]
+    nome = _nome_livre("Inimigo novo", [_valor(ficha, "nome") for _, ficha, _, _ in fichas])
+
+    # A copia: a ficha do primeiro, com a letra, o nome, a imagem e o som novos.
+    chave, ficha, inicio, fim = fichas[0]
+    antigo = _valor(ficha, "nome") or "primeiro"
+    copia = linhas[inicio - 1:fim]
+    onde = _letras(copia[0], chave.col_offset)
+    ate = _letras(copia[0], chave.end_col_offset)
+    copia[0] = copia[0][:onde] + '"' + letra + '"' + copia[0][ate:]
+    texto = "\n".join(copia)
+    texto = re.sub(r'"nome":\s*"[^"]*"', '"nome": "' + nome + '"', texto, count=1)
+    texto = re.sub(r'"imagem":\s*"[^"]*"', '"imagem": "' + _ficheiro(nome) + '.png"', texto)
+    texto = re.sub(r'"som":\s*"[^"]*"', '"som": "' + _ficheiro(nome) + '.wav"', texto)
+    nova = _acrescentar(linhas, texto.split("\n"), fichas[-1][3])
+
+    nova, nivel = _por_no_mapa(nova, letra)
+    aviso = 'Criei o "' + nome + '", uma cópia de "' + str(antigo) + '", com a letra "' + letra + '". '
+    if nivel is not None:
+        aviso = aviso + 'Pus um no primeiro nível ("' + str(nivel) + '"), perto do início. '
+    aviso = aviso + "Em Níveis, escreve " + letra + " no mapa onde quiseres mais."
+    return nova, "inimigo:" + str(len(fichas)), aviso
+
+
+def _novo_nivel(fonte):
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    fichas = _fichas(arvore, "NIVEIS")
+    if not fichas:
+        raise ValueError("não encontrei os NIVEIS no ficheiro.")
+    # Copia-se o primeiro nivel a serio (o recreio nao conta).
+    modelo = 0
+    for i in range(len(fichas)):
+        if _valor(fichas[i][1], "treino") is not True:
+            modelo = i
+            break
+    _, ficha, inicio, fim = fichas[modelo]
+    antigo = _valor(ficha, "nome") or "primeiro"
+    nome = _nome_livre("Nível novo", [_valor(f, "nome") for _, f, _, _ in fichas])
+    texto = "\n".join(linhas[inicio - 1:fim])
+    texto = re.sub(r'"nome":\s*"[^"]*"', '"nome": "' + nome + '"', texto, count=1)
+    texto = re.sub(r'"dica":\s*"[^"]*"', '"dica": "Um nível só teu. Muda-lhe as letras!"', texto, count=1)
+    texto = re.sub(r'"treino":\s*True', '"treino": False', texto)
+    ultimo = _valor(fichas[-1][1], "nome") or "último"
+    nova = _acrescentar(linhas, texto.split("\n"), fichas[-1][3])
+    numero = _nome_do_nivel(_fichas(ast.parse(nova), "NIVEIS"), len(fichas)).split(".")[0]
+    aviso = ('Criei o "' + nome + '", uma cópia de "' + str(antigo) + '". É o nível ' + numero
+             + ', o último, a seguir a "' + str(ultimo) + '". '
+             "Em Jogar o jogo inteiro, escolhe-o no título com a seta para a direita.")
+    return nova, "nivel:" + str(len(fichas)), aviso
+
+
+def novo(fonte, grupo):
+    if grupo == "Inimigos":
+        return _novo_inimigo(fonte)
+    if grupo == "Níveis":
+        return _novo_nivel(fonte)
+    raise ValueError("aqui não dá para criar isso.")
 
 
 # =====================================================================
@@ -267,6 +593,9 @@ def _ver_constantes(ns, problemas, avisos):
             problemas.append(nome + " tem de ser um texto, entre aspas.")
     if not isinstance(ns.get("IMAGEM_DO_HEROI"), str):
         problemas.append('IMAGEM_DO_HEROI é o nome de um ficheiro, entre aspas, como "faisca.png".')
+    for nome in SONS:
+        if not isinstance(ns.get(nome), str):
+            problemas.append(nome + ' é o nome de um ficheiro, entre aspas, como "salto.wav".')
 
 
 def _ver_inimigos(ns, problemas, avisos):
@@ -304,6 +633,8 @@ def _ver_inimigos(ns, problemas, avisos):
                           'Os jeitos são "' + '", "'.join(JEITOS) + '".')
         if "imagem" in ficha and not isinstance(ficha["imagem"], str):
             problemas.append(quem + ': a "imagem" é o nome de um ficheiro, entre aspas, como "lesma.png".')
+        if "som" in ficha and not isinstance(ficha["som"], str):
+            problemas.append(quem + ': o "som" é o nome de um ficheiro, entre aspas, como "lesma.wav".')
 
 
 def _ver_letras_sem_dono(ns, avisos):
@@ -430,6 +761,27 @@ def _ver_nivel(ns, indice, problemas, avisos):
         avisos.append("O ecrã mostra 20 letras de largura. O jogo enche o resto com ar.")
 
 
+def _ver_funcoes(ns, problemas, avisos):
+    # O jogo chama cada funcao pelo nome e da-lhe sempre as mesmas coisas.
+    todas = {}
+    for tipo in FUNCOES:
+        todas.update(FUNCOES[tipo][0])
+    for nome in todas:
+        esperado = todas[nome][1]
+        funcao = ns.get(nome)
+        como = "def " + nome + "(" + ", ".join(esperado) + "):"
+        if not inspect.isfunction(funcao):
+            problemas.append('"' + nome + '" tem de ser uma função. A primeira linha é: ' + como)
+            continue
+        recebe = list(inspect.signature(funcao).parameters)
+        if len(recebe) != len(esperado):
+            problemas.append("A função " + nome + " tem de receber "
+                             + (", ".join(esperado) if esperado else "nada, só ( )") + ", nem mais nem menos. "
+                             "A primeira linha tem de ser: " + como)
+    if not isinstance(ns.get("memoria"), dict):
+        problemas.append('A "memoria" tem de continuar a ser um dicionário. Para a esvaziar usa memoria.clear().')
+
+
 # =====================================================================
 #                      OS NIVEIS DE EXPERIENCIA
 # =====================================================================
@@ -512,6 +864,95 @@ def pista(ns):
     return {"nome": "A pista de testes", "dica": "", "mapa": mapa}
 
 
+def letra_com_jeito(ns, jeito):
+    # O primeiro inimigo com esse jeito; se nao houver nenhum, o primeiro.
+    for letra, ficha in ns["INIMIGOS"].items():
+        if ficha.get("jeito") == jeito:
+            return letra
+    return list(ns["INIMIGOS"])[0]
+
+
+def letras_do_chao(ns, primeiro):
+    # Dois inimigos que andam pelo chao. primeiro="vida": os que aguentam
+    # mais tiros (para se ver a vida a descer). primeiro="pisavel": um a que
+    # se salta em cima e um a que nao. Se so houver um, vem duas vezes.
+    fichas = ns["INIMIGOS"]
+    letras = [letra for letra in fichas if fichas[letra].get("jeito") in ("andar", "carregar")]
+    if len(letras) == 0:
+        letras = [list(fichas)[0]]
+    if primeiro == "vida":
+        letras.sort(key=lambda letra: -fichas[letra].get("vida", 1))
+    else:
+        letras.sort(key=lambda letra: not fichas[letra].get("pisavel"))
+        letras = [letras[0], letras[-1]]
+    return [letras[0], letras[min(1, len(letras) - 1)]]
+
+
+def letra_sem_desenho(ns):
+    # Um inimigo que o jogo desenhe com desenhar_inimigo_novo. Se ainda nao
+    # houver nenhum (ninguem criou um inimigo novo), inventa-se aqui um so
+    # para a mostra: fica na memoria do jogo, nao no ficheiro.
+    for letra, ficha in ns["INIMIGOS"].items():
+        if letra not in LETRAS_COM_DESENHO and ficha.get("jeito") not in JEITOS_COM_DESENHO:
+            return letra
+    ns["INIMIGOS"]["?"] = {"nome": "Inimigo novo", "vida": 1, "velocidade": 1.0, "pisavel": True,
+                           "jeito": "andar", "largura": 38, "altura": 28, "cor": (230, 120, 200)}
+    return "?"
+
+
+def arena_dos_toques(ns, letras):
+    # Um ecra so, sem caixote: o Faisca vai direito aos inimigos.
+    fila = list(".P..................")
+    fila[8] = letras[0]
+    fila[15] = letras[1]
+    mapa = encher([""] * 7, 20) + [
+        ".......===..........",
+        "....................",
+        "".join(fila),
+        "####################",
+        "####################",
+    ]
+    return {"nome": "A arena", "dica": "", "mapa": mapa}
+
+
+def recreio_dos_acontecimentos(ns):
+    # Um ecra so, onde acontece de tudo depressa: tres moedas logo a frente,
+    # uma lesma a vir, lava para cair, e um coracao la em cima.
+    mapa = encher([
+        "", "", "", "", "", "",
+        "..........ooo.......",
+        "..........===......h",
+        "",
+        ".P..o.o.o@..........",
+        "###############..###",
+        "###############~~###",
+    ], 20)
+    mapa[9] = mapa[9].replace("@", letra_que_anda(ns))
+    return {"nome": "O recreio dos acontecimentos", "dica": "", "mapa": mapa}
+
+
+# As teclas que o palco carrega pelo jogador (para o Faisca disparar ou
+# ficar parado sozinho). O jogo pergunta ao pygame que teclas estao em
+# baixo; aqui responde-se com as verdadeiras mais estas.
+teclas_a_mais = set()
+teclas_verdadeiras = None        # o pygame.key.get_pressed de antes de mexermos
+
+
+class TeclasComAjuda:
+    def __init__(self, verdadeiras):
+        self.verdadeiras = verdadeiras
+
+    def __getitem__(self, tecla):
+        return tecla in teclas_a_mais or self.verdadeiras[tecla]
+
+
+def ajudar_nas_teclas(pygame):
+    global teclas_verdadeiras
+    if teclas_verdadeiras is None:
+        teclas_verdadeiras = pygame.key.get_pressed
+        pygame.key.get_pressed = lambda: TeclasComAjuda(teclas_verdadeiras())
+
+
 # =====================================================================
 #                              O PALCO
 # =====================================================================
@@ -528,6 +969,17 @@ class Palco:
         self.carregadas = {}         # as teclas Q e E no frame anterior
         self.quantos = None          # quantas entradas tem a lista da coisa escolhida
         self.com_mapa = True         # a tecla M esconde e mostra o mapa pequeno
+        # Uma regra, um acontecimento ou um desenho: qual e a funcao.
+        self.funcao = numero if tipo in FUNCOES and numero in FUNCOES[tipo][0] else None
+        self.a_letra_da_arena = None # o inimigo que esta na arena dessa funcao
+        self.guardado = None         # as moedas e os inimigos da arena, para voltarem
+        self.sem_moedas = 0          # ha quantos frames nao ha moedas, nem inimigos
+        self.sem_inimigos = 0
+        self.desde_a_mudanca = 0     # frames desde que o codigo mudou
+        if tipo in FUNCOES:
+            # Uma funcao nova so mostra o que vale quando chega a vez de ser
+            # usada (o salto, o tiro a acertar): prova-se mais tempo.
+            self.quadros_de_prova = 150
 
     def verificar(self, ns):
         problemas = []
@@ -535,6 +987,7 @@ class Palco:
         _ver_constantes(ns, problemas, avisos)
         _ver_inimigos(ns, problemas, avisos)
         _ver_mundos(ns, problemas, avisos)
+        _ver_funcoes(ns, problemas, avisos)
         if self.tipo == "nivel":
             _ver_nivel(ns, self.numero, problemas, avisos)
         if self.tipo == "inimigo":
@@ -570,11 +1023,107 @@ class Palco:
             self.montar_arena(ns, arena_do_inimigo(letra, ns["INIMIGOS"][letra]))
         elif self.tipo == "numeros":
             self.montar_arena(ns, pista(ns))
+        elif self.funcao is not None:
+            self.montar_arena(ns, self.arena_da_funcao(ns))
         else:
             self.montar_arena(ns, montra(ns))
         nivel["da_oficina"] = True       # o jogo apaga isto se carregar outro nivel
         self.mapa_pequeno = None
         self.contar(ns)
+        if self.funcao is not None:
+            # Nestas arenas as moedas e os inimigos voltam depois de acabarem.
+            self.guardado = {
+                "inicio": nivel["ponto"],
+                "moedas": [moeda.copy() for moeda in nivel["moedas"]],
+                "inimigos": [(inimigo["letra"], inimigo["x0"], inimigo["y0"]) for inimigo in nivel["inimigos"]],
+            }
+            self.sem_moedas = 0
+            self.sem_inimigos = 0
+
+    def arena_da_funcao(self, ns):
+        # O sitio onde se ve o que cada funcao faz.
+        self.a_letra_da_arena = None
+        if self.tipo == "evento":
+            return recreio_dos_acontecimentos(ns)
+        if self.funcao == "tocar_num_inimigo":
+            return arena_dos_toques(ns, letras_do_chao(ns, "pisavel"))
+        if self.funcao == "acertar_tiro":
+            return arena_dos_toques(ns, letras_do_chao(ns, "vida"))
+        if self.funcao in ("mexer_saltador", "mexer_voador"):
+            letra = letra_com_jeito(ns, "saltar" if self.funcao == "mexer_saltador" else "voar")
+        elif self.funcao == "desenhar_lesma":
+            letra = "a" if "a" in ns["INIMIGOS"] else list(ns["INIMIGOS"])[0]
+        elif self.funcao == "desenhar_inimigo_novo":
+            letra = letra_sem_desenho(ns)
+        elif self.funcao == "desenhar_robot":
+            return montra(ns)
+        else:
+            return pista(ns)
+        self.a_letra_da_arena = letra
+        return arena_do_inimigo(letra, ns["INIMIGOS"][letra])
+
+    def repor_arena(self, ns, moedas, inimigos):
+        # As moedas e os inimigos da arena voltam ao sitio onde nasceram.
+        nivel = ns["nivel"]
+        if moedas:
+            nivel["moedas"] = [moeda.copy() for moeda in self.guardado["moedas"]]
+            self.sem_moedas = 0
+        if inimigos:
+            nivel["inimigos"] = []
+            for letra, x, y in self.guardado["inimigos"]:
+                if letra in ns["INIMIGOS"]:
+                    inimigo = ns["criar_inimigo"](letra, 0, 0)
+                    inimigo["x"] = inimigo["x0"] = x
+                    inimigo["y"] = inimigo["y0"] = y
+                    nivel["inimigos"].append(inimigo)
+            self.sem_inimigos = 0
+
+    def voltar_ao_inicio(self, ns):
+        # O Faisca volta ao principio da arena, com tudo no sitio: assim o
+        # que se acabou de escrever acontece logo, sem se ter de esperar.
+        nivel = ns["nivel"]
+        heroi = ns["heroi"]
+        inicio = self.guardado["inicio"]
+        ns["repor_heroi"](inicio[0], inicio[1])
+        heroi["congelado"] = 10          # quase sem esperar: quer-se ver ja
+        heroi["virado"] = 1
+        heroi["invencivel"] = 0
+        heroi["vidas"] = ns["VIDAS"]
+        nivel["ponto"] = inicio
+        nivel["tiros"] = []
+        nivel["balas"] = []
+        self.repor_arena(ns, True, True)
+
+    def manter_arena(self, ns, pygame):
+        # Todos os frames, nas arenas das funcoes: repor o que acabou, e
+        # carregar nas teclas que o palco carrega pelo jogador.
+        nivel = ns["nivel"]
+        self.desde_a_mudanca = self.desde_a_mudanca + 1
+        if len(self.guardado["moedas"]) > 0 and len(nivel["moedas"]) == 0:
+            self.sem_moedas = self.sem_moedas + 1
+            if self.sem_moedas > 120:
+                self.repor_arena(ns, True, False)
+        if len(self.guardado["inimigos"]) > 0 and len(nivel["inimigos"]) == 0:
+            self.sem_inimigos = self.sem_inimigos + 1
+            if self.sem_inimigos > 90:
+                self.repor_arena(ns, False, True)
+
+        ajudar_nas_teclas(pygame)
+        teclas_a_mais.clear()
+        if ns["jogo"]["fase"] != "jogar":
+            return
+        if self.funcao in ("acertar_tiro", "ao_derrotar_inimigo"):
+            # Dispara sozinho, um tiro por segundo.
+            if self.desde_a_mudanca % 60 > 54:
+                teclas_a_mais.add(pygame.K_x)
+        if self.funcao == "acertar_tiro":
+            # E fica parado, a nao ser que se carregue numa seta.
+            teclas = teclas_verdadeiras()
+            if not teclas[pygame.K_LEFT] and not teclas[pygame.K_RIGHT]:
+                teclas_a_mais.add(pygame.K_DOWN)
+        if self.funcao in ("saltar", "ao_saltar") and self.desde_a_mudanca == 45:
+            # Um salto sozinho, pouco depois de o codigo mudar.
+            pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE, unicode=" ", mod=0, scancode=0))
 
     def montar_arena(self, ns, dados):
         # O jogo so sabe carregar niveis da lista NIVEIS: empresta-se-lhe
@@ -602,6 +1151,14 @@ class Palco:
         if not nivel.get("da_oficina"):
             return
         self.contar(ns)
+        if self.funcao is not None:
+            # Uma funcao nova: o jogo passa a chama-la sozinho. A memoria
+            # comeca vazia, para nao ficar la nada do codigo antigo.
+            self.desde_a_mudanca = 0
+            ns["memoria"].clear()
+            if self.tipo == "evento" or self.funcao in ("tocar_num_inimigo", "acertar_tiro"):
+                self.voltar_ao_inicio(ns)
+            return
         if self.tipo == "mundo":
             nivel["mundo"] = self.o_mundo(ns)
             nivel.pop("ceu", None)           # o jogo volta a pintar o ceu
@@ -678,8 +1235,10 @@ class Palco:
             heroi["invencivel"] = 110
             heroi["vidas"] = ns["VIDAS"]
             outro_ecra = True
-        if heroi["vidas"] < 2:
-            heroi["vidas"] = ns["VIDAS"]
+        if heroi["vidas"] < 2 and self.tipo != "evento":
+            heroi["vidas"] = ns["VIDAS"]     # (nos acontecimentos os coracoes contam ate ao fim)
+        if self.funcao is not None and self.guardado is not None:
+            self.manter_arena(ns, pygame)
 
         if outro_ecra:
             # O jogo ja tinha desenhado este frame (o titulo, o "Quase!"...):
@@ -690,7 +1249,7 @@ class Palco:
             jogo["fase"] = "pausa"       # parado por baixo; por cima, o titulo
             ns["desenhar_titulo"](ns["ler_mao"]())
 
-        if self.tipo in ("nivel", "mundo", "numeros"):
+        if self.tipo in ("nivel", "mundo", "numeros") or self.funcao == "saltar":
             teclas = pygame.key.get_pressed()
             for tecla, ecras in ((pygame.K_q, -1), (pygame.K_e, 1), (pygame.K_m, 0)):
                 if teclas[tecla] and not self.carregadas.get(tecla) and jogo["fase"] == "jogar":
@@ -731,6 +1290,17 @@ class Palco:
             texto = "Quando perdes:  O " + ns["NOME_DO_HEROI"] + " ficou sem corações.      No fim:  " + ns["TEXTO_VITORIA"]
         elif self.tipo == "nivel" and self.com_mapa and ns["jogo"]["fase"] == "jogar":
             self.desenhar_mapa_pequeno(ns, pygame)
+        elif self.tipo == "regra":
+            texto = "Regra:   " + REGRAS[self.funcao][0] + "   (a função " + self.funcao + ")"
+        elif self.tipo == "evento":
+            texto = "Acontecimento:   " + ACONTECIMENTOS[self.funcao][0] + "   (a função " + self.funcao + ")"
+            texto = texto + "      memoria = " + repr(ns["memoria"])[:70]
+        elif self.tipo == "desenho":
+            texto = "Desenho:   " + DESENHOS[self.funcao][0] + "   (a função " + self.funcao + ")"
+            if self.funcao == "desenhar_robot":
+                self.lupa_do_heroi(ns, pygame)
+            elif self.a_letra_da_arena in ns["INIMIGOS"]:
+                self.lupa(ns, pygame, self.a_letra_da_arena)
 
         if texto != "":
             ecra = ns["janela"]["ecra"]
@@ -760,6 +1330,22 @@ class Palco:
             ns["desenhar_inimigo"](modelo, 0)
         finally:
             ns["janela"]["ecra"] = ecra
+        self.mostrar_lupa(ns, pygame, folha)
+
+    def lupa_do_heroi(self, ns, pygame):
+        # O mesmo para o Faisca, com a funcao que o desenha com formas.
+        folha = pygame.Surface((64, 64))
+        folha.fill(ns["nivel"]["mundo"]["ceu_baixo"])
+        ecra = ns["janela"]["ecra"]
+        ns["janela"]["ecra"] = folha
+        try:
+            ns["desenhar_robot"](17, 16, ns["heroi"]["virado"])
+        finally:
+            ns["janela"]["ecra"] = ecra
+        self.mostrar_lupa(ns, pygame, folha)
+
+    def mostrar_lupa(self, ns, pygame, folha):
+        ecra = ns["janela"]["ecra"]
         grande = pygame.transform.scale(folha, (110, 110))
         caixa = pygame.Rect(ns["LARGURA"] - 126, 84, 114, 114)
         pygame.draw.rect(ecra, (30, 30, 48), caixa.inflate(6, 6), border_radius=6)

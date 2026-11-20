@@ -37,14 +37,17 @@ perceber o que se lhe pode pedir (`SUGESTOES`, no `jogos/o_cerco.py`).
 
 ## Regras do jogo
 
-N'O Cerco, além dos dados (inimigos, torres, mapa, ondas), abrem-se quatro
-**regras**: quem a torre ataca, o que a torre faz ao disparar, o que acontece
-a um inimigo atingido e como anda um inimigo. Cada uma é uma função pequena
-do jogo; mudá-la muda a maneira como o jogo se comporta. É aqui que se
-escreve um `if` a sério.
+Além dos dados, os quatro jogos abrem **regras**. N'O Cerco são quatro: quem
+a torre ataca, o que a torre faz ao disparar, o que acontece a um inimigo
+atingido e como anda um inimigo. Nos outros: como saem os tiros e o que faz
+cada carta (FADO//NEON), quanto magoa um ataque e quem ataca primeiro
+(Bicharada), como salta o Faísca e como se mexe um inimigo (Mãos ao Ar!).
+Cada uma é uma função pequena do jogo; mudá-la muda a maneira como o jogo se
+comporta. É aqui que se escreve um `if` a sério.
 
-- O palco das regras tem uma torre de cada e inimigos já a meio do caminho,
-  e marca com um círculo amarelo quem cada torre escolheu.
+- O palco de uma regra põe o jogo a fazer aquilo que a regra decide (n'O
+  Cerco: uma torre de cada, inimigos já a meio do caminho, e um círculo
+  amarelo em quem cada torre escolheu).
 - Uma regra nova é experimentada mais tempo antes de ser guardada. Se
   rebentar, o jogo volta à anterior e o erro aparece com a linha.
 - O código escrito na Oficina não pode usar `import`, `open` nem outras
@@ -57,18 +60,26 @@ no `jogos/o_cerco.py`).
 
 ## Acontecimentos, desenhos e coisas novas
 
-Também n'O Cerco:
+Nos quatro jogos:
 
-- **Acontecimentos**: seis funções que vêm vazias e que o jogo chama quando
-  começa uma onda, cai um inimigo, um inimigo chega ao castelo, se constrói
-  uma torre, se carrega numa tecla, e a cada frame. O que lá se escrever
-  passa a acontecer nesse momento; há um dicionário `memoria` para guardar
-  coisas de um frame para o outro. É aqui que se acrescenta ao jogo algo que
-  ele não tinha. No palco o jogo joga-se sozinho, onda atrás de onda.
-- **Desenhos**: as funções que desenham uma torre e um inimigo.
-- **+ Novo inimigo / + Nova torre**: cria uma cópia do primeiro, com outro
-  nome, no fim da lista. O inimigo novo entra logo na primeira onda. (No
-  ficheiro do jogo em `oficina/jogos/`: `CRIAVEIS` e `novo()`.)
+- **Acontecimentos**: funções que vêm vazias e que o jogo chama em certos
+  momentos (n'O Cerco: quando começa uma onda, cai um inimigo, um inimigo
+  chega ao castelo, se constrói uma torre, se carrega numa tecla, e a cada
+  frame). O que lá se escrever passa a acontecer nesse momento; há um
+  dicionário `memoria` para guardar coisas de um frame para o outro. É aqui
+  que se acrescenta ao jogo algo que ele não tinha. No palco o jogo joga-se
+  sozinho, para os acontecimentos acontecerem.
+- **Desenhos**: as funções que desenham uma torre, um inimigo, um bicho, o
+  herói.
+- **Os botões com +**: criam uma cópia do primeiro, com outro nome, no fim
+  da lista: um inimigo, uma torre, uma carta, um bicho, um ataque, um
+  treinador, um nível. A cópia é posta onde apareça no jogo (o inimigo novo
+  d'O Cerco entra na primeira onda), e o aviso diz onde. (No ficheiro do
+  jogo em `oficina/jogos/`: `CRIAVEIS` e `novo()`.)
+
+Uma função que só corre mais tarde (a de uma tecla, por exemplo) pode
+rebentar já depois de guardada: o jogo pára com o erro à vista, e corrige-se
+ou carrega-se em **Repor o original**.
 
 ## Imagens e sons
 

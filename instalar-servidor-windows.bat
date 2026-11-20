@@ -6,7 +6,7 @@ rem Uma vez por computador, com uma conta de administrador (a mesma conta
 rem que vai estar ligada durante as sessoes do clube):
 rem
 rem   - Duplo clique. Pede autorizacao de administrador e pergunta o modelo.
-rem   - Ou, numa linha de comandos:  instalar-servidor-windows.bat qwen2.5:7b
+rem   - Ou, numa linha de comandos:  instalar-servidor-windows.bat gpt-oss:20b
 rem
 rem O que faz:
 rem   1. instala o Ollama, se ainda nao existir
@@ -18,9 +18,10 @@ rem
 rem Pode correr-se outra vez sem estragar nada (para trocar de modelo, por
 rem exemplo).
 rem
-rem O modelo tem de caber na memoria da placa grafica. Numa placa de 8 GB
-rem cabe um modelo de 7 ou 8 mil milhoes de parametros (qwen2.5:7b); um de 20
-rem (gpt-oss:20b) ja nao cabe e fica muito lento.
+rem O modelo tem de ser o mesmo em todos os servidores: e o que esta em
+rem oficina/servidores.txt (gpt-oss:20b). Numa placa de 8 GB nao cabe
+rem inteiro, mas com 32 GB de memoria responde depressa na mesma. Um modelo
+rem mais pequeno (qwen2.5:7b) cabe na placa, mas engana-se mais.
 rem
 rem Este ficheiro tem de ficar com fins de linha CRLF (ver .gitattributes).
 rem Dai para baixo de PS-INICIO e PowerShell: o cmd nunca la chega.
@@ -73,8 +74,8 @@ try {
     }
 
     if (-not $modelo) {
-        $resposta = Read-Host 'Modelo a instalar (Enter para qwen2.5:7b)'
-        if ($resposta) { $modelo = $resposta.Trim() } else { $modelo = 'qwen2.5:7b' }
+        $resposta = Read-Host 'Modelo a instalar (Enter para gpt-oss:20b)'
+        if ($resposta) { $modelo = $resposta.Trim() } else { $modelo = 'gpt-oss:20b' }
     }
 
     Write-Host '==> 1/5  Ollama'
