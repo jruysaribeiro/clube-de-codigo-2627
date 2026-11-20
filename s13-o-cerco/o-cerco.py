@@ -495,8 +495,32 @@ def texto_a_voar(texto, x, y, cor):
 #                          A LOGICA, UM PASSO
 # =====================================================================
 
+# --- As regras do jogo ---
+# As quatro funcoes que se seguem sao as REGRAS: quem as torres atacam, o que
+# fazem ao disparar, o que acontece a um inimigo atingido e como anda um
+# inimigo. Mudar uma delas muda a maneira como o jogo se comporta.
+#
+# Dentro delas podes usar tudo o que o jogo tem:
+#   inimigos, torres, projeteis, efeitos    as listas do que esta no ecra
+#   distancia(x1, y1, x2, y2)               quantos pixeis vao de um ponto a outro
+#   valor_da_torre(torre, "dano")           o dano (ou o "alcance") ja com o nivel
+#   random.random()                         um numero ao calhas entre 0 e 1
+# Para aparecer um efeito no ecra tem de se por na lista efeitos:
+#   efeitos.append(texto_a_voar("ola", x, y, cor))        um texto que sobe e some
+#   efeitos.append(circulo_a_crescer(x, y, cor, raio))    um circulo que cresce
+# Para mudar o ouro ou as vidas dentro de uma funcao, a primeira linha dela
+# tem de ser "global ouro" (ou "global vidas").
+
+# QUEM A TORRE ATACA
+# Recebe uma torre e devolve o inimigo que ela vai atacar (ou None, se nao
+# houver nenhum ao alcance). Como esta: o que vai mais a frente.
+#   torre["x"], torre["y"]    onde esta a torre, em pixeis
+#   inimigo["x"], inimigo["y"], inimigo["vida"], inimigo["vida_max"]
+#   inimigo["andado"]         quanto ja andou: quem andou mais vai a frente
+#   inimigo["nome"]           "Soldado", "Cavaleiro"...
+# Ideias: atacar o que tem menos vida; o que esta mais perto da torre; so os
+# Cavaleiros.
 def escolher_alvo(torre):
-    # A torre ataca o inimigo dentro do alcance que vai mais a frente.
     alcance = valor_da_torre(torre, "alcance")
     melhor = None
     for inimigo in inimigos:
@@ -506,8 +530,59 @@ def escolher_alvo(torre):
     return melhor
 
 
+# O QUE ACONTECE A UM INIMIGO ATINGIDO
+# Corre cada vez que um golpe acerta num inimigo. Recebe o inimigo e o dano
+# desse golpe. Como esta: tira o dano a vida, e mais nada.
+#   inimigo["vida"]       a vida que lhe resta (com 0 ou menos, cai)
+#   inimigo["vida_max"]   a vida com que nasceu
+#   inimigo["nome"]       "Soldado", "Cavaleiro"...
+#   inimigo["x"], inimigo["y"]
+# Ideias: golpes criticos (as vezes o dano conta a dobrar); uma armadura (o
+# Ariete so leva metade); mostrar o dano com um texto_a_voar.
 def magoar(inimigo, dano):
     inimigo["vida"] = inimigo["vida"] - dano
+
+
+# O QUE A TORRE FAZ AO DISPARAR
+# Corre quando uma torre esta pronta e tem um alvo. Recebe a torre e o
+# inimigo escolhido. Como esta: faz o que diz o "efeito" da torre.
+#   modelo           a ficha da torre em TORRES ("efeito", "cadencia", "cor"...)
+#   torre["recarga"] os frames que a torre fica a espera ate ao proximo disparo
+#   torre["mira"]    para onde aponta o cano
+# Um projetil e um dicionario posto na lista projeteis: voa de "x", "y" ate
+# ao "alvo", e ao chegar tira-lhe o "dano". Com "raio" maior que 0 rebenta e
+# magoa todos os que estiverem a essa distancia.
+# Ideias: disparar duas setas de cada vez; a pedra do Trabuco voar mais
+# depressa; o golpe da Padeira acertar tambem em quem esta ao lado do alvo.
+def disparar(torre, alvo):
+    modelo = TORRES[torre["tipo"]]
+    dano = valor_da_torre(torre, "dano")
+    torre["recarga"] = modelo["cadencia"]
+    torre["mira"] = (alvo["x"], alvo["y"])
+
+    if modelo["efeito"] == "tiro" or modelo["efeito"] == "explosao":
+        raio = 0
+        velocidade = 9
+        if modelo["efeito"] == "explosao":
+            raio = modelo["raio_explosao"]
+            velocidade = 5
+        projeteis.append({
+            "x": torre["x"], "y": torre["y"], "alvo": alvo,
+            "destino_x": alvo["x"], "destino_y": alvo["y"],
+            "dano": dano, "raio": raio, "velocidade": velocidade,
+            "cor": modelo["cor"],
+        })
+    elif modelo["efeito"] == "area":
+        alcance = valor_da_torre(torre, "alcance")
+        for inimigo in inimigos:
+            if distancia(torre["x"], torre["y"], inimigo["x"], inimigo["y"]) <= alcance:
+                magoar(inimigo, dano)
+                inimigo["lento"] = TEMPO_LENTIDAO
+                inimigo["fator_lento"] = modelo["lentidao"]
+        efeitos.append(circulo_a_crescer(torre["x"], torre["y"], modelo["cor"], alcance))
+    elif modelo["efeito"] == "golpe":
+        magoar(alvo, dano)
+        efeitos.append(circulo_a_crescer(alvo["x"], alvo["y"], BRANCO, 18))
 
 
 def atualizar_torres():
@@ -518,34 +593,7 @@ def atualizar_torres():
         alvo = escolher_alvo(torre)
         if alvo is None:
             continue
-        modelo = TORRES[torre["tipo"]]
-        dano = valor_da_torre(torre, "dano")
-        torre["recarga"] = modelo["cadencia"]
-        torre["mira"] = (alvo["x"], alvo["y"])
-
-        if modelo["efeito"] == "tiro" or modelo["efeito"] == "explosao":
-            raio = 0
-            velocidade = 9
-            if modelo["efeito"] == "explosao":
-                raio = modelo["raio_explosao"]
-                velocidade = 5
-            projeteis.append({
-                "x": torre["x"], "y": torre["y"], "alvo": alvo,
-                "destino_x": alvo["x"], "destino_y": alvo["y"],
-                "dano": dano, "raio": raio, "velocidade": velocidade,
-                "cor": modelo["cor"],
-            })
-        elif modelo["efeito"] == "area":
-            alcance = valor_da_torre(torre, "alcance")
-            for inimigo in inimigos:
-                if distancia(torre["x"], torre["y"], inimigo["x"], inimigo["y"]) <= alcance:
-                    magoar(inimigo, dano)
-                    inimigo["lento"] = TEMPO_LENTIDAO
-                    inimigo["fator_lento"] = modelo["lentidao"]
-            efeitos.append(circulo_a_crescer(torre["x"], torre["y"], modelo["cor"], alcance))
-        elif modelo["efeito"] == "golpe":
-            magoar(alvo, dano)
-            efeitos.append(circulo_a_crescer(alvo["x"], alvo["y"], BRANCO, 18))
+        disparar(torre, alvo)
 
 
 def atualizar_projeteis():
@@ -576,28 +624,43 @@ def atualizar_projeteis():
     projeteis = sobreviventes
 
 
+# COMO ANDA UM INIMIGO
+# Corre uma vez por frame (60 vezes por segundo) para cada inimigo, e da-lhe
+# um passo. Como esta: vai a direito ate ao proximo ponto do caminho.
+#   velocidade          quantos pixeis anda neste passo
+#   CAMINHO_PONTOS      a lista dos pontos (x, y) do caminho, por ordem
+#   inimigo["ponto"]    o numero do ponto para onde ele vai agora
+#   inimigo["lento"]    os frames de lentidao que ainda lhe faltam
+#   inimigo["andado"]   quanto ja andou ao todo (as torres usam isto)
+#   inimigo["chegou"]   passa a True quando chega ao castelo
+# Ideias: acelerar quando ja tem pouca vida; parar um bocadinho de vez em
+# quando; andar aos solucos (um passo grande, depois nenhum).
+def mover_inimigo(inimigo):
+    dados = INIMIGOS[inimigo["nome"]]
+    velocidade = dados["velocidade"]
+    if inimigo["lento"] > 0:
+        inimigo["lento"] = inimigo["lento"] - 1
+        velocidade = velocidade * inimigo["fator_lento"]
+    destino = CAMINHO_PONTOS[inimigo["ponto"]]
+    dx = destino[0] - inimigo["x"]
+    dy = destino[1] - inimigo["y"]
+    falta = math.hypot(dx, dy)
+    if falta <= velocidade:
+        inimigo["x"] = destino[0]
+        inimigo["y"] = destino[1]
+        inimigo["ponto"] = inimigo["ponto"] + 1
+        if inimigo["ponto"] >= len(CAMINHO_PONTOS):
+            inimigo["chegou"] = True
+    else:
+        inimigo["x"] = inimigo["x"] + dx / falta * velocidade
+        inimigo["y"] = inimigo["y"] + dy / falta * velocidade
+    inimigo["andado"] = inimigo["andado"] + velocidade
+
+
 def atualizar_inimigos():
     global inimigos, vidas, ouro
     for inimigo in inimigos:
-        dados = INIMIGOS[inimigo["nome"]]
-        velocidade = dados["velocidade"]
-        if inimigo["lento"] > 0:
-            inimigo["lento"] = inimigo["lento"] - 1
-            velocidade = velocidade * inimigo["fator_lento"]
-        destino = CAMINHO_PONTOS[inimigo["ponto"]]
-        dx = destino[0] - inimigo["x"]
-        dy = destino[1] - inimigo["y"]
-        falta = math.hypot(dx, dy)
-        if falta <= velocidade:
-            inimigo["x"] = destino[0]
-            inimigo["y"] = destino[1]
-            inimigo["ponto"] = inimigo["ponto"] + 1
-            if inimigo["ponto"] >= len(CAMINHO_PONTOS):
-                inimigo["chegou"] = True
-        else:
-            inimigo["x"] = inimigo["x"] + dx / falta * velocidade
-            inimigo["y"] = inimigo["y"] + dy / falta * velocidade
-        inimigo["andado"] = inimigo["andado"] + velocidade
+        mover_inimigo(inimigo)
 
     # A receita dos sobreviventes: quem morreu ou chegou ao castelo nao
     # passa para a lista nova.
