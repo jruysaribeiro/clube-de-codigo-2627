@@ -1,0 +1,20 @@
+# Os computadores ajudantes da sala: os que tem placa grafica e correram o
+# instalar-servidor-windows.bat (que no fim mostra o endereco a por aqui).
+#
+# Um endereco por linha. Com varios, a Oficina espalha as perguntas por
+# todos, e se um estiver desligado usa os outros. Sem nenhum, a Oficina
+# funciona na mesma, so nao mostra o botao "Pedir ajuda".
+#
+# O melhor e usar o nome do computador seguido de .local: o nome nao muda,
+# e o endereco com numeros pode mudar quando o computador reinicia.
+#
+# Tira o # do inicio e troca pelos verdadeiros:
+#
+# http://nome-do-computador.local:11434
+# http://192.168.1.51:11434
+
+http://cicf-2.local:11434
+
+# O modelo e o que cada computador tiver instalado. Para obrigar a usar um:
+#
+# modelo = qwen2.5:7b

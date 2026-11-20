@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oficina</title>
+<style>
+  :root {
+    --fundo: #14141f;
+    --painel: #1e1e30;
+    --painel-2: #27273d;
+    --linha: #34344f;
+    --texto: #ececf2;
+    --fraco: #9a9ab4;
+    --amarelo: #f0c846;
+    --verde: #5fd07a;
+    --vermelho: #ff6b5e;
+    --laranja: #ffab4a;
+    --letra-codigo: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --alto: 26px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--fundo); color: var(--texto);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  button {
+    font: inherit; color: var(--texto); background: var(--painel-2);
+    border: 1px solid var(--linha); border-radius: 8px; padding: 7px 12px; cursor: pointer;
+  }
+  button:hover { border-color: var(--amarelo); }
+  button:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--amarelo); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* ---------- escolher ---------- */
+  #escolher { padding: 24px 20px 40px; overflow: auto; }
+  #escolher h1 { margin: 0 0 4px; font-size: 26px; color: var(--amarelo); letter-spacing: .02em; }
+  #escolher > p { margin: 0 0 22px; color: var(--fraco); }
+  .jogo { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 18px; margin-bottom: 18px; }
+  .jogo h2 { margin: 0; font-size: 21px; }
+  .jogo .descricao { margin: 2px 0 14px; color: var(--fraco); }
+  .jogo h3 { margin: 14px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .09em; color: var(--fraco); font-weight: 600; }
+  .coisas { display: flex; flex-wrap: wrap; gap: 8px; }
+  .coisas button { padding: 10px 16px; font-size: 17px; }
+  .ficheiro { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--linha); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ficheiro button { font-size: 14px; }
+  .ficheiro span { color: var(--fraco); font-size: 14px; flex-basis: 100%; }
+
+  /* ---------- editar ---------- */
+  #editar { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .topo { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); }
+  .topo h1 { margin: 0; font-size: 19px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topo h1 small { color: var(--fraco); font-weight: 400; font-size: 14px; margin-right: 6px; }
+  .lados { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr); }
+  .lado-jogo { padding: 14px; overflow: auto; border-right: 1px solid var(--linha); min-width: 0; }
+  .lado-codigo { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #jogo { margin: 0 auto; border: 3px solid var(--linha); border-radius: 10px; overflow: hidden; line-height: 0; background: #000; cursor: crosshair; outline: none; }
+  #jogo:focus { border-color: var(--amarelo); }
+  #imagem { display: block; width: 100%; height: auto; user-select: none; }
+  .foco { margin: 10px 0 4px; font-size: 14px; color: var(--fraco); text-align: center; }
+  .foco.no-jogo { color: var(--amarelo); }
+  .dica { margin: 0; color: var(--fraco); font-size: 14px; text-align: center; }
+  @media (max-width: 860px) {
+    .lados { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+    .lado-jogo { border-right: 0; border-bottom: 1px solid var(--linha); padding: 8px; overflow: visible; }
+    .dica { display: none; }
+  }
+
+  details { border-bottom: 1px solid var(--linha); }
+  summary { padding: 9px 14px; cursor: pointer; color: var(--amarelo); font-size: 15px; }
+  #ajuda { margin: 0; padding: 0 14px 12px; max-height: 30vh; overflow: auto; white-space: pre; color: #cfcfe0; font: 12.5px/1.5 var(--letra-codigo); }
+
+  .caixa { flex: 1; min-height: 140px; display: flex; background: #10101a; overflow: hidden; }
+  #numeros {
+    margin: 0; padding: 12px 8px 12px 12px; text-align: right; color: #565672; user-select: none;
+    font: 16px/var(--alto) var(--letra-codigo); overflow: hidden; white-space: pre; flex: none;
+  }
+  #numeros .mal { color: var(--vermelho); font-weight: 700; }
+  .folhas { position: relative; flex: 1; min-width: 0; }
+  #cores, #codigo {
+    position: absolute; inset: 0; margin: 0; border: 0; padding: 12px 14px 12px 6px;
+    font: 16px/var(--alto) var(--letra-codigo); white-space: pre; tab-size: 4; overflow: auto;
+    letter-spacing: 0; font-variant-ligatures: none;
+  }
+  #cores { color: var(--texto); pointer-events: none; overflow: hidden; }
+  #cores div { min-height: var(--alto); min-width: max-content; }
+  #cores div.mal { background: rgba(255, 107, 94, .2); box-shadow: inset 3px 0 var(--vermelho); }
+  #codigo { background: transparent; color: transparent; caret-color: var(--amarelo); resize: none; outline: none; }
+  #codigo::selection { background: rgba(240, 200, 70, .3); }
+  .c-coment { color: #7c7c98; font-style: italic; }
+  .c-texto { color: #9be28f; }
+  .c-numero { color: #ffb86b; }
+  .c-palavra { color: #c79bff; }
+  .c-cor { color: #ffb86b; border-bottom: 3px solid; }
+
+  #estado { padding: 10px 14px; border-top: 1px solid var(--linha); background: var(--painel); min-height: 46px; font-size: 15px; }
+  #estado.bem { color: var(--verde); }
+  #estado.mal { color: var(--vermelho); }
+  #estado.aviso { color: var(--laranja); }
+  #estado.espera { color: var(--fraco); }
+  #estado ul { margin: 4px 0 0; padding-left: 20px; }
+  #estado small { display: block; color: var(--fraco); font-family: var(--letra-codigo); font-size: 12px; margin-top: 3px; }
+  #estado .avisos { color: var(--laranja); }
+  #fala { padding: 6px 14px; border-top: 1px solid var(--linha); font: 13px/1.4 var(--letra-codigo); color: var(--fraco); white-space: pre-wrap; max-height: 80px; overflow: auto; }
+  .baixo { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--linha); background: var(--painel); }
+  .baixo button { font-size: 14px; }
+  #reabrir { border-color: var(--amarelo); color: var(--amarelo); }
+
+  /* ---------- o ajudante ---------- */
+  #ajudante { display: flex; flex-direction: column; min-height: 0; max-height: 45%; border-top: 1px solid var(--linha); background: var(--painel); }
+  #ajudante .nota { margin: 0; padding: 8px 14px 0; font-size: 13px; color: var(--fraco); }
+  #conversa { flex: 1; min-height: 0; overflow: auto; padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; }
+  #conversa:empty { display: none; }
+  #conversa div { padding: 8px 11px; border-radius: 10px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 92%; }
+  #conversa .eu { align-self: flex-end; background: var(--painel-2); border: 1px solid var(--linha); }
+  #conversa .ajudante { align-self: flex-start; background: #10101a; border: 1px solid var(--linha); }
+  #conversa .a-pensar { color: var(--fraco); font-style: italic; }
+  #conversa .falhou { color: var(--laranja); }
+  #conversa code, #conversa pre { font: 14px/1.45 var(--letra-codigo); color: var(--amarelo); }
+  #conversa pre { margin: 6px 0; padding: 8px 10px; background: var(--painel); border-radius: 6px; overflow: auto; white-space: pre; }
+  .atalhos { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 14px 0; }
+  .atalhos button { font-size: 14px; border-radius: 999px; }
+  #perguntar { display: flex; gap: 8px; padding: 8px 14px 10px; }
+  #pergunta {
+    flex: 1; min-width: 0; font: inherit; color: var(--texto); background: #10101a;
+    border: 1px solid var(--linha); border-radius: 8px; padding: 7px 10px;
+  }
+  #pergunta:focus-visible { outline: 2px solid var(--amarelo); outline-offset: 2px; }
+  #ajudante button:disabled { opacity: .5; cursor: default; border-color: var(--linha); }
+  #pedir-ajuda { border-color: var(--amarelo); color: var(--amarelo); margin-left: auto; }
+</style>
+</head>
+<body>
+
+<main id="escolher">
+  <h1>Oficina</h1>
+  <p>Escolhe uma coisa para mudar. Vês só o código dela, e o jogo muda enquanto escreves.</p>
+  <div id="jogos"></div>
+</main>
+
+<main id="editar" hidden>
+  <div class="topo">
+    <button id="voltar">&larr; Escolher outra coisa</button>
+    <h1><small id="nome-jogo"></small><span id="titulo"></span></h1>
+  </div>
+  <div class="lados">
+  <section class="lado-jogo">
+    <div id="jogo" tabindex="0" aria-label="O jogo"><canvas id="imagem"></canvas></div>
+    <p class="foco" id="foco"></p>
+    <p class="dica" id="dica"></p>
+  </section>
+  <section class="lado-codigo">
+  <details id="caixa-ajuda">
+    <summary>O que quer dizer cada coisa</summary>
+    <pre id="ajuda"></pre>
+  </details>
+  <div class="caixa">
+    <pre id="numeros" aria-hidden="true"></pre>
+    <div class="folhas">
+      <pre id="cores" aria-hidden="true"></pre>
+      <textarea id="codigo" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Código"></textarea>
+    </div>
+  </div>
+  <div id="estado" class="espera" role="status"></div>
+  <div id="fala" hidden></div>
+  <div id="ajudante" hidden>
+    <p class="nota">O ajudante é um programa: às vezes engana-se. Experimenta sempre no jogo.</p>
+    <div id="conversa" aria-live="polite"></div>
+    <div class="atalhos">
+      <button type="button" id="atalho-erro" hidden>Porque é que dá erro?</button>
+      <button type="button" id="atalho-explica">O que faz este código?</button>
+    </div>
+    <form id="perguntar">
+      <input id="pergunta" maxlength="400" autocomplete="off" placeholder="Escreve a tua pergunta…" aria-label="Pergunta ao ajudante">
+      <button id="enviar-pergunta">Perguntar</button>
+    </form>
+  </div>
+  <div class="baixo">
+    <button id="repor">Repor o original</button>
+    <button id="guardar">Guardar o meu jogo</button>
+    <button id="reabrir" hidden>Pôr o jogo a correr outra vez</button>
+    <button id="pedir-ajuda" hidden>Pedir ajuda</button>
+  </div>
+  </section>
+  </div>
+</main>
+
+<input type="file" id="escolher-ficheiro" accept=".py,text/x-python,text/plain" hidden>
+
+<script>
+const $ = id => document.getElementById(id);
+const codigo = $("codigo");
+
+let jogoAberto = null;      // id do jogo
+let ultimoPedido = 0;       // numero do ultimo codigo que o jogo aceitou receber
+let desde = 0;              // ultima mensagem do jogo que ja vimos
+let linhaMal = null;
+let espera = null;
+let aVer = null;
+const jogo = $("jogo");
+const imagem = $("imagem");
+
+async function pedir(caminho, dados) {
+  const opcoes = dados === undefined ? {} : {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(dados),
+  };
+  const resposta = await fetch(caminho, opcoes);
+  const corpo = await resposta.json();
+  if (!resposta.ok) throw new Error(corpo.falha || "Não deu.");
+  return corpo;
+}
+
+/* ---------------- escolher ---------------- */
+
+function elemento(tipo, texto, classe) {
+  const e = document.createElement(tipo);
+  if (texto) e.textContent = texto;
+  if (classe) e.className = classe;
+  return e;
+}
+
+async function mostrarJogos() {
+  $("editar").hidden = true;
+  $("escolher").hidden = false;
+  history.replaceState(null, "", location.pathname);
+  aMostrar = aMostrar + 1;            // deixa de pedir a imagem do jogo
+  clearInterval(aVer);
+  const caixa = $("jogos");
+  let jogos;
+  try {
+    jogos = (await pedir("/api/jogos")).jogos;
+  } catch (erro) {
+    caixa.textContent = "A Oficina não responde. Está a correr no terminal?";
+    return;
+  }
+  caixa.textContent = "";
+  for (const jogo of jogos) {
+    const cartao = elemento("section", "", "jogo");
+    cartao.append(elemento("h2", jogo.nome), elemento("p", jogo.descricao, "descricao"));
+    if (jogo.erro) cartao.append(elemento("p", jogo.erro));
+    const grupos = new Map();
+    for (const escolha of jogo.escolhas) {
+      if (!grupos.has(escolha.grupo)) grupos.set(escolha.grupo, []);
+      grupos.get(escolha.grupo).push(escolha);
+    }
+    for (const [grupo, escolhas] of grupos) {
+      cartao.append(elemento("h3", grupo));
+      const linha = elemento("div", "", "coisas");
+      for (const escolha of escolhas) {
+        const botao = elemento("button", escolha.titulo);
+        botao.onclick = () => abrir(jogo.id, escolha.id);
+        linha.append(botao);
+      }
+      cartao.append(linha);
+    }
+    const ficheiro = elemento("div", "", "ficheiro");
+    const guardar = elemento("button", "Guardar o meu jogo");
+    guardar.onclick = () => guardarJogo(jogo.id);
+    const trazer = elemento("button", "Abrir um jogo guardado");
+    trazer.onclick = () => trazerJogo(jogo.id, jogo.nome);
+    ficheiro.append(guardar, trazer, elemento("span",
+      "Guardar dá-te o ficheiro inteiro do jogo, para levares. Noutro dia, abre-o aqui e continuas dele."));
+    cartao.append(ficheiro);
+    caixa.append(cartao);
+  }
+}
+
+function guardarJogo(jogo) {
+  const a = document.createElement("a");
+  a.href = "/api/descarregar?jogo=" + encodeURIComponent(jogo);
+  a.download = "";
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+function trazerJogo(jogo, nome) {
+  const entrada = $("escolher-ficheiro");
+  entrada.value = "";
+  entrada.onchange = async () => {
+    const ficheiro = entrada.files[0];
+    if (!ficheiro) return;
+    if (!confirm('Abrir "' + ficheiro.name + '" como o teu ' + nome + "?\n\nO jogo que está agora na Oficina é trocado por este.")) return;
+    try {
+      await pedir("/api/carregar", {jogo, fonte: await ficheiro.text()});
+      await mostrarJogos();
+    } catch (erro) {
+      alert(erro.message);
+    }
+  };
+  entrada.click();
+}
+
+/* ---------------- editar ---------------- */
+
+async function abrir(jogo, escolha) {
+  let dados;
+  try {
+    dados = await pedir("/api/abrir", {jogo, escolha});
+  } catch (erro) {
+    alert(erro.message);
+    return;
+  }
+  jogoAberto = jogo;
+  history.replaceState(null, "", "#" + jogo + "/" + escolha);   // recarregar a pagina volta aqui
+  desde = dados.desde;
+  ultimoPedido = 0;
+  mostrarVideo();
+  mostrarFoco();
+  $("nome-jogo").textContent = dados.jogo + " ›";
+  $("titulo").textContent = dados.titulo;
+  $("dica").textContent = dados.dica;
+  $("ajuda").textContent = dados.ajuda;
+  $("caixa-ajuda").hidden = !dados.ajuda;
+  $("caixa-ajuda").open = window.innerHeight > 700;
+  $("fala").hidden = true;
+  $("fala").textContent = "";
+  $("reabrir").hidden = true;
+  limparConversa();
+  codigo.value = dados.codigo;
+  codigo.setSelectionRange(0, 0);     // senao o Safari abre o codigo ja puxado para a direita
+  linhaMal = null;
+  pintar();
+  dizer("espera", "Muda um número e vê o que acontece no jogo.");
+  $("escolher").hidden = true;
+  $("editar").hidden = false;
+  codigo.focus();
+  clearInterval(aVer);
+  aVer = setInterval(verEstado, 350);
+}
+
+function dizer(classe, texto, extras) {
+  const caixa = $("estado");
+  caixa.className = classe;
+  caixa.textContent = texto;
+  if (extras) caixa.append(...extras);
+  $("atalho-erro").hidden = !haAviso();
+}
+
+function lista(frases, classe) {
+  const ul = elemento("ul", "", classe);
+  for (const frase of frases) ul.append(elemento("li", frase));
+  return ul;
+}
+
+async function enviar() {
+  let resposta;
+  try {
+    resposta = await pedir("/api/codigo", {codigo: codigo.value});
+  } catch (erro) {
+    dizer("mal", erro.message);
+    return;
+  }
+  if (resposta.ok) {
+    ultimoPedido = resposta.id;
+    marcarLinha(null);
+    dizer("espera", "A experimentar no jogo…");
+  } else {
+    ultimoPedido = Infinity;     // nada do que o jogo disser agora interessa
+    mostrarErro(resposta.erro);
+  }
+}
+
+function mostrarErro(erro) {
+  marcarLinha(erro.linha);
+  const onde = erro.linha ? "Linha " + erro.linha + ": " : "";
+  dizer("mal", onde + erro.texto, [elemento("small", erro.detalhe)]);
+}
+
+async function verEstado() {
+  let estado;
+  try {
+    estado = await pedir("/api/estado?desde=" + desde);
+  } catch (erro) {
+    return;
+  }
+  for (const m of estado.mensagens) {
+    desde = Math.max(desde, m.n);
+    if (m.tipo === "print") {
+      const fala = $("fala");
+      fala.hidden = false;
+      fala.textContent = (fala.textContent + "\n" + m.texto).trim().split("\n").slice(-6).join("\n");
+      fala.scrollTop = fala.scrollHeight;
+    } else if (m.id === ultimoPedido || (m.tipo === "erro" && m.id == null)) {
+      if (m.tipo === "aplicado" || m.tipo === "estavel") {
+        const guardado = m.tipo === "estavel" ? " Ficou guardado." : "";
+        const extras = m.avisos && m.avisos.length ? [lista(m.avisos, "avisos")] : [];
+        if (m.tipo === "estavel" && $("estado").querySelector(".avisos")) continue;
+        dizer("bem", "Está no jogo." + guardado, extras);
+      } else if (m.tipo === "problemas") {
+        dizer("aviso", "Ainda não entrou no jogo:", [lista(m.problemas)]);
+      } else if (m.tipo === "erro") {
+        mostrarErro(m);
+      }
+    }
+  }
+  $("reabrir").hidden = estado.viva;
+}
+
+/* ---------------- o jogo, dentro da pagina ---------------- */
+// A imagem vem do jogo verdadeiro. O rato e as teclas vao daqui para ele,
+// por ordem e em grupos, para nao se atropelarem.
+
+const fila = [];
+let aDespachar = false;
+let ratoMarcado = false;
+let ultimoRato = {x: 0, y: 0};
+
+function entrada(evento) {
+  fila.push(evento);
+  despachar();
+}
+
+async function despachar() {
+  if (aDespachar) return;
+  aDespachar = true;
+  while (fila.length) {
+    const lote = fila.splice(0);
+    try { await pedir("/api/entrada", {eventos: lote}); } catch (erro) {}
+  }
+  aDespachar = false;
+}
+
+function ponto(ev) {
+  // De pixeis da pagina para pixeis do jogo (a imagem pode estar encolhida).
+  const caixa = imagem.getBoundingClientRect();
+  if (!caixa.width) return {x: 0, y: 0};
+  return {
+    x: Math.round((ev.clientX - caixa.left) * imagem.width / caixa.width),
+    y: Math.round((ev.clientY - caixa.top) * imagem.height / caixa.height),
+  };
+}
+
+function mostrarFoco() {
+  const noJogo = document.activeElement === jogo;
+  $("foco").textContent = noJogo
+    ? "O teclado está no jogo. Clica no código para voltares a escrever."
+    : "Clica no jogo para jogares nele com o rato e o teclado.";
+  $("foco").classList.toggle("no-jogo", noJogo);
+}
+
+// A pagina pede os frames um a um e desenha-os. (Um <img> a receber os
+// frames todos de seguida ficava preto no Safari.)
+let aMostrar = 0;
+
+function acertarTamanho(largura, altura) {
+  // Nunca mais alto do que o ecra: a largura maxima sai da forma do jogo.
+  imagem.width = largura;
+  imagem.height = altura;
+  const sobra = window.innerWidth > 860 ? "100vh - 190px" : "42vh";
+  jogo.style.maxWidth = "min(" + largura * 1.5 + "px, calc((" + sobra + ") * " + largura / altura + "))";
+}
+
+async function mostrarVideo() {
+  const eu = ++aMostrar;
+  const tela = imagem.getContext("2d");
+  let ultimo = 0;
+  while (eu === aMostrar) {
+    try {
+      const resposta = await fetch("/api/quadro?depois=" + ultimo, {cache: "no-store"});
+      if (resposta.status !== 200) continue;       // ainda nao ha frame novo
+      const quadro = await createImageBitmap(await resposta.blob());
+      if (eu !== aMostrar) return;
+      if (imagem.width !== quadro.width || imagem.height !== quadro.height) acertarTamanho(quadro.width, quadro.height);
+      tela.drawImage(quadro, 0, 0);
+      quadro.close();
+      ultimo = Number(resposta.headers.get("X-Quadro"));
+    } catch (erro) {
+      await new Promise(feito => setTimeout(feito, 500));   // a Oficina nao respondeu: tenta outra vez
+    }
+  }
+}
+
+jogo.addEventListener("mousemove", ev => {
+  ultimoRato = ponto(ev);
+  if (ratoMarcado) return;
+  ratoMarcado = true;
+  requestAnimationFrame(() => {
+    ratoMarcado = false;
+    entrada({tipo: "rato", ...ultimoRato});
+  });
+});
+jogo.addEventListener("mouseleave", () => entrada({tipo: "rato", x: 0, y: 0}));
+jogo.addEventListener("mousedown", ev => {
+  ev.preventDefault();
+  jogo.focus();
+  entrada({tipo: "botao", baixo: true, botao: ev.button + 1, ...ponto(ev)});
+});
+jogo.addEventListener("mouseup", ev => {
+  entrada({tipo: "botao", baixo: false, botao: ev.button + 1, ...ponto(ev)});
+});
+jogo.addEventListener("contextmenu", ev => ev.preventDefault());
+jogo.addEventListener("keydown", ev => {
+  if (ev.metaKey || ev.ctrlKey) return;      // atalhos do browser ficam do browser
+  ev.preventDefault();
+  if (!ev.repeat) entrada({tipo: "tecla", baixo: true, tecla: ev.key});
+});
+jogo.addEventListener("keyup", ev => {
+  ev.preventDefault();
+  entrada({tipo: "tecla", baixo: false, tecla: ev.key});
+});
+jogo.addEventListener("focus", mostrarFoco);
+jogo.addEventListener("blur", () => {
+  entrada({tipo: "largar"});
+  mostrarFoco();
+});
+
+/* ---------------- o editor ---------------- */
+
+const PALAVRAS = "def|return|if|elif|else|for|while|in|not|and|or|True|False|None|import|global|break|continue|pass";
+const PECAS = new RegExp(
+  "(#.*)" +
+  "|(\"(?:[^\"\\\\]|\\\\.)*\"?|'(?:[^'\\\\]|\\\\.)*'?)" +
+  "|(\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*\\))" +
+  "|(\\b\\d+(?:\\.\\d+)?\\b)" +
+  "|(\\b(?:" + PALAVRAS + ")\\b)", "g");
+
+function limpo(texto) {
+  return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function pintarLinha(linha) {
+  let html = "";
+  let ultimo = 0;
+  for (const p of linha.matchAll(PECAS)) {
+    html += limpo(linha.slice(ultimo, p.index));
+    const t = limpo(p[0]);
+    if (p[1]) html += '<span class="c-coment">' + t + "</span>";
+    else if (p[2]) html += '<span class="c-texto">' + t + "</span>";
+    else if (p[3]) {
+      // Tres numeros entre parenteses: e uma cor. Sublinha-se com ela.
+      const cor = [p[4], p[5], p[6]].map(n => Math.min(255, Number(n))).join(",");
+      html += '<span class="c-cor" style="border-color:rgb(' + cor + ')">' + t + "</span>";
+    }
+    else if (p[7]) html += '<span class="c-numero">' + t + "</span>";
+    else html += '<span class="c-palavra">' + t + "</span>";
+    ultimo = p.index + p[0].length;
+  }
+  return html + limpo(linha.slice(ultimo));
+}
+
+function pintar() {
+  const linhas = codigo.value.split("\n");
+  $("cores").innerHTML = linhas.map((linha, i) =>
+    "<div" + (i + 1 === linhaMal ? ' class="mal"' : "") + ">" + pintarLinha(linha) + "</div>").join("");
+  $("numeros").innerHTML = linhas.map((_, i) =>
+    i + 1 === linhaMal ? '<span class="mal">' + (i + 1) + "</span>" : String(i + 1)).join("\n");
+  acertar();
+}
+
+function marcarLinha(linha) {
+  linhaMal = linha || null;
+  pintar();
+}
+
+function acertar() {
+  $("cores").scrollTop = codigo.scrollTop;
+  $("cores").scrollLeft = codigo.scrollLeft;
+  $("numeros").scrollTop = codigo.scrollTop;
+}
+
+function escrever(texto) {
+  // insertText mantem o Ctrl+Z a funcionar.
+  if (!document.execCommand("insertText", false, texto)) {
+    codigo.setRangeText(texto, codigo.selectionStart, codigo.selectionEnd, "end");
+    codigo.dispatchEvent(new Event("input"));
+  }
+}
+
+codigo.addEventListener("input", () => {
+  pintar();
+  clearTimeout(espera);
+  espera = setTimeout(enviar, 350);
+});
+codigo.addEventListener("scroll", acertar);
+codigo.addEventListener("keydown", evento => {
+  if (evento.key === "Tab") {
+    evento.preventDefault();
+    escrever("    ");
+  } else if (evento.key === "Enter") {
+    // A linha nova comeca com os mesmos espacos da anterior.
+    evento.preventDefault();
+    const ate = codigo.value.slice(0, codigo.selectionStart);
+    const linha = ate.slice(ate.lastIndexOf("\n") + 1);
+    escrever("\n" + linha.match(/^ */)[0]);
+  }
+});
+
+/* ---------------- o ajudante ---------------- */
+// As perguntas vao para a Oficina, que as leva a um computador da sala com
+// um modelo de linguagem. Com cada pergunta segue o codigo como esta agora
+// e o erro que estiver a vista.
+
+let conversa = [];          // [{quem: "eu" ou "ajudante", texto}]
+let aResponder = false;
+
+function haAviso() {
+  const classe = $("estado").className;
+  return classe === "mal" || classe === "aviso";
+}
+
+function limparConversa() {
+  conversa = [];
+  $("conversa").textContent = "";
+  $("ajudante").hidden = true;
+  $("pedir-ajuda").textContent = "Pedir ajuda";
+}
+
+function formatar(texto) {
+  // Os modelos escrevem `codigo`, **negrito** e blocos entre ```.
+  return texto.split("```").map((parte, i) => {
+    if (i % 2) return "<pre>" + limpo(parte.replace(/^[a-zA-Z]*\n/, "").replace(/\n$/, "")) + "</pre>";
+    return limpo(parte)
+      .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
+  }).join("");
+}
+
+function bolha(classe, texto) {
+  const caixa = $("conversa");
+  const b = elemento("div", texto, classe);
+  caixa.append(b);
+  caixa.scrollTop = caixa.scrollHeight;
+  return b;
+}
+
+async function perguntar(texto) {
+  texto = texto.trim();
+  if (!texto || aResponder) return;
+  aResponder = true;
+  for (const botao of $("ajudante").querySelectorAll("button")) botao.disabled = true;
+  const caixa = $("conversa");
+  bolha("eu", texto);
+  const resposta = bolha("ajudante a-pensar", "A pensar…");
+  let dito = "";
+  try {
+    const pedido = await fetch("/api/pergunta", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        pergunta: texto, codigo: codigo.value, conversa,
+        erro: haAviso() ? $("estado").innerText : "", linha: linhaMal,
+      }),
+    });
+    if (!pedido.ok) throw new Error((await pedido.json()).falha || "Não deu.");
+    const leitor = pedido.body.getReader();
+    const letras = new TextDecoder();
+    while (true) {
+      const {done, value} = await leitor.read();
+      if (done) break;
+      dito += letras.decode(value, {stream: true});
+      const noFim = caixa.scrollHeight - caixa.scrollTop - caixa.clientHeight < 40;
+      resposta.className = "ajudante";
+      resposta.innerHTML = formatar(dito);
+      if (noFim) caixa.scrollTop = caixa.scrollHeight;
+    }
+    if (!dito.trim()) throw new Error("O ajudante não disse nada. Pergunta outra vez.");
+    conversa.push({quem: "eu", texto}, {quem: "ajudante", texto: dito});
+  } catch (erro) {
+    if (dito.trim()) {
+      bolha("ajudante falhou", "A resposta ficou a meio. Pergunta outra vez.");
+    } else {
+      resposta.className = "ajudante falhou";
+      resposta.textContent = erro instanceof TypeError ? "A Oficina não responde. Está a correr no terminal?" : erro.message;
+    }
+  }
+  aResponder = false;
+  for (const botao of $("ajudante").querySelectorAll("button")) botao.disabled = false;
+}
+
+$("pedir-ajuda").onclick = () => {
+  const painel = $("ajudante");
+  painel.hidden = !painel.hidden;
+  $("pedir-ajuda").textContent = painel.hidden ? "Pedir ajuda" : "Fechar a ajuda";
+  if (!painel.hidden) $("pergunta").focus();
+};
+$("perguntar").onsubmit = evento => {
+  evento.preventDefault();
+  if (aResponder) return;
+  const texto = $("pergunta").value;
+  $("pergunta").value = "";
+  perguntar(texto);
+};
+$("atalho-erro").onclick = () => perguntar("Porque é que dá erro?");
+$("atalho-explica").onclick = () => perguntar("O que faz este código?");
+
+pedir("/api/ajudante").then(dados => { $("pedir-ajuda").hidden = !dados.ha; }).catch(() => {});
+
+$("voltar").onclick = async () => {
+  clearTimeout(espera);
+  try { await pedir("/api/fechar", {}); } catch (erro) {}
+  mostrarJogos();
+};
+$("repor").onclick = async () => {
+  if (!confirm("Repor este bocado como estava no jogo original?\n\nO que escreveste aqui perde-se.")) return;
+  try {
+    const dados = await pedir("/api/original", {});
+    codigo.value = dados.codigo;
+    marcarLinha(null);
+    enviar();
+  } catch (erro) {
+    alert(erro.message);
+  }
+};
+$("guardar").onclick = () => guardarJogo(jogoAberto);
+$("reabrir").onclick = async () => {
+  $("reabrir").hidden = true;
+  try {
+    await pedir("/api/reabrir", {});
+    enviar();
+  } catch (erro) {
+    alert(erro.message);
+  }
+};
+
+const [jogoInicial, escolhaInicial] = decodeURIComponent(location.hash.slice(1)).split("/");
+if (jogoInicial && escolhaInicial) abrir(jogoInicial, escolhaInicial);
+else mostrarJogos();
+</script>
+</body>
+</html>

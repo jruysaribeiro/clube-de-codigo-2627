@@ -16,3 +16,8 @@ hand_landmarker.task.parte
 # Sistema
 .DS_Store
 Thumbs.db
+
+# A Oficina guarda aqui uma copia de cada jogo tal como estava
+oficina/.originais/
+*.py.anterior
+*.py.novo
