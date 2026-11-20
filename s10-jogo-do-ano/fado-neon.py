@@ -7,7 +7,9 @@
 #
 # Zero assets: o som, a musica, os graficos e a saudade sao todos gerados
 # por codigo. So precisa de pygame-ce. (Se puseres um PNG com o nome que
-# esta em "imagem" na pasta comum/assets/imagens/, o inimigo fica com ele.)
+# esta em "imagem" na pasta comum/assets/imagens/, o inimigo fica com ele.
+# E com um WAV com o nome que esta em "som", em comum/assets/sons/, e esse
+# o som que ele faz ao rebentar.)
 #
 # Joga-se so com o teclado (o rato tambem funciona, se quiseres):
 #   WASD                mover               Setas           disparar nessa direcao
@@ -151,19 +153,27 @@ VIDA_CHEFE = 1100
 #              sozinho (o "pequeno" so nasce quando um divisor rebenta)
 # imagem:      o nome de um PNG. Se ele existir em comum/assets/imagens/,
 #              o inimigo aparece com essa imagem; se nao, fica a forma.
-# O comportamento (o corredor corre para ti, o atirador dispara...) esta
-# na funcao atualizar() da classe Inimigo, e depende do nome.
+# som:         o nome de um WAV. Se ele existir em comum/assets/sons/, e
+#              esse som que toca quando o inimigo rebenta.
+# O comportamento (o corredor corre para ti, o atirador foge e dispara...)
+# depende do nome: esta na funcao mover_inimigo(), nas regras do jogo. Um
+# inimigo com um nome novo corre para ti, como o corredor.
 PERFIS = {
     "corredor": {"raio": 12, "vida": 20, "velocidade": 150, "cor": ROSA, "lados": 3,
-                 "pontos": 10, "custo": 1, "desde_onda": 1, "imagem": "corredor.png"},
+                 "pontos": 10, "custo": 1, "desde_onda": 1,
+                 "imagem": "corredor.png", "som": "corredor.wav"},
     "atirador": {"raio": 15, "vida": 34, "velocidade": 90, "cor": LARANJA, "lados": 4,
-                 "pontos": 20, "custo": 2, "desde_onda": 2, "imagem": "atirador.png"},
+                 "pontos": 20, "custo": 2, "desde_onda": 2,
+                 "imagem": "atirador.png", "som": "atirador.wav"},
     "divisor": {"raio": 24, "vida": 60, "velocidade": 60, "cor": VERDE, "lados": 6,
-                "pontos": 25, "custo": 3, "desde_onda": 3, "imagem": "divisor.png"},
+                "pontos": 25, "custo": 3, "desde_onda": 3,
+                "imagem": "divisor.png", "som": "divisor.wav"},
     "pequeno": {"raio": 12, "vida": 16, "velocidade": 125, "cor": VERDE, "lados": 6,
-                "pontos": 8, "custo": 0, "desde_onda": None, "imagem": "pequeno.png"},
+                "pontos": 8, "custo": 0, "desde_onda": None,
+                "imagem": "pequeno.png", "som": "pequeno.wav"},
     "investida": {"raio": 14, "vida": 40, "velocidade": 70, "cor": ROXO, "lados": 4,
-                  "pontos": 25, "custo": 2, "desde_onda": 4, "imagem": "investida.png"},
+                  "pontos": 25, "custo": 2, "desde_onda": 4,
+                  "imagem": "investida.png", "som": "investida.wav"},
 }
 
 # ======================================================================
@@ -181,8 +191,8 @@ PESOS_RARIDADE = {1: 6, 2: 3, 3: 1}
 #   id:        o nome interno (e o que o codigo procura em escolher())
 #   nome:      o que aparece na carta
 #   descricao: o texto da carta. E so texto! O que a carta FAZ esta na
-#              funcao escolher(), mais abaixo. Se mudares o numero la,
-#              muda tambem a descricao aqui.
+#              funcao aplicar_carta(), nas regras do jogo. Se mudares o
+#              numero la, muda tambem a descricao aqui.
 #   raridade:  1 comum, 2 rara, 3 lendaria
 #   unica:     True = so se pode apanhar uma vez
 MELHORIAS = [
@@ -438,6 +448,30 @@ def obter_imagem(nome_ficheiro, tamanho):
     return imagens_carregadas[chave]
 
 
+# Com os sons e igual: ficam aqui depois de lidos, e None quer dizer "nao ha".
+sons_carregados = {}
+
+
+def tocar_som(nome_ficheiro):
+    # Toca o som com esse nome, se ele existir em comum/assets/sons/.
+    # Devolve True se tocou e False se nao havia nada para tocar.
+    if not nome_ficheiro:
+        return False
+    if nome_ficheiro not in sons_carregados:
+        caminho = PASTA_ASSETS / "sons" / nome_ficheiro
+        som = None
+        if caminho.is_file() and pygame.mixer.get_init():
+            try:
+                som = pygame.mixer.Sound(str(caminho))
+            except pygame.error:
+                som = None       # o ficheiro existe mas nao e um som que se perceba
+        sons_carregados[nome_ficheiro] = som
+    if sons_carregados[nome_ficheiro] is None:
+        return False
+    sons_carregados[nome_ficheiro].play()
+    return True
+
+
 def poligono(centro, raio, lados, angulo):
     return [(centro[0] + math.cos(angulo + k * TAU / lados) * raio,
              centro[1] + math.sin(angulo + k * TAU / lados) * raio) for k in range(lados)]
@@ -651,6 +685,7 @@ class Inimigo:
         self.lados = perfil["lados"]
         self.valor = perfil["pontos"]
         self.imagem = perfil.get("imagem")  # pode nao haver: fica a forma
+        self.som = perfil.get("som")        # pode nao haver: fica o som do jogo
         self.ang = random.uniform(0, TAU)
         self.t = random.uniform(0, 5)
         self.flash = 0.0
@@ -673,17 +708,11 @@ class Inimigo:
         para = alvo - self.pos
         dist = para.length() or 1
         dirc = para / dist
-        mov = Vector2()
-        if self.tipo == "corredor":
-            mov = dirc * self.velocidade
-            self.ang = math.atan2(dirc.y, dirc.x)
-        elif self.tipo in ("divisor", "pequeno"):
-            mov = dirc.rotate(math.sin(self.t * 2) * 35) * self.velocidade
-            self.ang += dt * 1.2
-        elif self.tipo == "atirador":
-            lado = dirc.rotate(90) * math.sin(self.t * 0.7)
-            mov = (dirc * (1 if dist > 280 else -1 if dist < 220 else 0) + lado * 0.8) * self.velocidade
-            self.ang += dt * 2
+        # Para onde vai e quao depressa: e uma regra do jogo (mover_inimigo).
+        mov = mover_inimigo(self, dirc, dist, dt)
+        if mov is None:
+            mov = Vector2()      # a regra nao devolveu nada: fica parado
+        if self.tipo == "atirador":
             self.cd_tiro -= dt
             if self.cd_tiro <= 0:
                 self.cd_tiro = random.uniform(1.6, 2.4)
@@ -692,41 +721,42 @@ class Inimigo:
                     a = dirc.rotate((k - (quantas - 1) / 2) * 14)
                     jogo.bala_inimiga(self.pos + a * self.raio, a * 210, LARANJA)
                 tocar("inimigo_tiro", 0.4)
-        elif self.tipo == "investida":
-            self.estado_t -= dt
-            if self.estado == "vaguear":
-                mov = dirc * self.velocidade
-                self.ang = math.atan2(dirc.y, dirc.x)
-                if self.estado_t <= 0:
-                    self.estado, self.estado_t, self.direcao = "mirar", 0.6, dirc
-            elif self.estado == "mirar":
-                self.ang += dt * 20
-                if self.estado_t <= 0:
-                    self.estado, self.estado_t = "carregar", 0.45
-                    tocar("investida", 0.5)
-            elif self.estado == "carregar":
-                mov = self.direcao * 640
-                if random.random() < 0.6:
-                    jogo.particula(self.pos, -self.direcao * 80, 0.3, ROXO, 3)
-                if self.estado_t <= 0:
-                    self.estado, self.estado_t = "vaguear", random.uniform(1.2, 2.2)
         self.pos += (mov + self.empurrao) * dt
         self.empurrao *= 0.002 ** dt
         self.pos.x = max(self.raio, min(LARGURA - self.raio, self.pos.x))
         self.pos.y = max(self.raio, min(ALTURA - self.raio, self.pos.y))
 
+    def mover_investida(self, jogo, dirc, dt):
+        # O "investida" anda devagar para ti, para a rodar (a mirar) e depois
+        # atira-se a direito, muito depressa. Devolve a velocidade dele.
+        mov = Vector2()
+        self.estado_t -= dt
+        if self.estado == "vaguear":
+            mov = dirc * self.velocidade
+            self.ang = math.atan2(dirc.y, dirc.x)
+            if self.estado_t <= 0:
+                self.estado, self.estado_t, self.direcao = "mirar", 0.6, dirc
+        elif self.estado == "mirar":
+            self.ang += dt * 20
+            if self.estado_t <= 0:
+                self.estado, self.estado_t = "carregar", 0.45
+                tocar("investida", 0.5)
+        elif self.estado == "carregar":
+            mov = self.direcao * 640
+            if random.random() < 0.6:
+                jogo.particula(self.pos, -self.direcao * 80, 0.3, ROXO, 3)
+            if self.estado_t <= 0:
+                self.estado, self.estado_t = "vaguear", random.uniform(1.2, 2.2)
+        return mov
+
     def desenhar(self, surf, cam):
         p = self.pos - cam
-        cor = BRANCO if self.flash > 0 else self.cor
-        escala = 1 + max(0, self.flash) * 3
         if self.tipo == "investida" and self.estado == "mirar":
             fim = p + self.direcao * 640 * 0.45
             if int(self.t * 20) % 2:
                 pygame.draw.line(surf, (120, 40, 70), p, fim, 2)
         if self.tipo == "atirador" and self.cd_tiro < 0.35:
             pygame.draw.circle(surf, AMARELO, p, (0.35 - self.cd_tiro) * 22, 2)
-        lados = self.lados
-        raio = self.raio * escala
         imagem = None
         if self.imagem:
             imagem = obter_imagem(self.imagem, self.raio * 2)
@@ -735,16 +765,10 @@ class Inimigo:
             # leva um tiro, em vez de ficar branca ganha um anel branco.
             surf.blit(imagem, imagem.get_rect(center=p))
             if self.flash > 0:
-                pygame.draw.circle(surf, BRANCO, p, raio + 2, 2)
+                pygame.draw.circle(surf, BRANCO, p, self.raio * (1 + self.flash * 3) + 2, 2)
             return
-        if self.tipo == "investida":
-            pts = poligono(p, raio, 4, self.ang)
-            pts[0] = (p.x + math.cos(self.ang) * raio * 1.6, p.y + math.sin(self.ang) * raio * 1.6)
-        else:
-            pts = poligono(p, raio, lados, self.ang)
-        pygame.draw.polygon(surf, misturar(cor, FUNDO, 0.75), pts)
-        pygame.draw.polygon(surf, cor, pts, 2)
-        pygame.draw.polygon(surf, cor, poligono(p, raio * 0.4, lados, -self.ang * 1.5), 1)
+        # A forma: e um dos desenhos que se podem mudar (desenhar_inimigo).
+        desenhar_inimigo(surf, self, p)
 
 
 class Chefe(Inimigo):
@@ -892,6 +916,371 @@ class Chefe(Inimigo):
             a = self.ang * -0.6 + k * TAU / 6
             c = p + Vector2(math.cos(a), math.sin(a)) * self.raio * 1.75
             pygame.draw.polygon(surf, cor, poligono(c, 7, 3, a), 2)
+
+
+# ======================================================================
+#  AS REGRAS, OS ACONTECIMENTOS E OS DESENHOS
+# ======================================================================
+# As funcoes desta parte estao fora das classes de proposito: sao as que
+# mais apetece mudar. As classes (o Inimigo, o Jogo) chamam-nas pelo nome
+# quando chega a altura.
+
+# O jogo inteiro, para estas funcoes lhe poderem mexer. Fica preenchido no
+# main(), quando o jogo arranca.
+jogo = None
+
+# --- Os acontecimentos ---
+# O jogo chama cada uma destas funcoes quando acontece o que o nome diz.
+# Estao vazias (so tem "pass"): o que la escreveres passa a acontecer nesse
+# momento. E aqui que se INVENTA: uma bomba, um poder, um premio.
+#
+# Alem do que as regras do jogo podem usar (ver mais abaixo), tens:
+#   memoria                     um dicionario so teu, para guardares o que
+#                               quiseres de um frame para o outro:
+#                               memoria["bombas"] = 3
+#                               (fica vazio cada vez que o jogo recomeca)
+#   memoria.get("mortes", 0)    le o que la esta, ou 0 se ainda nao ha nada
+#   jogo.inimigos.append(Inimigo("corredor", (100, 100), jogo.onda))
+#                               manda vir mais um inimigo, nesse sitio
+#   disparar_balas(90)          dispara para baixo (0 e a direita, 180 a
+#                               esquerda, 270 para cima)
+memoria = {}
+
+
+# QUANDO COMECA UMA ONDA
+# numero: 1 na primeira onda, 2 na segunda, e por ai fora.
+# Ideias: ganhar um coracao de 2 em 2 ondas (jogo.jogador.vida += 1); avisar
+# com um jogo.texto que vem ai uma onda dificil; mandar vir um divisor de
+# surpresa na onda 3.
+def ao_comecar_onda(numero):
+    pass
+
+
+# QUANDO UM INIMIGO MORRE
+# inimigo: o que acabou de rebentar (ja nao esta em jogo.inimigos).
+# inimigo.pos diz onde foi, inimigo.tipo diz qual era ("corredor",
+# "divisor"...) e inimigo.chefe e True se era o Saudosista.
+# Ideias: rebentar e magoar os que estao perto; ganhar um coracao de 10 em
+# 10 mortes (conta-as na memoria); um corredor que ao morrer larga dois
+# "pequeno".
+def ao_morrer_inimigo(inimigo):
+    pass
+
+
+# QUANDO PERDES UM CORACAO
+# Corre cada vez que um inimigo (ou uma bala dele) te acerta. O coracao ja
+# foi tirado: jogo.jogador.vida diz quantos te restam.
+# Ideias: uma vinganca que magoa todos os inimigos; encher logo o laser
+# (jogo.farol = 1); escrever "AI!" por cima de ti com um jogo.texto.
+def ao_perder_coracao():
+    pass
+
+
+# QUANDO DISPARAS
+# Corre depois de cada tiro teu. angulo: para onde disparaste, em graus
+# (0 e a direita, 90 para baixo, 180 a esquerda, 270 para cima).
+# Ideias: um tiro tambem para tras, com disparar_balas(angulo + 180); de 10
+# em 10 tiros, um leque de tres (conta os tiros na memoria).
+def ao_disparar(angulo):
+    pass
+
+
+# QUANDO SE CARREGA NUMA TECLA
+# tecla: a tecla em que se carregou. pygame.K_g e a tecla G, pygame.K_x a X.
+# So corre a meio de uma onda, nao nos menus. (As teclas W A S D, as setas,
+# Espaco, Shift, E, T, F, M, B, C, P e Esc ja fazem coisas no jogo.)
+# Ideias: a tecla X e uma bomba que magoa todos os inimigos, mas so uma vez
+# por onda (usa a memoria para te lembrares se ja foi usada); a tecla G da
+# um coracao (batota!).
+def ao_carregar_tecla(tecla):
+    pass
+
+
+# A CADA FRAME
+# Corre 60 vezes por segundo enquanto ha combate. Cuidado: o que aqui
+# puseres acontece MUITAS vezes. dt: os segundos que passaram desde o frame
+# anterior (muito pouco: cerca de 0.016).
+# Ideias: 10 pontos por cada segundo que aguentas (soma o dt na memoria ate
+# chegar a 1); os inimigos perderem vida aos poucos; o laser encher sozinho.
+def a_cada_frame(dt):
+    pass
+
+
+# --- As regras do jogo ---
+# As cinco funcoes que se seguem sao as REGRAS: como anda cada inimigo, o que
+# acontece a um inimigo atingido, como saem os teus tiros, o que um inimigo
+# deixa ao rebentar e o que cada carta faz. Mudar uma delas muda a maneira
+# como o jogo se comporta.
+#
+# Dentro delas podes usar tudo o que o jogo tem. O "jogo" e o jogo inteiro:
+#   jogo.jogador                 tu: .pos (onde estas), .vida, .vida_max,
+#                                .dano, .velocidade
+#   jogo.inimigos                a lista dos inimigos que estao na arena
+#   jogo.onda, jogo.pontos       a onda em que vais e os teus pontos
+#   jogo.farol                   a barra do laser, de 0 (vazia) a 1 (cheia)
+#   jogo.texto(pos, "ola", AMARELO)          um texto que sobe e desaparece
+#   jogo.explosao(pos, ROSA)                 faiscas (so para ver, nao magoa)
+#   jogo.ferir(inimigo, 20, Vector2(1, 0))   tira 20 de vida a um inimigo
+#                                            (a seta diz para onde o empurra)
+#   random.random()              um numero ao calhas entre 0 e 1
+# Um sitio (pos) e um Vector2: tem .x e .y, e podem somar-se dois.
+#   jogo.jogador.pos + Vector2(0, -30)       30 pixeis acima de ti
+#   inimigo.pos.distance_to(jogo.jogador.pos)    a distancia dele ate ti
+# Para mexer numa lista enquanto a percorres, percorre uma copia:
+#   for inimigo in list(jogo.inimigos):
+# As cores sao as do inicio do ficheiro: CIANO, ROSA, AMARELO, VERDE...
+
+# COMO ANDA CADA INIMIGO
+# Corre uma vez por frame para cada inimigo, e devolve a velocidade dele: um
+# Vector2 que diz para onde vai e quao depressa (em pixeis por segundo).
+#   direcao              uma seta de comprimento 1 que aponta dele para ti
+#                        (-direcao e fugir; direcao.rotate(90) e andar de lado)
+#   distancia            quantos pixeis vao dele ate ti
+#   dt                   os segundos desde o frame anterior (cerca de 0.016)
+#   inimigo.tipo         "corredor", "atirador", "divisor"...
+#   inimigo.velocidade   a velocidade da ficha dele em PERFIS
+#   inimigo.vida, inimigo.vida_max
+#   inimigo.t            ha quantos segundos ele existe (bom para o math.sin)
+#   inimigo.ang          para onde esta virado o desenho dele
+# Ideias: fugir de ti quando ja tem pouca vida; os corredores virem aos
+# ziguezagues; dar um comportamento so teu a um inimigo novo.
+def mover_inimigo(inimigo, direcao, distancia, dt):
+    if inimigo.tipo == "atirador":
+        # Fica a uma certa distancia de ti, a andar de lado.
+        inimigo.ang += dt * 2
+        frente = 0
+        if distancia > 280:
+            frente = 1
+        elif distancia < 220:
+            frente = -1
+        lado = direcao.rotate(90) * math.sin(inimigo.t * 0.7)
+        return (direcao * frente + lado * 0.8) * inimigo.velocidade
+    if inimigo.tipo == "divisor" or inimigo.tipo == "pequeno":
+        # Vem para ti aos esses.
+        inimigo.ang += dt * 1.2
+        return direcao.rotate(math.sin(inimigo.t * 2) * 35) * inimigo.velocidade
+    if inimigo.tipo == "investida":
+        # Anda, para a mirar e atira-se: esta na classe Inimigo.
+        return inimigo.mover_investida(jogo, direcao, dt)
+    # O corredor, e qualquer inimigo novo: a direito para ti.
+    inimigo.ang = math.atan2(direcao.y, direcao.x)
+    return direcao * inimigo.velocidade
+
+
+# O QUE ACONTECE A UM INIMIGO ATINGIDO
+# Corre cada vez que alguma coisa tua acerta num inimigo (uma bala, o laser,
+# uma gaivota). Como esta: tira-lhe o dano, empurra-o e mostra o numero.
+#   dano             quanto tira este golpe
+#   direcao          uma seta de comprimento 1: para onde ia o golpe
+#   critico          True se foi um tiro critico (os amarelos)
+#   inimigo.vida     a vida que lhe resta (com 0 ou menos, rebenta)
+#   inimigo.flash    o tempo que fica branco, em segundos
+#   inimigo.empurrao o empurrao que leva (um Vector2)
+#   inimigo.chefe    True se e o Saudosista
+# Ideias: um escudo (o divisor so leva metade do dano); ganhar 1 ponto por
+# cada golpe que acerta; os criticos empurrarem muito mais.
+def magoar_inimigo(inimigo, dano, direcao, critico):
+    inimigo.vida -= dano
+    inimigo.flash = 0.06
+    forca = 90
+    cor = BRANCO
+    numero = str(int(dano))
+    tamanho = 20
+    if critico:
+        forca = 180
+        cor = AMARELO
+        numero = numero + "!"
+        tamanho = 30
+    if inimigo.chefe:
+        forca = 15
+    inimigo.empurrao += direcao * forca
+    jogo.texto(inimigo.pos + Vector2(0, -inimigo.raio), numero, cor, tamanho)
+    for _ in range(4):
+        faisca = direcao.rotate(random.uniform(-50, 50)) * random.uniform(80, 260)
+        jogo.particula(inimigo.pos, faisca, 0.25, inimigo.cor, 2)
+    tocar("acerto", 0.5)
+
+
+# COMO SAEM OS TEUS TIROS
+# Corre cada vez que disparas, e poe as balas novas na lista jogo.balas.
+# angulo: para onde apontas, em graus (0 e a direita, 90 para baixo).
+#   j.multi          quantas balas saem de cada vez (a carta Guitarra da +1)
+#   j.dano           o dano de cada bala       j.tam_bala   o tamanho dela
+#   j.critico        a probabilidade de um tiro ser critico, de 0 a 1
+#   Bala(sitio, velocidade, dano, tamanho, cor)    faz uma bala nova
+#   bala.perfura     quantos inimigos ainda atravessa
+#   bala.ricochete   quantas vezes ainda bate nas paredes
+#   bala.teleguiada  True se persegue os inimigos
+# Ideias: disparar tambem para tras; balas mais lentas mas com o dobro do
+# dano; todas as balas fazerem ricochete uma vez.
+def disparar_balas(angulo):
+    j = jogo.jogador
+    for k in range(j.multi):
+        # Com varias balas, abrem em leque: 8 graus entre cada uma.
+        desvio = (k - (j.multi - 1) / 2) * 8 + random.uniform(-2, 2)
+        direcao = Vector2(1, 0).rotate(angulo + desvio)
+        dano = j.dano
+        tamanho = j.tam_bala
+        cor = CIANO
+        critico = random.random() < j.critico
+        if critico:
+            dano = dano * DANO_CRITICO
+            tamanho = tamanho * 1.4
+            cor = AMARELO
+        bala = Bala(j.pos + direcao * 14, direcao * VELOCIDADE_BALA, dano, tamanho, cor)
+        bala.perfura = j.perfura
+        bala.ricochete = j.ricochete
+        bala.teleguiada = j.teleguiada
+        bala.critica = critico
+        jogo.balas.append(bala)
+
+
+# O QUE UM INIMIGO DEIXA AO REBENTAR
+# Corre quando um inimigo fica sem vida (o Saudosista nao passa por aqui).
+# Como esta: uma explosao, o som, 2 a 4 notas, as vezes um coracao, e o
+# divisor parte-se em dois "pequeno".
+#   inimigo.pos, inimigo.cor, inimigo.raio, inimigo.tipo
+#   inimigo.som      o "som" da ficha dele: se esse ficheiro existir toca
+#                    ele, se nao toca a explosao do jogo
+#   Recompensa(sitio, "nota")        uma nota, que vale pontos
+#   Recompensa(sitio, "coracao")     um coracao
+#   Inimigo("pequeno", sitio, jogo.onda)     um inimigo novo nesse sitio
+# Ideias: o atirador deixar sempre um coracao; o divisor partir-se em
+# quatro; os inimigos deixarem muito mais notas.
+def rebentar_inimigo(inimigo):
+    jogo.explosao(inimigo.pos, inimigo.cor, 18 + inimigo.raio)
+    if not tocar_som(inimigo.som):
+        tocar("explosao", 0.6)
+    for _ in range(random.randint(2, 4)):
+        jogo.recompensas.append(Recompensa(inimigo.pos, "nota"))
+    if random.random() < CHANCE_CORACAO:
+        jogo.recompensas.append(Recompensa(inimigo.pos, "coracao"))
+    if inimigo.tipo == "divisor":
+        for lado in (-1, 1):
+            filho = Inimigo("pequeno", inimigo.pos + Vector2(lado * 14, 0), jogo.onda)
+            filho.empurrao = Vector2(lado * 260, random.uniform(-80, 80))
+            jogo.inimigos.append(filho)
+
+
+# O QUE CADA CARTA FAZ
+# Corre quando escolhes uma carta. carta e o id dela (a primeira coisa de
+# cada linha de MELHORIAS) e jogador es tu: a carta muda os teus numeros.
+# Multiplicar por 0.8 e tirar 20%; por 1.3 e somar 30%. Se mudares um numero
+# aqui, muda tambem a descricao da carta em MELHORIAS.
+#   jogador.multi         quantas balas saem de cada vez
+#   jogador.intervalo     segundos entre dois tiros (menos = mais depressa)
+#   jogador.dano, jogador.tam_bala, jogador.critico (de 0 a 1)
+#   jogador.perfura, jogador.ricochete, jogador.teleguiada (True ou False)
+#   jogador.vida, jogador.vida_max, jogador.velocidade
+#   jogador.dash_recarga  segundos ate poderes investir outra vez
+#   jogador.orbes         quantas gaivotas rodam a tua volta
+# Ideias: a Guitarra dar logo +2 projeteis; o Cafe Duplo tambem te por mais
+# rapido; dar um efeito a uma carta nova (mais um "elif" no fim).
+def aplicar_carta(carta, jogador):
+    if carta == "guitarra":
+        jogador.multi += 1
+    elif carta == "cafe":
+        jogador.intervalo *= 0.8
+    elif carta == "calcada":
+        jogador.perfura += 1
+    elif carta == "eletrico":
+        jogador.ricochete += 1
+    elif carta == "nata":
+        jogador.vida_max += 1
+        jogador.vida = jogador.vida_max
+    elif carta == "saudade":
+        jogador.dano *= 1.3
+    elif carta == "gaivota":
+        jogador.orbes += 1
+    elif carta == "bacalhau":
+        jogador.critico += 0.12
+    elif carta == "vira":
+        jogador.vira = True
+    elif carta == "azulejo":
+        jogador.tam_bala *= 1.4
+        jogador.dano *= 1.1
+    elif carta == "sardinha":
+        jogador.teleguiada = True
+    elif carta == "ginjinha":
+        jogador.velocidade *= 1.12
+        jogador.dash_recarga *= 0.85
+    elif carta == "fado":
+        jogador.vampiro += 0.1
+    elif carta == "bugio":
+        jogador.laser_duracao *= 1.4
+        jogador.farol_ganho *= 1.3
+
+
+# --- Os desenhos ---
+# As tres funcoes que se seguem desenham um inimigo, a tua nave e uma bala
+# tua. Desenha-se com formas do pygame, sempre na "cena":
+#   pygame.draw.circle(cena, cor, p, raio)
+#   pygame.draw.circle(cena, cor, p, raio, 2)     so o contorno, com 2 de grossura
+#   pygame.draw.line(cena, cor, p, p + Vector2(20, 0), grossura)
+#   pygame.draw.polygon(cena, cor, [(x1, y1), (x2, y2), (x3, y3)])
+#   poligono(p, raio, lados, angulo)    os pontos de um triangulo (3 lados),
+#                                       de um quadrado (4)... para o polygon
+# p e o centro da coisa no ecra: tem p.x e p.y. O x cresce para a direita e
+# o y cresce para BAIXO: p + Vector2(0, -10) fica 10 pixeis acima. Uma cor
+# sao tres numeros (vermelho, verde, azul), de 0 a 255, ou uma das do
+# inicio do ficheiro (CIANO, ROSA...). O que se desenha depois fica por cima
+# do que se desenhou antes. misturar(cor, FUNDO, 0.75) da a mesma cor, mais
+# escura. O brilho de neon vem sozinho: cores claras brilham mais.
+
+# O DESENHO DE UM INIMIGO
+# inimigo.raio, inimigo.cor, inimigo.lados    o que diz a ficha dele em PERFIS
+# inimigo.ang      o angulo para onde esta virado (o desenho roda com ele)
+# inimigo.flash    maior que 0 logo a seguir a levar um tiro
+# inimigo.vida, inimigo.vida_max, inimigo.tipo
+# (Um inimigo com uma imagem tua nao passa por aqui: aparece a imagem.)
+# Ideias: dar-lhe um olho no meio; uma barra de vida por cima; ficar
+# vermelho quando ja tem pouca vida.
+def desenhar_inimigo(cena, inimigo, p):
+    cor = inimigo.cor
+    if inimigo.flash > 0:
+        cor = BRANCO          # acabou de levar um tiro: pisca e incha
+    raio = inimigo.raio * (1 + max(0, inimigo.flash) * 3)
+    if inimigo.tipo == "investida":
+        # Um quadrado com um bico para onde esta virado.
+        pontos = poligono(p, raio, 4, inimigo.ang)
+        pontos[0] = (p.x + math.cos(inimigo.ang) * raio * 1.6, p.y + math.sin(inimigo.ang) * raio * 1.6)
+    else:
+        pontos = poligono(p, raio, inimigo.lados, inimigo.ang)
+    pygame.draw.polygon(cena, misturar(cor, FUNDO, 0.75), pontos)
+    pygame.draw.polygon(cena, cor, pontos, 2)
+    pygame.draw.polygon(cena, cor, poligono(p, raio * 0.4, inimigo.lados, -inimigo.ang * 1.5), 1)
+
+
+# O DESENHO DA TUA NAVE
+# jogador.ang      o angulo para onde apontas, em radianos (o math.cos e o
+#                  math.sin dao a seta desse angulo)
+# jogador.vida, jogador.vida_max
+# A nave sao 4 pontos a volta do centro: cada um tem um angulo e uma
+# distancia. O primeiro (0, 17) e o bico: 17 pixeis para a frente.
+# Ideias: uma nave maior ou com outra forma; mudar de cor quando so te
+# resta um coracao; um circulo a volta, como um escudo.
+def desenhar_jogador(cena, jogador, p):
+    pontos = []
+    for angulo, distancia in ((0, 17), (2.5, 12), (math.pi, 5), (-2.5, 12)):
+        x = p.x + math.cos(jogador.ang + angulo) * distancia
+        y = p.y + math.sin(jogador.ang + angulo) * distancia
+        pontos.append((x, y))
+    pygame.draw.polygon(cena, (20, 60, 90), pontos)
+    pygame.draw.polygon(cena, CIANO, pontos, 2)
+    pygame.draw.circle(cena, BRANCO, p, 3 + math.sin(jogo.tempo_real * 10))
+
+
+# O DESENHO DE UMA BALA TUA
+# bala.cor         CIANO, ou AMARELO se for um tiro critico
+# bala.raio        o tamanho dela
+# bala.vel         a velocidade (um Vector2): a cauda fica para tras
+# bala.critica     True se for um tiro critico
+# Ideias: uma cauda mais comprida; balas redondas e grandes; as criticas
+# com um anel a volta.
+def desenhar_bala(cena, bala, p):
+    cauda = p - bala.vel * 0.025
+    pygame.draw.line(cena, bala.cor, cauda, p, max(2, int(bala.raio)))
+    pygame.draw.circle(cena, BRANCO, p, bala.raio * 0.7)
 
 
 # ======================================================================
@@ -1046,6 +1435,7 @@ class Jogo:
         self.farol = 0.0
         self.laser_t = 0.0
         self.laser_ang = 0.0
+        memoria.clear()
 
     def novo_jogo(self):
         self.limpar_mundo()
@@ -1081,6 +1471,7 @@ class Jogo:
                 self.fila.append(nome)
                 orcamento -= PERFIS[nome]["custo"]
             tocar("onda")
+        ao_comecar_onda(self.onda)
 
     def desbloquear(self, chave):
         if chave in self.conquistas:
@@ -1101,6 +1492,7 @@ class Jogo:
             self.particulas.append(Particula(pos, vel, vida, cor, tam, atrito, faisca))
 
     def explosao(self, pos, cor, quantas=28, forca=320, grelha=380):
+        quantas = int(quantas)      # (um raio como 12.5 dava meia faisca)
         for _ in range(quantas):
             v = Vector2(1, 0).rotate(random.uniform(0, 360)) * random.uniform(0.2, 1) * forca
             self.particula(pos, v, random.uniform(0.3, 0.8), cor, random.uniform(1.5, 3))
@@ -1134,20 +1526,10 @@ class Jogo:
 
     # ---------------------------------------------------------- combate
     def ferir(self, inimigo, dano, direcao, critico=False, carrega=True):
-        inimigo.vida -= dano
         if carrega:
             self.farol = min(1.0, self.farol + dano * 0.0005 * self.jogador.farol_ganho)
-        inimigo.flash = 0.06
-        if not inimigo.chefe:
-            inimigo.empurrao += direcao * (180 if critico else 90)
-        else:
-            inimigo.empurrao += direcao * 15
-        cor = AMARELO if critico else BRANCO
-        self.texto(inimigo.pos + Vector2(0, -inimigo.raio), str(int(dano)) + ("!" if critico else ""), cor, 30 if critico else 20)
-        for _ in range(4):
-            v = direcao.rotate(random.uniform(-50, 50)) * random.uniform(80, 260)
-            self.particula(inimigo.pos, v, 0.25, inimigo.cor, 2)
-        tocar("acerto", 0.5)
+        # O que acontece ao inimigo e uma regra do jogo (magoar_inimigo).
+        magoar_inimigo(inimigo, dano, direcao, critico)
         if inimigo.vida <= 0 and inimigo in self.inimigos:
             self.matar(inimigo)
 
@@ -1167,25 +1549,18 @@ class Jogo:
             self.desbloquear("combo25")
         if inimigo.chefe:
             self.morte_do_chefe(inimigo)
+            ao_morrer_inimigo(inimigo)
             return
-        self.explosao(inimigo.pos, inimigo.cor, 18 + inimigo.raio)
         self.trauma = min(1.0, self.trauma + 0.12 + inimigo.raio / 200)
         if inimigo.raio > 20:
             self.hitstop = max(self.hitstop, 0.04)
-        tocar("explosao", 0.6)
-        for _ in range(random.randint(2, 4)):
-            self.recompensas.append(Recompensa(inimigo.pos, "nota"))
-        if random.random() < CHANCE_CORACAO:
-            self.recompensas.append(Recompensa(inimigo.pos, "coracao"))
+        # A explosao e o que ele deixa sao uma regra do jogo (rebentar_inimigo).
+        rebentar_inimigo(inimigo)
         j = self.jogador
         if j.vampiro and random.random() < j.vampiro and j.vida < j.vida_max:
             j.vida += 1
             self.texto(j.pos + Vector2(0, -24), "+1", VERMELHO, 28)
-        if inimigo.tipo == "divisor":
-            for k in (-1, 1):
-                filho = Inimigo("pequeno", inimigo.pos + Vector2(k * 14, 0), self.onda)
-                filho.empurrao = Vector2(k * 260, random.uniform(-80, 80))
-                self.inimigos.append(filho)
+        ao_morrer_inimigo(inimigo)
 
     def morte_do_chefe(self, chefe):
         self.chefe = None
@@ -1231,6 +1606,7 @@ class Jogo:
             self.explosao(j.pos, CIANO, 90, 500, 1200)
             self.desbloquear("morte")
             tocar("grande")
+        ao_perder_coracao()
 
     def disparar(self, alvo):
         j = self.jogador
@@ -1238,18 +1614,8 @@ class Jogo:
         if mira.length() < 1:
             mira = Vector2(1, 0)
         base = math.degrees(math.atan2(mira.y, mira.x))
-        for k in range(j.multi):
-            a = base + (k - (j.multi - 1) / 2) * 8 + random.uniform(-2, 2)
-            d = Vector2(1, 0).rotate(a)
-            critico = random.random() < j.critico
-            b = Bala(j.pos + d * 14, d * VELOCIDADE_BALA, j.dano * (DANO_CRITICO if critico else 1),
-                     j.tam_bala * (1.4 if critico else 1),
-                     AMARELO if critico else CIANO)
-            b.perfura = j.perfura
-            b.ricochete = j.ricochete
-            b.teleguiada = j.teleguiada
-            b.critica = critico
-            self.balas.append(b)
+        # As balas que saem sao uma regra do jogo (disparar_balas).
+        disparar_balas(base)
         d = Vector2(1, 0).rotate(base)
         for _ in range(3):
             self.particula(j.pos + d * 16, d.rotate(random.uniform(-25, 25)) * random.uniform(150, 350), 0.12, CIANO, 2)
@@ -1258,6 +1624,7 @@ class Jogo:
         j.cd_tiro = j.intervalo
         self.trauma = min(1.0, self.trauma + 0.015)
         tocar("tiro", 0.35)
+        ao_disparar(base)
 
     def disparar_laser(self):
         if self.farol < 1 or self.laser_t > 0 or self.fase not in ("combate", "banner"):
@@ -1348,43 +1715,12 @@ class Jogo:
         mid = self.cartas[indice][0][0]
         j = self.jogador
         j.melhorias[mid] = j.melhorias.get(mid, 0) + 1
-        # O que cada carta FAZ. Multiplicar por 0.8 e tirar 20%; por 1.3 e
-        # somar 30%. Se mudares um numero aqui, muda a descricao em MELHORIAS.
-        if mid == "guitarra":
-            j.multi += 1
-        elif mid == "cafe":
-            j.intervalo *= 0.8
-        elif mid == "calcada":
-            j.perfura += 1
-        elif mid == "eletrico":
-            j.ricochete += 1
-        elif mid == "nata":
-            j.vida_max += 1
-            j.vida = j.vida_max
+        # O que cada carta FAZ e uma regra do jogo (aplicar_carta).
+        aplicar_carta(mid, j)
+        if mid == "nata":
             self.natas += 1
             if self.natas >= 3:
                 self.desbloquear("nata")
-        elif mid == "saudade":
-            j.dano *= 1.3
-        elif mid == "gaivota":
-            j.orbes += 1
-        elif mid == "bacalhau":
-            j.critico += 0.12
-        elif mid == "vira":
-            j.vira = True
-        elif mid == "azulejo":
-            j.tam_bala *= 1.4
-            j.dano *= 1.1
-        elif mid == "sardinha":
-            j.teleguiada = True
-        elif mid == "ginjinha":
-            j.velocidade *= 1.12
-            j.dash_recarga *= 0.85
-        elif mid == "fado":
-            j.vampiro += 0.1
-        elif mid == "bugio":
-            j.laser_duracao *= 1.4
-            j.farol_ganho *= 1.3
         tocar("melhoria")
         self.flash_t = 0.12
         self.grelha.impulso(j.pos, 600, 400)
@@ -1438,6 +1774,8 @@ class Jogo:
                 self.auto = not self.auto
                 if self.auto:
                     self.desbloquear("auto")
+        if ev.type == pygame.KEYDOWN and self.estado == "jogo":
+            ao_carregar_tecla(ev.key)
         if self.estado == "titulo":
             if ev.type == pygame.KEYDOWN and ev.key in (pygame.K_RETURN, pygame.K_SPACE):
                 self.novo_jogo()
@@ -1723,6 +2061,7 @@ class Jogo:
         if self.combo_t <= 0:
             self.combo = 0
         self.pontos_mostrados += (self.pontos - self.pontos_mostrados) * min(1, dt_real * 10)
+        a_cada_frame(dt)
 
         if self.fase == "combate" and not self.fila and not self.inimigos and not self.avisos:
             self.fase = "limpo"
@@ -1890,10 +2229,7 @@ class Jogo:
                 continue
             e.desenhar(cena, cam)
         for b in self.balas:
-            p = b.pos - cam
-            cauda = p - b.vel * 0.025
-            pygame.draw.line(cena, b.cor, cauda, p, max(2, int(b.raio)))
-            pygame.draw.circle(cena, BRANCO, p, b.raio * 0.7)
+            desenhar_bala(cena, b, b.pos - cam)
         for b in self.balas_inimigas:
             p = b.pos - cam
             pygame.draw.circle(cena, b.cor, p, b.raio + 2)
@@ -1917,9 +2253,7 @@ class Jogo:
                 pygame.draw.line(cena, BRANCO, a, b, int(7 * f) + 1)
                 pygame.draw.circle(cena, BRANCO, a, 13 * f)
             if j.invulneravel <= 0 or int(j.invulneravel * 15) % 2:
-                pygame.draw.polygon(cena, (20, 60, 90), self.forma_jogador(p, j.ang))
-                pygame.draw.polygon(cena, CIANO, self.forma_jogador(p, j.ang), 2)
-                pygame.draw.circle(cena, BRANCO, p, 3 + math.sin(self.tempo_real * 10))
+                desenhar_jogador(cena, j, p)
                 if j.dash_cd > 0:  # anel que mostra a recarga da investida
                     fracao = 1 - j.dash_cd / j.dash_recarga
                     rect = pygame.Rect(0, 0, 40, 40)
@@ -2168,7 +2502,7 @@ class Jogo:
 
 
 def main():
-    global TAXA
+    global TAXA, jogo
     pygame.mixer.pre_init(22050, -16, 2, 512)
     pygame.init()
     if pygame.mixer.get_init() is not None:

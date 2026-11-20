@@ -108,11 +108,16 @@ LARANJA = (245, 140, 50)
 # O Faisca. Se houver um PNG com este nome em comum/assets/imagens/, ele
 # aparece com essa imagem (desenhada a olhar para a direita); se nao houver,
 # e o robot de sempre, com estas duas cores.
+# SOM_DO_SALTO e o nome de um WAV: se ele existir em comum/assets/sons/, e
+# esse o som do salto; se nao houver, fica o som de sempre.
 IMAGEM_DO_HEROI = "faisca.png"
 COR_HEROI = (70, 190, 230)
 COR_HEROI_ESCURA = (40, 110, 160)
+SOM_DO_SALTO = "salto.wav"
 
+# O tiro do Faisca: a cor dele, e o som (um WAV, tal como o do salto).
 COR_TIRO = (255, 240, 120)
+SOM_DO_TIRO = "tiro.wav"
 COR_MOEDA = (250, 205, 60)
 COR_MADEIRA = (170, 120, 70)
 COR_PONTE_PODRE = (200, 170, 120)
@@ -153,29 +158,31 @@ MUNDOS = [
 #   imagem:      o nome de um PNG. Se ele existir em comum/assets/imagens/,
 #                o inimigo aparece com essa imagem (desenhada a olhar para
 #                a direita); se nao, fica o desenho de sempre.
+#   som:         o nome de um WAV. Se ele existir em comum/assets/sons/, e
+#                esse o som que se ouve quando o inimigo e derrotado.
 # ---------------------------------------------------------------------
 INIMIGOS = {
     "a": {"nome": "Lesma", "vida": 1, "velocidade": 1.0, "pisavel": True,
           "jeito": "andar", "largura": 38, "altura": 28, "cor": (150, 210, 90),
-          "imagem": "lesma.png"},
+          "imagem": "lesma.png", "som": "lesma.wav"},
     "s": {"nome": "Sapo", "vida": 1, "velocidade": 2.4, "pisavel": True,
           "jeito": "saltar", "largura": 36, "altura": 30, "cor": (60, 170, 110),
-          "imagem": "sapo.png"},
+          "imagem": "sapo.png", "som": "sapo.wav"},
     "m": {"nome": "Morcego", "vida": 1, "velocidade": 0.022, "pisavel": True,
           "jeito": "voar", "largura": 40, "altura": 26, "cor": (150, 90, 190),
-          "imagem": "morcego.png"},
+          "imagem": "morcego.png", "som": "morcego.wav"},
     "e": {"nome": "Ouriço", "vida": 2, "velocidade": 1.3, "pisavel": False,
           "jeito": "andar", "largura": 40, "altura": 32, "cor": (200, 120, 70),
-          "imagem": "ourico.png"},
+          "imagem": "ourico.png", "som": "ourico.wav"},
     "j": {"nome": "Javali", "vida": 2, "velocidade": 1.0, "pisavel": True,
           "jeito": "carregar", "largura": 46, "altura": 36, "cor": (120, 85, 70),
-          "imagem": "javali.png"},
+          "imagem": "javali.png", "som": "javali.wav"},
     "t": {"nome": "Canhão", "vida": 3, "velocidade": 4.0, "pisavel": False,
           "jeito": "canhao", "largura": 40, "altura": 40, "cor": (90, 95, 110),
-          "imagem": "canhao.png"},
+          "imagem": "canhao.png", "som": "canhao.wav"},
     "X": {"nome": "Rei Sucata", "vida": 24, "velocidade": 1.6, "pisavel": True,
           "jeito": "chefe", "largura": 84, "altura": 84, "cor": (190, 70, 90),
-          "imagem": "rei-sucata.png"},
+          "imagem": "rei-sucata.png", "som": "rei-sucata.wav"},
 }
 
 
@@ -1093,6 +1100,32 @@ def tocar(nome):
         sons[nome].play()
 
 
+# Os sons que vem de ficheiros (os WAV de comum/assets/sons/). Ficam aqui
+# depois de lidos, para nao ler o disco de cada vez. None quer dizer
+# "procurei e nao ha".
+PASTA_SONS = os.path.join(os.path.dirname(PASTA), "comum", "assets", "sons")
+sons_carregados = {}
+
+
+def tocar_som(nome_ficheiro):
+    # Toca o WAV com esse nome, se ele existir em comum/assets/sons/.
+    # Devolve True se tocou e False se nao ha: assim quem chama sabe se tem
+    # de tocar o som de sempre.
+    nome_ficheiro = str(nome_ficheiro)
+    if nome_ficheiro not in sons_carregados:
+        sons_carregados[nome_ficheiro] = None
+        caminho = os.path.join(PASTA_SONS, nome_ficheiro)
+        if SOM_LIGADO and pygame.mixer.get_init() is not None and os.path.isfile(caminho):
+            try:
+                sons_carregados[nome_ficheiro] = pygame.mixer.Sound(caminho)
+            except pygame.error:
+                pass            # o ficheiro nao e um som que se perceba
+    if sons_carregados[nome_ficheiro] is None:
+        return False
+    sons_carregados[nome_ficheiro].play()
+    return True
+
+
 def letra_em(coluna, linha):
     # Fora do mapa pelos lados ha parede; por cima e por baixo ha ar.
     if coluna < 0 or coluna >= nivel["colunas"]:
@@ -1161,6 +1194,7 @@ def repor_heroi(x, y):
     heroi["recarga"] = 0
     heroi["recuo"] = 0
     heroi["passo"] = 0.0
+    heroi["turbo"] = 1           # multiplica a velocidade: 2 e o dobro
     heroi["congelado"] = 40      # um momento parado, para respirar
 
 
@@ -1175,6 +1209,7 @@ def carregar_nivel(indice):
             colunas = len(texto)
 
     nivel.clear()
+    memoria.clear()              # a memoria dos acontecimentos comeca vazia
     nivel["nome"] = dados["nome"]
     nivel["dica"] = dados.get("dica", "")
     nivel["treino"] = dados.get("treino", False)
@@ -1254,6 +1289,222 @@ def carregar_nivel(indice):
     heroi["invencivel"] = 0
     jogo["indice"] = indice
     jogo["tremor"] = 0
+
+
+# =====================================================================
+# OS ACONTECIMENTOS
+# =====================================================================
+
+# --- Os acontecimentos ---
+# O jogo chama cada uma destas funcoes quando acontece o que o nome diz.
+# Estao vazias (so tem "pass"): o que la escreveres passa a acontecer nesse
+# momento. E aqui que se INVENTA: um super salto, um iman de moedas, um
+# coracao de premio.
+#
+# Alem do que as regras do jogo podem usar (ver mais abaixo), tens:
+#   memoria                 um dicionario so teu, para guardares o que
+#                           quiseres de um frame para o outro:
+#                           memoria["saltos"] = 3
+#                           (fica vazio cada vez que um nivel comeca)
+#   memoria.get("saltos", 0)    o que la esta guardado, ou 0 se ainda nada
+#   nivel["moedas"]         as moedas que faltam apanhar. Cada uma tem
+#                           moeda.x e moeda.y, que podes mudar.
+#   nivel["moedas"].append(pygame.Rect(x, y, 20, 20))    poe la mais uma moeda
+#   heroi["turbo"] = 2      o Faisca passa a andar ao dobro da velocidade
+#                           (1 e o normal; volta a 1 quando ele perde e renasce)
+memoria = {}
+
+
+# QUANDO O FAISCA SALTA
+# Corre no instante em que ele sai do chao com um salto (nas molas nao).
+# Ideias: faiscas amarelas nos pes; ficar meio segundo sem que nada o magoe
+# (heroi["invencivel"] = 30); de 5 em 5 saltos, um salto gigante
+# (heroi["vy"] = -20), contando os saltos na memoria.
+def ao_saltar():
+    pass
+
+
+# QUANDO O FAISCA APANHA UMA MOEDA
+# x, y: o sitio onde a moeda estava, em pixeis do nivel.
+# nivel["apanhadas"] ja conta com esta moeda.
+# Ideias: mais um coracao de 10 em 10 moedas; cada moeda dar um bocadinho
+# de turbo; um fogo de artificio de faiscas no sitio da moeda.
+def ao_apanhar_moeda(x, y):
+    pass
+
+
+# QUANDO O FAISCA PERDE UM CORACAO
+# Corre logo a seguir a ele se magoar (num inimigo, nos espinhos, na lava,
+# num buraco). heroi["vidas"] ja tem o coracao a menos; se estiver em 0, o
+# nivel vai acabar, a nao ser que lhe des aqui mais um.
+# Ideias: uma segunda oportunidade (se ficou com 0 coracoes volta a ter 1,
+# mas so uma vez por nivel: lembra-te disso na memoria); perder tambem 3
+# moedas; todos os inimigos que estao no ecra levam 1 de dano.
+def ao_perder_coracao():
+    pass
+
+
+# QUANDO UM INIMIGO E DERROTADO
+# inimigo: o que acabou de cair. inimigo["x"], inimigo["y"] dizem onde foi, e
+# INIMIGOS[inimigo["letra"]]["nome"] diz qual era ("Lesma", "Sapo"...).
+# Ideias: deixar uma moeda no sitio onde caiu; ganhar um coracao por cada 3
+# inimigos derrotados; rebentar e magoar os inimigos que estao perto (so os
+# que ainda tem vida, senao a funcao chama-se a si propria sem parar).
+def ao_derrotar_inimigo(inimigo):
+    pass
+
+
+# QUANDO SE CARREGA NUMA TECLA
+# tecla: a tecla em que se carregou. pygame.K_b e a tecla B, pygame.K_g a G.
+# So corre a meio de um nivel. (As setas, Espaco, Shift, X, Z, P, F, T, C, I
+# e N ja fazem coisas no jogo.)
+# Ideias: a tecla B da um super salto, mas so 3 vezes por nivel (conta-os na
+# memoria); a tecla G liga e desliga o turbo; a tecla V leva o Faisca 3
+# quadrados para a frente (heroi["x"] mais 3 * TILE * heroi["virado"]).
+def ao_carregar_tecla(tecla):
+    pass
+
+
+# A CADA FRAME
+# Corre 60 vezes por segundo enquanto se joga. Cuidado: o que aqui puseres
+# acontece MUITAS vezes.
+# Ideias: um iman de moedas (as moedas que estao perto do Faisca andam para
+# ele); cair devagar, como um paraquedas (se heroi["vy"] passar de 3, fica
+# em 3); um coracao de premio de 20 em 20 segundos (conta os frames na
+# memoria).
+def a_cada_frame():
+    pass
+
+
+# =====================================================================
+# AS REGRAS DO JOGO
+# =====================================================================
+
+# --- As regras do jogo ---
+# As cinco funcoes que se seguem sao as REGRAS: como o Faisca salta, o que
+# acontece quando ele toca num inimigo, o que faz um tiro que acerta, e como
+# se mexem os inimigos que saltam e os que voam. Mudar uma delas muda a
+# maneira como o jogo se comporta.
+#
+# Dentro delas podes usar tudo o que o jogo tem:
+#   heroi["x"], heroi["y"]    onde esta o Faisca, em pixeis. O x cresce para
+#                             a direita e o y cresce para BAIXO.
+#   heroi["vx"], heroi["vy"]  a velocidade dele. Com vy negativo, sobe. (O vx
+#                             e o jogo que o decide a cada frame: para o
+#                             Faisca andar mais depressa usa heroi["turbo"].)
+#   heroi["vidas"]            os coracoes que lhe restam (o ecra mostra VIDAS)
+#   heroi["no_chao"]          True quando tem os pes no chao
+#   heroi["virado"]           1 se olha para a direita, -1 para a esquerda
+#   heroi["invencivel"]       frames em que nada o magoa (60 = um segundo)
+#   nivel["inimigos"]         os inimigos do nivel. Cada um tem "x", "y",
+#                             "vida" e "letra" (a letra dele no mapa)
+#   nivel["apanhadas"]        as moedas apanhadas neste nivel
+#   magoar_inimigo(inimigo, 1)    tira 1 de vida a um inimigo
+#   perder_vida(False)        o Faisca perde um coracao
+#   particulas(x, y, cor, quantas, forca)    faiscas a saltar de um ponto
+#   acao("OLA!")              uma palavra no canto do ecra, por um instante
+#   tocar("moeda")            um som do jogo: "salto", "tiro", "moeda",
+#                             "mola", "pancada", "pisar", "vitoria"...
+#   random.random()           um numero ao calhas entre 0 e 1
+#   TILE                      o lado de um quadrado do mapa, em pixeis
+# Para MUDAR uma constante do jogo (GRAVIDADE, VIDAS...) dentro de uma
+# funcao, a primeira linha dela tem de ser "global GRAVIDADE".
+
+# COMO O FAISCA SALTA
+# Corre a cada frame, antes de o Faisca se mexer. Como esta: se foi pedido um
+# salto e ele tem os pes no chao, sobe com a FORCA_SALTO.
+#   heroi["salto_pedido"]   maior que 0 se se pediu um salto ha instantes
+#   heroi["coiote"]         maior que 0 se ele tem os pes no chao (ou saiu
+#                           agora mesmo da beira de um buraco)
+# Ideias: um salto duplo (deixar saltar mais uma vez no ar, contando os
+# saltos na memoria); saltar mais alto quando vai a correr; saltar sozinho
+# sempre que toca no chao, como uma bola.
+def saltar():
+    if heroi["salto_pedido"] > 0 and heroi["coiote"] > 0:
+        heroi["vy"] = -FORCA_SALTO
+        heroi["salto_pedido"] = 0
+        heroi["coiote"] = 0
+        if not tocar_som(SOM_DO_SALTO):
+            tocar("salto")
+        acao("SALTO!")
+        particulas(heroi["x"] + 15, heroi["y"] + ALTURA_HEROI, BRANCO, 5, 2)
+        ao_saltar()
+
+
+# O QUE ACONTECE QUANDO O FAISCA TOCA NUM INIMIGO
+# inimigo:   aquele em que tocou.
+# por_cima:  True se o Faisca vinha a cair para cima dele, False se foi de lado.
+# tipo (la dentro) e a ficha desse inimigo em INIMIGOS: "pisavel", "jeito"...
+# Como esta: se o inimigo e pisavel e o Faisca veio por cima, o inimigo leva
+# dano e o Faisca ressalta; senao, o Faisca perde um coracao.
+# Ideias: ganhar uma moeda por cada inimigo pisado; ressaltar muito mais
+# alto; os Javalis so cairem a segunda vez que se lhes salta em cima.
+def tocar_num_inimigo(inimigo, por_cima):
+    tipo = INIMIGOS[inimigo["letra"]]
+    if tipo["pisavel"] and por_cima:
+        if tipo["jeito"] == "chefe":
+            magoar_inimigo(inimigo, 3)
+            heroi["vy"] = -12.5
+            heroi["invencivel"] = 45
+        else:
+            magoar_inimigo(inimigo, 99)
+            heroi["vy"] = -9.5
+        heroi["coiote"] = 0
+    else:
+        perder_vida(False)
+
+
+# O QUE FAZ UM TIRO QUE ACERTA NUM INIMIGO
+# inimigo:  aquele em que o tiro acertou.
+# tiro:     o tiro. tiro["x"], tiro["y"] dizem onde esta, e tiro["vx"] para
+#           que lado ia (positivo: para a direita).
+# Como esta: tira 1 de vida ao inimigo. O tiro desaparece sempre a seguir.
+# Ideias: tiros mais fortes (2 de vida); um golpe critico de vez em quando
+# (3 de vida, com um acao("CRITICO!")); cada tiro certeiro dar uma moeda.
+def acertar_tiro(inimigo, tiro):
+    magoar_inimigo(inimigo, 1)
+
+
+# COMO SE MEXE UM INIMIGO QUE SALTA (o Sapo)
+# Corre a cada frame para cada inimigo com o jeito "saltar".
+# velocidade: a "velocidade" da ficha dele em INIMIGOS.
+#   inimigo["espera"]   os frames que faltam para o proximo salto
+#   inimigo["dir"]      para onde esta virado: 1 direita, -1 esquerda
+#   inimigo["vx"], inimigo["vy"]    a velocidade dele (vy negativo: sobe)
+#   mover_corpo(...)    mexe-o e para-o nas paredes e no chao
+# Ideias: saltos mais altos; saltar mais vezes; fugir do Faisca em vez de ir
+# atras dele.
+def mexer_saltador(inimigo, velocidade):
+    dx = heroi["x"] - inimigo["x"]      # positivo: o Faisca esta a direita
+    inimigo["vy"] += GRAVIDADE
+    if inimigo["no_chao"]:
+        inimigo["vx"] = 0.0
+        inimigo["espera"] -= 1
+        if inimigo["espera"] <= 0:
+            if abs(dx) < 9 * TILE:
+                inimigo["dir"] = sinal(dx)
+            inimigo["vy"] = -10.5
+            inimigo["vx"] = inimigo["dir"] * velocidade
+            inimigo["espera"] = random.randint(60, 110)
+    if mover_corpo(inimigo, inimigo["vx"], inimigo["vy"]):
+        inimigo["vx"] = 0.0
+
+
+# COMO SE MEXE UM INIMIGO QUE VOA (o Morcego)
+# Corre a cada frame para cada inimigo com o jeito "voar".
+# velocidade: a "velocidade" da ficha dele em INIMIGOS (um numero pequeno).
+#   inimigo["x0"], inimigo["y0"]   o sitio onde ele nasceu, e a volta do
+#                                  qual voa
+#   inimigo["t"]                   os frames que ja viveu: sobe 1 por frame
+#   math.sin(...)                  um numero que vai e vem entre -1 e 1
+# Como esta: vai e vem 150 pixeis para cada lado, e 34 para cima e para baixo.
+# Ideias: voar mais longe; voar as voltas, num circulo (math.cos no y);
+# seguir o Faisca devagarinho.
+def mexer_voador(inimigo, velocidade):
+    antes = inimigo["x"]
+    inimigo["x"] = inimigo["x0"] + math.sin(inimigo["t"] * velocidade) * 150
+    inimigo["y"] = inimigo["y0"] + math.sin(inimigo["t"] * 0.06) * 34
+    inimigo["dir"] = sinal(inimigo["x"] - antes)
 
 
 # =====================================================================
@@ -1357,21 +1608,16 @@ def atualizar_heroi(comando):
         velocidade = VEL_ANDAR
         if comando["correr"]:
             velocidade = VEL_CORRER
-    heroi["vx"] = velocidade * heroi["virado"]
+    heroi["vx"] = velocidade * heroi["virado"] * heroi["turbo"]
 
     # Saltar. Duas ajudas: o salto pedido um pouco antes de tocar no chao
     # ainda conta, e ainda se pode saltar um instante depois de cair da beira.
+    # O salto propriamente dito e uma regra do jogo: esta em saltar().
     if comando["saltar"]:
         heroi["salto_pedido"] = TOLERANCIA_SALTO
     if heroi["no_chao"]:
         heroi["coiote"] = TEMPO_COIOTE
-    if heroi["salto_pedido"] > 0 and heroi["coiote"] > 0:
-        heroi["vy"] = -FORCA_SALTO
-        heroi["salto_pedido"] = 0
-        heroi["coiote"] = 0
-        tocar("salto")
-        acao("SALTO!")
-        particulas(heroi["x"] + 15, heroi["y"] + ALTURA_HEROI, BRANCO, 5, 2)
+    saltar()
     if heroi["salto_pedido"] > 0:
         heroi["salto_pedido"] -= 1
     if heroi["coiote"] > 0:
@@ -1397,7 +1643,8 @@ def atualizar_heroi(comando):
             "vx": VEL_TIRO * heroi["virado"],
             "vida": ALCANCE_TIRO,
         })
-        tocar("tiro")
+        if not tocar_som(SOM_DO_TIRO):
+            tocar("tiro")
         acao("FOGO!")
 
 
@@ -1414,6 +1661,7 @@ def perder_vida(voltar_atras):
     jogo["tremor"] = 14
     tocar("pancada")
     particulas(heroi["x"] + 15, heroi["y"] + 20, COR_HEROI, 14, 5)
+    ao_perder_coracao()
     if heroi["vidas"] <= 0:
         jogo["fase"] = "perdeu"
         jogo["espera"] = 50
@@ -1428,7 +1676,7 @@ def perder_vida(voltar_atras):
 def concluir_nivel():
     indice = jogo["indice"]
     estrelas = 1
-    if nivel["apanhadas"] == nivel["total_moedas"]:
+    if nivel["apanhadas"] >= nivel["total_moedas"]:
         estrelas += 1
     if nivel["sem_falhas"]:
         estrelas += 1
@@ -1493,6 +1741,7 @@ def tocar_no_mapa():
             nivel["apanhadas"] += 1
             tocar("moeda")
             particulas(moeda.centerx, moeda.centery, COR_MOEDA, 6, 3)
+            ao_apanhar_moeda(moeda.centerx, moeda.centery)
         else:
             restantes.append(moeda)
     nivel["moedas"] = restantes
@@ -1547,7 +1796,12 @@ def magoar_inimigo(inimigo, dano):
     if inimigo["vida"] > 0:
         tocar("toque")
         return
-    tocar("pisar")
+    # Caiu. Se este inimigo tiver um som so dele (um WAV), e esse que se ouve.
+    tocou = False
+    if "som" in tipo:
+        tocou = tocar_som(tipo["som"])
+    if not tocou:
+        tocar("pisar")
     particulas(centro_x, centro_y, tipo["cor"], 14, 5)
     if tipo["jeito"] == "chefe":
         particulas(centro_x, centro_y, AMARELO, 60, 9)
@@ -1556,6 +1810,7 @@ def magoar_inimigo(inimigo, dano):
         nivel["trancada"] = False
         nivel["balas"] = []
         tocar("vitoria")
+    ao_derrotar_inimigo(inimigo)
 
 
 def atualizar_tiros():
@@ -1579,7 +1834,7 @@ def atualizar_tiros():
         for inimigo in nivel["inimigos"]:
             alvo = retangulo(inimigo).inflate(8, 8)
             if inimigo["vida"] > 0 and alvo.collidepoint(tiro["x"], tiro["y"]):
-                magoar_inimigo(inimigo, 1)
+                acertar_tiro(inimigo, tiro)
                 acertou = True
                 break
         if not acertou:
@@ -1666,24 +1921,10 @@ def mexer_inimigo(inimigo):
         andar_no_chao(inimigo, velocidade)
 
     elif jeito == "saltar":
-        inimigo["vy"] += GRAVIDADE
-        if inimigo["no_chao"]:
-            inimigo["vx"] = 0.0
-            inimigo["espera"] -= 1
-            if inimigo["espera"] <= 0:
-                if abs(dx) < 9 * TILE:
-                    inimigo["dir"] = sinal(dx)
-                inimigo["vy"] = -10.5
-                inimigo["vx"] = inimigo["dir"] * velocidade
-                inimigo["espera"] = random.randint(60, 110)
-        if mover_corpo(inimigo, inimigo["vx"], inimigo["vy"]):
-            inimigo["vx"] = 0.0
+        mexer_saltador(inimigo, velocidade)     # uma regra do jogo
 
     elif jeito == "voar":
-        antes = inimigo["x"]
-        inimigo["x"] = inimigo["x0"] + math.sin(inimigo["t"] * velocidade) * 150
-        inimigo["y"] = inimigo["y0"] + math.sin(inimigo["t"] * 0.06) * 34
-        inimigo["dir"] = sinal(inimigo["x"] - antes)
+        mexer_voador(inimigo, velocidade)       # outra
 
     elif jeito == "carregar":
         if inimigo["tonto"] > 0:
@@ -1749,19 +1990,9 @@ def atualizar_inimigos():
         eu = retangulo(heroi)
         ele = retangulo(inimigo)
         if jogo["fase"] == "jogar" and inimigo["vida"] > 0 and eu.colliderect(ele):
+            # Tocaram-se. O que acontece a seguir e uma regra do jogo.
             por_cima = heroi["vy"] > 0 and eu.bottom - heroi["vy"] < ele.top + ele.height * 0.6
-            if tipo["pisavel"] and por_cima:
-                # Saltar-lhe em cima
-                if tipo["jeito"] == "chefe":
-                    magoar_inimigo(inimigo, 3)
-                    heroi["vy"] = -12.5
-                    heroi["invencivel"] = 45
-                else:
-                    magoar_inimigo(inimigo, 99)
-                    heroi["vy"] = -9.5
-                heroi["coiote"] = 0
-            else:
-                perder_vida(False)
+            tocar_num_inimigo(inimigo, por_cima)
         if inimigo["vida"] > 0:
             vivos.append(inimigo)
     nivel["inimigos"] = vivos
@@ -1779,6 +2010,8 @@ def passo_do_jogo(comando):
     if jogo["fase"] == "jogar":
         tocar_no_mapa()
     atualizar_particulas()
+    if jogo["fase"] == "jogar":
+        a_cada_frame()
 
 
 # =====================================================================
@@ -2093,6 +2326,63 @@ def desenhar_coisas(camara_x):
         desenhar_coracao(coracao.x - camara_x, coracao.y + salto, 24, VERMELHO)
 
 
+# --- Os desenhos ---
+# Os desenhos que se podem mudar: a Lesma (desenhar_lesma), um inimigo
+# inventado por ti (desenhar_inimigo_novo) e o Faisca (desenhar_robot).
+# Desenha-se com formas do pygame, sempre no "ecra":
+#   pygame.draw.circle(ecra, cor, (x, y), raio)
+#   pygame.draw.rect(ecra, cor, (x, y, largura, altura))
+#   pygame.draw.rect(ecra, cor, (x, y, largura, altura), border_radius=8)
+#                                         (o mesmo, com os cantos redondos)
+#   pygame.draw.ellipse(ecra, cor, (x, y, largura, altura))
+#   pygame.draw.line(ecra, cor, (x1, y1), (x2, y2), grossura)
+#   pygame.draw.polygon(ecra, cor, [(x1, y1), (x2, y2), (x3, y3)])
+# O x cresce para a direita e o y cresce para BAIXO. Uma cor sao tres
+# numeros (vermelho, verde, azul), de 0 a 255, ou uma das que o jogo ja tem:
+# BRANCO, PRETO, CINZA, AMARELO, VERMELHO, VERDE, AZUL, LARANJA. O que se
+# desenha depois fica por cima do que se desenhou antes.
+# Atencao: se houver uma imagem (um PNG) para essa personagem, e a imagem
+# que aparece, e o desenho nao se ve.
+
+# O DESENHO DA LESMA
+# x, y   o canto de cima, do lado esquerdo, do retangulo onde ela cabe
+# cor    a cor da ficha dela (branca por um instante, quando leva um tiro)
+# l, a   a largura e a altura dela         d   1 se vai para a direita, -1
+#                                              se vai para a esquerda
+# frente o x do lado para onde ela vai: e ai que fica o olho
+# Ideias: dar-lhe dois olhos; uma casca de outra cor; um rasto atras dela.
+def desenhar_lesma(inimigo, x, y, cor):
+    ecra = janela["ecra"]
+    l = inimigo["l"]
+    a = inimigo["a"]
+    d = inimigo["dir"]
+    frente = x + l // 2 + d * (l // 2 - 8)
+    pygame.draw.ellipse(ecra, cor, (x, y + 12, l, a - 12))
+    pygame.draw.circle(ecra, (220, 170, 90), (x + l // 2 - d * 6, y + 12), 11)
+    pygame.draw.circle(ecra, (170, 120, 60), (x + l // 2 - d * 6, y + 12), 5)
+    pygame.draw.line(ecra, cor, (frente, y + 16), (frente + d * 3, y + 4), 3)
+    pygame.draw.circle(ecra, PRETO, (frente + d * 3, y + 4), 3)
+
+
+# O DESENHO DE UM INIMIGO NOVO
+# E com esta funcao que aparece um inimigo inventado por ti, que ainda nao
+# tem desenho so dele: um bloco com um olho.
+# x, y   o canto de cima, do lado esquerdo, do retangulo onde ele cabe
+# cor    a cor da ficha dele (branca por um instante, quando leva um tiro)
+# l, a   a largura e a altura dele         d   1 se vai para a direita, -1
+#                                              se vai para a esquerda
+# inimigo["t"]   os frames que ele ja viveu: da para o fazer mexer
+# Ideias: dois olhos e uma boca; uns chifres; pernas que mexem com o tempo.
+def desenhar_inimigo_novo(inimigo, x, y, cor):
+    ecra = janela["ecra"]
+    l = inimigo["l"]
+    a = inimigo["a"]
+    d = inimigo["dir"]
+    frente = x + l // 2 + d * (l // 2 - 8)
+    pygame.draw.rect(ecra, cor, (x, y, l, a), border_radius=8)
+    pygame.draw.circle(ecra, PRETO, (frente, y + 12), 4)
+
+
 def desenhar_inimigo(inimigo, camara_x):
     ecra = janela["ecra"]
     tipo = INIMIGOS[inimigo["letra"]]
@@ -2125,11 +2415,7 @@ def desenhar_inimigo(inimigo, camara_x):
         return
 
     if letra == "a":            # lesma
-        pygame.draw.ellipse(ecra, cor, (x, y + 12, l, a - 12))
-        pygame.draw.circle(ecra, (220, 170, 90), (x + l // 2 - d * 6, y + 12), 11)
-        pygame.draw.circle(ecra, (170, 120, 60), (x + l // 2 - d * 6, y + 12), 5)
-        pygame.draw.line(ecra, cor, (frente, y + 16), (frente + d * 3, y + 4), 3)
-        pygame.draw.circle(ecra, PRETO, (frente + d * 3, y + 4), 3)
+        desenhar_lesma(inimigo, x, y, cor)
     elif jeito == "saltar":     # sapo
         esticado = 0
         if not inimigo["no_chao"]:
@@ -2194,30 +2480,20 @@ def desenhar_inimigo(inimigo, camara_x):
         for i in range(4):
             pygame.draw.rect(ecra, BRANCO, (x + 25 + i * 9, y + 58, 5, 5))
     else:
-        # Um inimigo inventado por ti, sem desenho proprio: um bloco com olhos.
-        pygame.draw.rect(ecra, cor, (x, y, l, a), border_radius=8)
-        pygame.draw.circle(ecra, PRETO, (frente, y + 12), 4)
+        # Um inimigo inventado por ti, sem desenho proprio.
+        desenhar_inimigo_novo(inimigo, x, y, cor)
 
 
-def desenhar_heroi(camara_x):
+# O DESENHO DO FAISCA
+# x, y   o canto de cima, do lado esquerdo, do retangulo onde ele cabe (30
+#        pixeis de largura e 42 de altura)
+# v      1 se esta virado para a direita, -1 se esta virado para a esquerda
+# heroi["no_chao"], heroi["vx"]    para saber se anda, corre ou vai no ar
+# heroi["recuo"]                   maior que 0 logo a seguir a disparar
+# Ideias: um chapeu; a antena de outra cor; ficar vermelho quando so tem um
+# coracao (heroi["vidas"]).
+def desenhar_robot(x, y, v):
     ecra = janela["ecra"]
-    if heroi["invencivel"] > 0 and (heroi["invencivel"] // 4) % 2 == 0:
-        return                      # a piscar
-    x = int(heroi["x"] - camara_x)
-    y = int(heroi["y"])
-    v = heroi["virado"]
-
-    # Com imagem: desenha-se a imagem (virada para onde ele anda) e o
-    # clarao do tiro, e mais nada.
-    imagem = obter_imagem(IMAGEM_DO_HEROI, LARGURA_HEROI, ALTURA_HEROI)
-    if imagem is not None:
-        if v < 0:
-            imagem = pygame.transform.flip(imagem, True, False)
-        ecra.blit(imagem, (x, y))
-        if heroi["recuo"] > 0:
-            pygame.draw.circle(ecra, COR_TIRO, (x + 15 + v * 24, y + 23), heroi["recuo"])
-        return
-
     # pernas
     perna = 0
     if heroi["no_chao"] and heroi["vx"] != 0:
@@ -2248,6 +2524,29 @@ def desenhar_heroi(camara_x):
     if heroi["recuo"] > 0:
         pygame.draw.rect(ecra, COR_HEROI_ESCURA, (x + 15 + v * 14 - 6, y + 20, 14, 7), border_radius=3)
         pygame.draw.circle(ecra, COR_TIRO, (x + 15 + v * 24, y + 23), heroi["recuo"])
+
+
+def desenhar_heroi(camara_x):
+    ecra = janela["ecra"]
+    if heroi["invencivel"] > 0 and (heroi["invencivel"] // 4) % 2 == 0:
+        return                      # a piscar
+    x = int(heroi["x"] - camara_x)
+    y = int(heroi["y"])
+    v = heroi["virado"]
+
+    # Com imagem: desenha-se a imagem (virada para onde ele anda) e o
+    # clarao do tiro, e mais nada.
+    imagem = obter_imagem(IMAGEM_DO_HEROI, LARGURA_HEROI, ALTURA_HEROI)
+    if imagem is not None:
+        if v < 0:
+            imagem = pygame.transform.flip(imagem, True, False)
+        ecra.blit(imagem, (x, y))
+        if heroi["recuo"] > 0:
+            pygame.draw.circle(ecra, COR_TIRO, (x + 15 + v * 24, y + 23), heroi["recuo"])
+        return
+
+    # Sem imagem: o robot, desenhado com formas.
+    desenhar_robot(x, y, v)
 
 
 def desenhar_camara(m, x, y, largura):
@@ -2652,7 +2951,9 @@ def main():
     else:
         jogo["modo_teclado"] = True
 
-    if TODOS_OS_NIVEIS_ABERTOS:
+    # (Na Oficina tambem estao todos abertos, para se poder experimentar
+    # logo um nivel acabado de inventar.)
+    if TODOS_OS_NIVEIS_ABERTOS or SO_TECLADO:
         jogo["aberto"] = len(NIVEIS) - 1
     carregar_nivel(0)
     comando = {"direcao": 0, "andar": False, "correr": False, "saltar": False, "disparar": False}
@@ -2669,6 +2970,8 @@ def main():
                 a_correr = False
             elif evento.type == pygame.KEYDOWN:
                 tecla = evento.key
+                if fase == "jogar":
+                    ao_carregar_tecla(tecla)
                 if tecla == pygame.K_ESCAPE:
                     if fase == "titulo":
                         a_correr = False

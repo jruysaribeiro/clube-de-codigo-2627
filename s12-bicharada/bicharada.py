@@ -13,6 +13,8 @@
 #
 # Zero assets: os bichos sao formas com olhos. Se puseres um PNG com o nome
 # que esta em "imagem" na pasta comum/assets/imagens/, aparece a imagem.
+# Com os sons e igual: um WAV com o nome que esta em "som", na pasta
+# comum/assets/sons/, passa a ouvir-se.
 
 import math
 import random
@@ -68,6 +70,9 @@ EFICACIA = {
 # precisao: de 0 a 100, a probabilidade de acertar
 # efeito:   "dano", "cura", "sobe_ataque", "sobe_defesa",
 #           "baixa_ataque" ou "baixa_defesa"
+# som:      (so se quiseres) o nome de um WAV, assim: "som": "bicada.wav".
+#           Se ele existir em comum/assets/sons/, ouve-se quando o ataque
+#           e usado.
 ATAQUES = {
     "Investida": {"tipo": "normal", "poder": 40, "precisao": 100, "efeito": "dano"},
     "Arranhão": {"tipo": "normal", "poder": 40, "precisao": 100, "efeito": "dano"},
@@ -94,43 +99,45 @@ ATAQUES = {
 # --- Os bichos ---
 # Os numeros sao os valores BASE, ao nivel 1. Cada nivel acima soma 10%.
 # forma: "circulo", "quadrado", "triangulo" ou "gota"
+# som:   o nome de um WAV. Se ele existir em comum/assets/sons/, ouve-se
+#        quando o bicho entra em campo.
 # Para inventares um bicho: copia um destes, muda-lhe o nome e os numeros.
 # Regra de equilibrio: vida + ataque + defesa + velocidade da a volta de 85.
 BICHOS = {
     "Galo de Barcelos": {
         "tipo": "fogo", "vida": 45, "ataque": 15, "defesa": 10, "velocidade": 14,
         "ataques": ["Bicada", "Crista em Brasa", "Cocoricó", "Estalido"],
-        "cor": (200, 45, 45), "forma": "triangulo", "imagem": "galo.png",
+        "cor": (200, 45, 45), "forma": "triangulo", "imagem": "galo.png", "som": "galo.wav",
     },
     "Castanha Assada": {
         "tipo": "fogo", "vida": 55, "ataque": 12, "defesa": 13, "velocidade": 7,
         "ataques": ["Investida", "Fumarada", "Estalido", "Casca Dura"],
-        "cor": (130, 70, 35), "forma": "gota", "imagem": "castanha.png",
+        "cor": (130, 70, 35), "forma": "gota", "imagem": "castanha.png", "som": "castanha.wav",
     },
     "Sardinhão": {
         "tipo": "agua", "vida": 48, "ataque": 13, "defesa": 10, "velocidade": 15,
         "ataques": ["Investida", "Esguicho", "Onda da Nazaré", "Escamas"],
-        "cor": (120, 160, 200), "forma": "gota", "imagem": "sardinhao.png",
+        "cor": (120, 160, 200), "forma": "gota", "imagem": "sardinhao.png", "som": "sardinhao.wav",
     },
     "Polvo Lagareiro": {
         "tipo": "agua", "vida": 60, "ataque": 11, "defesa": 13, "velocidade": 6,
         "ataques": ["Tentáculo", "Tinta de Choco", "Esguicho", "Patada"],
-        "cor": (170, 80, 150), "forma": "circulo", "imagem": "polvo.png",
+        "cor": (170, 80, 150), "forma": "circulo", "imagem": "polvo.png", "som": "polvo.wav",
     },
     "Sobreirinho": {
         "tipo": "planta", "vida": 58, "ataque": 11, "defesa": 15, "velocidade": 5,
         "ataques": ["Chicote de Cortiça", "Bolotada", "Seiva", "Casca Dura"],
-        "cor": (120, 100, 50), "forma": "quadrado", "imagem": "sobreirinho.png",
+        "cor": (120, 100, 50), "forma": "quadrado", "imagem": "sobreirinho.png", "som": "sobreirinho.wav",
     },
     "Couve Galega": {
         "tipo": "planta", "vida": 50, "ataque": 13, "defesa": 11, "velocidade": 11,
         "ataques": ["Folha de Couve", "Seiva", "Investida", "Bolotada"],
-        "cor": (60, 150, 70), "forma": "circulo", "imagem": "couve.png",
+        "cor": (60, 150, 70), "forma": "circulo", "imagem": "couve.png", "som": "couve.wav",
     },
     "Lince Ibérico": {
         "tipo": "normal", "vida": 46, "ataque": 15, "defesa": 9, "velocidade": 16,
         "ataques": ["Arranhão", "Salto Felino", "Rugido", "Patada"],
-        "cor": (205, 155, 85), "forma": "quadrado", "imagem": "lince.png",
+        "cor": (205, 155, 85), "forma": "quadrado", "imagem": "lince.png", "som": "lince.wav",
     },
 }
 
@@ -208,6 +215,32 @@ def obter_imagem(nome_ficheiro, tamanho):
     return imagens_carregadas[chave]
 
 
+# Com os sons e igual: ficam aqui depois de lidos, e None quer dizer "nao ha".
+sons_carregados = {}
+
+
+def tocar_som(nome_ficheiro):
+    # Toca o som com esse nome, se ele existir em comum/assets/sons/.
+    if nome_ficheiro not in sons_carregados:
+        caminho = PASTA_ASSETS / "sons" / nome_ficheiro
+        som = None
+        if caminho.is_file() and pygame.mixer.get_init():
+            try:
+                som = pygame.mixer.Sound(str(caminho))
+            except pygame.error:
+                som = None       # o ficheiro existe mas nao e um som que se perceba
+        sons_carregados[nome_ficheiro] = som
+    if sons_carregados[nome_ficheiro] is not None:
+        sons_carregados[nome_ficheiro].play()
+
+
+def som_do_bicho(bicho):
+    # A "voz" do bicho: ouve-se quando ele entra em campo.
+    dados = BICHOS[bicho["nome"]]
+    if "som" in dados:
+        tocar_som(dados["som"])
+
+
 def mostrar_texto(texto, x, y, cor, letra):
     desenho = letra.render(texto, True, cor)
     ecra.blit(desenho, (x, y))
@@ -220,6 +253,34 @@ def escurecer(cor, quanto):
 # =====================================================================
 #                          AS REGRAS DO JOGO
 # =====================================================================
+
+# --- As regras do jogo ---
+# Ha cinco funcoes neste ficheiro que sao as REGRAS: quanto magoa um ataque
+# (calcular_dano), quando sai um golpe critico (golpe_critico), quanta
+# experiencia e precisa para subir de nivel (xp_para_subir), quem ataca
+# primeiro (quem_ataca_primeiro) e que ataque o inimigo escolhe
+# (escolher_ataque_inimigo). Mudar uma delas muda a maneira como o jogo se
+# comporta.
+#
+# Dentro delas podes usar tudo o que o jogo tem. Um bicho em batalha e um
+# dicionario:
+#   bicho["nome"], bicho["tipo"], bicho["nivel"], bicho["xp"]
+#   bicho["vida"], bicho["vida_max"]    a vida que lhe resta, e a maxima
+#   bicho["ataque"], bicho["defesa"], bicho["velocidade"]    ja com o nivel
+#   bicho["mod_ataque"], bicho["mod_defesa"]    comecam em 1.0; o Cocorico,
+#                                       o Rugido e outros fazem-nos mudar
+# E ha mais:
+#   minha_equipa[ativo_meu]             o teu bicho que esta em campo
+#   equipa_inimiga[ativo_inimigo]       o bicho inimigo que esta em campo
+#   BICHOS[bicho["nome"]]               a ficha dele, la em cima ("ataques"...)
+#   ATAQUES[nome]                       a ficha de um ataque ("tipo", "poder",
+#                                       "precisao", "efeito")
+#   eficacia(tipo_do_ataque, tipo_do_alvo)    2.0, 0.5 ou 1.0, pela tabela EFICACIA
+#   random.randint(1, 6)                um numero inteiro ao calhas, de 1 a 6
+#   random.uniform(0.5, 1.5)            um numero com virgula ao calhas
+#   dizer("ola")                        poe um texto no painel de baixo
+# Para mudar as sopas dentro de uma funcao, a primeira linha dela tem de ser
+# "global sopas".
 
 def valor_no_nivel(base, nivel):
     # Cada nivel acima do 1 soma 10% do valor base.
@@ -268,6 +329,14 @@ def eficacia(tipo_ataque, tipo_alvo):
     return 1.0
 
 
+# QUANTO MAGOA UM ATAQUE
+# Recebe quem ataca, quem leva e o NOME do ataque. Devolve quanta vida o
+# golpe tira (um numero inteiro). Como esta: o poder do ataque, vezes o
+# ataque de um a dividir pela defesa do outro, e depois o nivel, o tipo e
+# um bocadinho de sorte.
+#   dados["poder"], dados["tipo"]    vem da ficha do ataque, em ATAQUES
+# Ideias: um bicho com pouca vida bater mais forte (furia); tirar a sorte,
+# para o mesmo ataque tirar sempre o mesmo; bater mais em bichos mais lentos.
 def calcular_dano(atacante, alvo, ataque):
     dados = ATAQUES[ataque]
     ataque_real = atacante["ataque"] * atacante["mod_ataque"]
@@ -284,6 +353,16 @@ def calcular_dano(atacante, alvo, ataque):
     return int(dano) + 1
 
 
+# QUANDO SAI UM GOLPE CRITICO
+# Corre cada vez que um ataque acerta. Recebe quem ataca e quem leva, e
+# devolve True se o golpe for critico (tira mais metade do dano) ou False se
+# nao for. Como esta: e sorte, 1 vez em cada 16.
+# Ideias: sair mais vezes (1 em cada 4); os bichos mais rapidos do que o alvo
+# terem mais sorte; critico garantido quando quem ataca tem pouca vida.
+def golpe_critico(atacante, alvo):
+    return random.randint(1, 16) == 1
+
+
 def proximo_vivo(equipa):
     # Devolve a posicao do primeiro bicho com vida, ou -1 se nao houver.
     indice = 0
@@ -294,6 +373,14 @@ def proximo_vivo(equipa):
     return -1
 
 
+# QUANTA EXPERIENCIA E PRECISA PARA SUBIR DE NIVEL
+# Recebe um bicho e devolve quantos pontos de experiencia (XP) ele precisa
+# de juntar para passar ao nivel seguinte. Como esta: 10 por cada nivel que
+# ja tem (ao nivel 5 precisa de 50). Vencer um bicho da 12 de XP por cada
+# nivel dele. Tem de devolver sempre mais que zero, senao o bicho nunca mais
+# parava de subir.
+# Ideias: subir mais depressa (5 por nivel); os primeiros niveis faceis e os
+# ultimos dificeis; os bichos de planta crescerem mais depressa.
 def xp_para_subir(bicho):
     return bicho["nivel"] * 10
 
@@ -328,6 +415,14 @@ fila_acoes = []
 OPCOES_MENU = ["Lutar", "Equipa", "Sopa"]
 
 
+def dizer(texto):
+    # Poe um texto no painel de baixo, a seguir aos que la estiverem. O
+    # jogador le-o e passa-o com Enter. (So se ve durante uma batalha.)
+    global fase
+    mensagens.append(texto)
+    fase = "texto"
+
+
 def treinador():
     return TREINADORES[indice_treinador]
 
@@ -338,6 +433,7 @@ def comecar_escolha():
     escolhidos = []
     cursor_escolha = 0
     indice_treinador = 0
+    memoria.clear()
 
 
 def comecar_batalha():
@@ -360,6 +456,93 @@ def comecar_batalha():
         "Vai, " + minha_equipa[0]["nome"] + "!",
     ]
     fase = "texto"
+    som_do_bicho(equipa_inimiga[0])
+    som_do_bicho(minha_equipa[0])
+    ao_comecar_batalha()
+
+
+# =====================================================================
+#                          ACONTECIMENTOS
+# =====================================================================
+
+# --- Os acontecimentos ---
+# O jogo chama cada uma destas funcoes quando acontece o que o nome diz.
+# Estao vazias (so tem "pass"): o que la escreveres passa a acontecer nesse
+# momento. E aqui que se INVENTA: um bicho vampiro, um premio, um truque.
+#
+# Alem do que as regras do jogo podem usar (ver mais acima), tens:
+#   memoria                 um dicionario so teu, para guardares o que
+#                           quiseres de um turno para o outro:
+#                           memoria["vitorias"] = 3
+#                           (fica vazio cada vez que o jogo recomeca)
+#   dizer("Boa!")           poe um texto no painel de baixo, a seguir aos
+#                           que la estiverem; passa-se com Enter
+#   bicho in minha_equipa   e verdade se o bicho e teu, e nao do inimigo
+#   bicho["vida"] = min(bicho["vida_max"], bicho["vida"] + 10)
+#                           cura 10 de vida, sem passar da vida maxima
+#   ganhar_xp(bicho, 20)    da 20 de experiencia a um bicho teu
+#   sopas                   quantas sopas te restam. Para as MUDAR, a
+#                           primeira linha da funcao tem de ser "global sopas"
+memoria = {}
+
+
+# QUANDO COMECA UMA BATALHA
+# Corre no inicio de cada batalha, com as duas equipas ja prontas.
+# treinador()["nome"] diz contra quem e. indice_treinador diz qual deles e:
+# 0 no primeiro, 1 no segundo, e por ai fora.
+# Ideias: dizer uma frase tua antes da luta; levar uma sopa a mais contra o
+# segundo treinador; o teu primeiro bicho entrar com o ataque mais forte
+# (mod_ataque a 1.25).
+def ao_comecar_batalha():
+    pass
+
+
+# QUANDO UM ATAQUE ACERTA
+# atacante: quem atacou. alvo: quem levou. dano: quanta vida o golpe tirou
+# (a vida do alvo ja desceu). So corre nos ataques que fazem dano.
+# Ideias: um bicho vampiro, que recupera metade do dano que faz; dizer
+# "Que pancada!" quando o golpe tira mais de 20; o alvo ficar um bocadinho
+# mais fraco de cada vez que leva (mod_defesa a descer).
+def ao_acertar(atacante, alvo, dano):
+    pass
+
+
+# QUANDO UM BICHO DESMAIA
+# desmaiado: o bicho que ficou sem vida. vencedor: o que o deitou abaixo
+# (o que estava em campo do outro lado). Corre para os teus e para os do
+# inimigo.
+# Ideias: o vencedor recuperar 10 de vida; contar na memoria quantos bichos
+# ja deitaste abaixo, e dizer o numero; o desmaiado despedir-se com uma frase.
+def ao_desmaiar(desmaiado, vencedor):
+    pass
+
+
+# QUANDO UM BICHO TEU SOBE DE NIVEL
+# bicho: o que acabou de subir. bicho["nivel"] ja e o nivel novo.
+# Ideias: ficar com a vida toda (bicho["vida"] = bicho["vida_max"]); ganhar
+# uma sopa; dizer uma frase de festa quando chega ao nivel 10.
+def ao_subir_de_nivel(bicho):
+    pass
+
+
+# QUANDO GANHAS UMA BATALHA
+# Corre quando o ultimo bicho do treinador desmaia, antes do ecra que diz
+# que ganhaste.
+# Ideias: um premio (o teu bicho em campo ganha 30 de experiencia a mais);
+# contar as vitorias na memoria e dizer quantas ja vao; o treinador dizer uma
+# frase de mau perdedor.
+def ao_ganhar_batalha():
+    pass
+
+
+# QUANDO SE CARREGA NUMA TECLA
+# tecla: a tecla em que se carregou. pygame.K_s e a tecla S, pygame.K_c a C.
+# So corre durante as batalhas. (As setas, Enter, Espaco, Esc e Backspace ja
+# fazem coisas no jogo.)
+# Ideias: a tecla S da mais uma sopa (batota!); a tecla C cura o teu bicho,
+# mas so uma vez por jogo (usa a memoria para te lembrares se ja foi usada).
+def ao_carregar_tecla(tecla):
+    pass
 
 
 # =====================================================================
@@ -370,6 +553,13 @@ def comecar_batalha():
 # seguinte. Quando a fila acaba, vemos quem desmaiou.
 # =====================================================================
 
+# QUE ATAQUE O INIMIGO ESCOLHE
+# Nao recebe nada, e devolve o NOME de um dos ataques do bicho inimigo que
+# esta em campo. Como esta: da pontos a cada ataque (os que magoam mais
+# valem mais, e curar vale muito quando ele tem pouca vida), junta-lhes
+# alguma sorte e escolhe o que ficou com mais pontos.
+# Ideias: escolher ao calhas, com random.choice(BICHOS[inimigo["nome"]]["ataques"]);
+# escolher sempre o que magoa mais, sem sorte nenhuma; curar-se mais cedo.
 def escolher_ataque_inimigo():
     inimigo = equipa_inimiga[ativo_inimigo]
     eu = minha_equipa[ativo_meu]
@@ -394,20 +584,33 @@ def escolher_ataque_inimigo():
     return melhor
 
 
+# QUEM ATACA PRIMEIRO
+# Corre quando os dois bichos vao atacar no mesmo turno. Recebe o teu bicho
+# e o do inimigo, e devolve "jogador" (o teu vai primeiro) ou "inimigo".
+# Como esta: vai primeiro o mais rapido; se forem iguais, e a sorte.
+# (Trocar de bicho e comer sopa vem sempre antes dos ataques.)
+# Ideias: ir primeiro o que tem menos vida; ser sempre ao calhas; o teu bicho
+# ir sempre primeiro no primeiro turno (conta os turnos na memoria).
+def quem_ataca_primeiro(eu, inimigo):
+    if eu["velocidade"] > inimigo["velocidade"]:
+        return "jogador"
+    if eu["velocidade"] < inimigo["velocidade"]:
+        return "inimigo"
+    if random.randint(0, 1) == 0:
+        return "jogador"
+    return "inimigo"
+
+
 def jogador_escolheu(acao_jogador):
     global fila_acoes
     acao_inimigo = {"quem": "inimigo", "tipo": "atacar", "ataque": escolher_ataque_inimigo()}
     eu = minha_equipa[ativo_meu]
     inimigo = equipa_inimiga[ativo_inimigo]
     # Trocar de bicho e comer sopa vem sempre antes dos ataques.
-    # Entre dois ataques, vai primeiro o mais rapido.
+    # Entre dois ataques, decide a regra quem_ataca_primeiro.
     if acao_jogador["tipo"] != "atacar":
         fila_acoes = [acao_jogador, acao_inimigo]
-    elif eu["velocidade"] > inimigo["velocidade"]:
-        fila_acoes = [acao_jogador, acao_inimigo]
-    elif eu["velocidade"] < inimigo["velocidade"]:
-        fila_acoes = [acao_inimigo, acao_jogador]
-    elif random.randint(0, 1) == 0:
+    elif quem_ataca_primeiro(eu, inimigo) == "jogador":
         fila_acoes = [acao_jogador, acao_inimigo]
     else:
         fila_acoes = [acao_inimigo, acao_jogador]
@@ -429,13 +632,15 @@ def mudar_modificador(bicho, chave, fator, nome_do_valor):
 def usar_ataque(atacante, alvo, nome):
     dados = ATAQUES[nome]
     mensagens.append(atacante["nome"] + " usa " + nome + "!")
+    if "som" in dados:
+        tocar_som(dados["som"])
     if random.randint(1, 100) > dados["precisao"]:
         mensagens.append("Mas falhou!")
         return
     efeito = dados["efeito"]
     if efeito == "dano":
         dano = calcular_dano(atacante, alvo, nome)
-        if random.randint(1, 16) == 1:
+        if golpe_critico(atacante, alvo):
             dano = int(dano * 1.5)
             mensagens.append("Golpe crítico!")
         alvo["vida"] = max(0, alvo["vida"] - dano)
@@ -445,6 +650,7 @@ def usar_ataque(atacante, alvo, nome):
             mensagens.append("É super eficaz!")
         if multiplicador < 1:
             mensagens.append("Não é muito eficaz...")
+        ao_acertar(atacante, alvo, dano)
     elif efeito == "cura":
         cura = atacante["vida_max"] * 40 // 100
         atacante["vida"] = min(atacante["vida_max"], atacante["vida"] + cura)
@@ -478,9 +684,11 @@ def executar(acao):
         atacante["mod_defesa"] = 1.0
         ativo_meu = acao["indice"]
         mensagens.append("Vai, " + minha_equipa[ativo_meu]["nome"] + "!")
+        som_do_bicho(minha_equipa[ativo_meu])
     elif acao["tipo"] == "entrar_inimigo":
         ativo_inimigo = acao["indice"]
         mensagens.append(treinador()["nome"] + " manda " + equipa_inimiga[ativo_inimigo]["nome"] + "!")
+        som_do_bicho(equipa_inimiga[ativo_inimigo])
     elif acao["tipo"] == "sopa":
         sopas = sopas - 1
         cura = atacante["vida_max"] // 2
@@ -499,6 +707,7 @@ def ganhar_xp(bicho, quanto):
         calcular_valores(bicho)
         bicho["vida"] = max(1, bicho["vida_max"] - perdida)
         mensagens.append(bicho["nome"] + " subiu para o nível " + str(bicho["nivel"]) + "!")
+        ao_subir_de_nivel(bicho)
 
 
 def fim_do_turno():
@@ -510,7 +719,10 @@ def fim_do_turno():
         if not inimigo["anunciado"]:
             inimigo["anunciado"] = True
             mensagens.append(inimigo["nome"] + " desmaiou!")
+            ao_desmaiar(inimigo, eu)
             ganhar_xp(eu, inimigo["nivel"] * 12)
+            if proximo_vivo(equipa_inimiga) == -1:
+                ao_ganhar_batalha()
             fase = "texto"
             return
         seguinte = proximo_vivo(equipa_inimiga)
@@ -528,6 +740,7 @@ def fim_do_turno():
         if not eu["anunciado"]:
             eu["anunciado"] = True
             mensagens.append(eu["nome"] + " desmaiou!")
+            ao_desmaiar(eu, inimigo)
             fase = "texto"
             return
         if proximo_vivo(minha_equipa) == -1:
@@ -627,6 +840,7 @@ def tecla_na_batalha(tecla):
                 troca_obrigatoria = False
                 ativo_meu = cursor
                 mensagens.append("Vai, " + escolhido["nome"] + "!")
+                som_do_bicho(escolhido)
                 fase = "texto"
             else:
                 jogador_escolheu({"quem": "jogador", "tipo": "trocar", "indice": cursor})
@@ -636,8 +850,33 @@ def tecla_na_batalha(tecla):
 #                          DESENHAR
 # =====================================================================
 
+# --- Os desenhos ---
+# As funcoes que se seguem desenham um bicho (o corpo e os olhos) e a barra
+# de vida. Desenha-se com formas do pygame, sempre no "ecra":
+#   pygame.draw.circle(ecra, cor, (x, y), raio)
+#   pygame.draw.ellipse(ecra, cor, (x, y, largura, altura))
+#   pygame.draw.rect(ecra, cor, (x, y, largura, altura))
+#   pygame.draw.line(ecra, cor, (x1, y1), (x2, y2), grossura)
+#   pygame.draw.polygon(ecra, cor, [(x1, y1), (x2, y2), (x3, y3)])
+# O x cresce para a direita e o y cresce para BAIXO. Uma cor sao tres
+# numeros (vermelho, verde, azul), de 0 a 255. O que se desenha depois fica
+# por cima do que se desenhou antes. escurecer(cor, 0.5) da a mesma cor, mais
+# escura.
+#   cx, cy       o centro do bicho, em pixeis
+#   tamanho      a largura (e a altura) do bicho. O mesmo bicho e desenhado
+#                grande na batalha e pequeno nos menus, por isso faz as
+#                contas com o tamanho (tamanho // 4) em vez de numeros fixos
+#   bicho["nome"], bicho["tipo"], bicho["vida"], bicho["vida_max"]
+#   BICHOS[bicho["nome"]]    a ficha dele, la em cima ("forma", "cor"...)
+
+# O BICHO INTEIRO
+# Faz o bicho respirar e tremer, e depois mostra a imagem dele ou, se nao
+# houver imagem, manda desenhar o corpo e os olhos.
+#   olha_para         1 se o bicho olha para a direita, -1 para a esquerda
+#   bicho["tremor"]   os frames que ainda treme depois de levar um golpe
+# Ideias: respirar mais depressa; saltar em vez de tremer; ficar mais
+# pequeno quando tem pouca vida.
 def desenhar_bicho(bicho, cx, cy, tamanho, olha_para):
-    # olha_para: 1 se o bicho olha para a direita, -1 para a esquerda.
     if bicho["vida_mostrada"] <= 0.5:
         return
     dados = BICHOS[bicho["nome"]]
@@ -657,6 +896,20 @@ def desenhar_bicho(bicho, cx, cy, tamanho, olha_para):
     # Pisca a branco nos primeiros frames depois de levar um golpe.
     if bicho["tremor"] > 0 and bicho["tremor"] % 6 < 3:
         cor = BRANCO
+    desenhar_corpo(bicho, cor, cx, cy, tamanho)
+    desenhar_olhos(bicho, cx, cy, tamanho, olha_para)
+
+
+# O CORPO DE UM BICHO
+# Desenha a forma que esta na ficha do bicho ("circulo", "quadrado",
+# "triangulo" ou "gota"), com um contorno mais escuro.
+#   cor      a cor com que se pinta (a do bicho, ou branco quando leva um golpe)
+#   corpo    um retangulo do tamanho do bicho: corpo.top e o cimo,
+#            corpo.bottom o fundo, corpo.left e corpo.right os lados
+# Ideias: uma forma nova (um "losango", para usares na ficha de um bicho);
+# uma crista ou um chapeu por cima do corpo; uma boca; riscas.
+def desenhar_corpo(bicho, cor, cx, cy, tamanho):
+    dados = BICHOS[bicho["nome"]]
     contorno = escurecer(dados["cor"], 0.55)
     corpo = pygame.Rect(0, 0, tamanho, tamanho)
     corpo.center = (cx, cy)
@@ -679,7 +932,13 @@ def desenhar_bicho(bicho, cx, cy, tamanho, olha_para):
         pygame.draw.polygon(ecra, cor, bico)
         pygame.draw.circle(ecra, contorno, centro_baixo, raio, 4)
 
-    # Os olhos: dois circulos brancos com a pupila virada para o outro bicho.
+
+# OS OLHOS DE UM BICHO
+# Dois circulos brancos, cada um com a pupila virada para o outro bicho.
+#   olha_para    1 se o bicho olha para a direita, -1 para a esquerda
+# Ideias: olhos maiores; olhos zangados quando tem pouca vida (uma linha por
+# cima de cada olho); um olho so, ao meio, como um ciclope.
+def desenhar_olhos(bicho, cx, cy, tamanho, olha_para):
     olho_y = cy + tamanho // 10
     raio_olho = tamanho // 9
     for lado in [-1, 1]:
@@ -688,6 +947,11 @@ def desenhar_bicho(bicho, cx, cy, tamanho, olha_para):
         pygame.draw.circle(ecra, PRETO, (olho_x + olha_para * raio_olho // 2, olho_y), raio_olho // 2)
 
 
+# A BARRA DE VIDA
+# x, y: o canto de cima, a esquerda. largura: o comprimento da barra cheia.
+# fracao vai de 0 (sem vida) a 1 (vida toda). A barra e verde, passa a
+# amarela abaixo de metade e a vermelha quando esta quase no fim.
+# Ideias: outras cores; uma barra mais grossa; piscar quando esta vermelha.
 def desenhar_barra_vida(bicho, x, y, largura):
     fracao = bicho["vida_mostrada"] / bicho["vida_max"]
     cor = VERDE
@@ -828,17 +1092,29 @@ def desenhar_escolha():
     mostrar_texto("Escolhe " + str(TAMANHO_EQUIPA) + " bichos", 30, 20, AMARELO, fonte)
     mostrar_texto("Enter escolhe · Backspace tira o último · o primeiro é o que entra primeiro", 30, 52, CINZA, fonte_pequena)
     colunas = 4
+    # So cabem duas filas de cartoes. Com mais bichos do que isso, mostram-se
+    # as duas filas onde anda o cursor.
+    filas = (len(nomes_dos_bichos) + colunas - 1) // colunas
+    primeira_fila = max(0, min(cursor_escolha // colunas, filas - 2))
+    if primeira_fila > 0:
+        pygame.draw.polygon(ecra, AMARELO, [(770, 62), (790, 62), (780, 50)])
+    if primeira_fila + 2 < filas:
+        pygame.draw.polygon(ecra, AMARELO, [(770, 426), (790, 426), (780, 438)])
     indice = 0
     for nome in nomes_dos_bichos:
+        fila = indice // colunas - primeira_fila
+        if fila < 0 or fila > 1:
+            indice = indice + 1
+            continue
         x = 30 + (indice % colunas) * 188
-        y = 85 + (indice // colunas) * 170
+        y = 85 + fila * 170
         cartao = pygame.Rect(x, y, 176, 158)
         cor_borda = CINZA
         if indice == cursor_escolha:
             cor_borda = AMARELO
         pygame.draw.rect(ecra, PAINEL, cartao, border_radius=12)
         pygame.draw.rect(ecra, cor_borda, cartao, 3, border_radius=12)
-        modelo = {"nome": nome, "vida_mostrada": 1, "tremor": 0}
+        modelo = criar_bicho(nome, NIVEL_INICIAL)
         desenhar_bicho(modelo, cartao.centerx, y + 60, 80, 1)
         mostrar_texto(nome, x + 10, y + 112, BRANCO, fonte_pequena)
         tipo = BICHOS[nome]["tipo"]
@@ -926,6 +1202,7 @@ while a_correr:
                 tecla_na_escolha(evento.key)
             elif estado == "batalha":
                 tecla_na_batalha(evento.key)
+                ao_carregar_tecla(evento.key)
             elif estado == "intervalo" and confirmar:
                 curar_tudo(minha_equipa)
                 indice_treinador = indice_treinador + 1
@@ -951,9 +1228,9 @@ while a_correr:
         mostrar_texto("BICHARADA", 230, 170, AMARELO, fonte_grande)
         mostrar_texto("A feira dos bichos mais portugueses do mundo", 160, 260, BRANCO, fonte)
         # Os dois primeiros bichos de BICHOS, sejam eles quais forem.
-        modelo = {"nome": nomes_dos_bichos[0], "vida_mostrada": 1, "tremor": 0}
+        modelo = criar_bicho(nomes_dos_bichos[0], NIVEL_INICIAL)
         desenhar_bicho(modelo, 300, 380, 90, 1)
-        modelo = {"nome": nomes_dos_bichos[1], "vida_mostrada": 1, "tremor": 0}
+        modelo = criar_bicho(nomes_dos_bichos[1], NIVEL_INICIAL)
         desenhar_bicho(modelo, 500, 380, 90, -1)
         mostrar_texto("Enter para começar", 290, 490, CINZA, fonte)
     elif estado == "escolha":
