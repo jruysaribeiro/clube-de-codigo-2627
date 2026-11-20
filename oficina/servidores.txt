@@ -13,10 +13,12 @@
 # http://nome-do-computador.local:11434
 # http://192.168.1.51:11434
 
+http://cicf-1.local:11434
 http://cicf-2.local:11434
 http://cicf-3.local:11434
 http://cicf-4.local:11434
 
-# O modelo e o que cada computador tiver instalado. Para obrigar a usar um:
-#
-# modelo = qwen2.5:7b
+# Sem a linha de baixo, o modelo e o que cada computador tiver instalado.
+# O cicf-1 tem varios, por isso diz-se aqui qual e, igual para todos:
+
+modelo = gpt-oss:20b
