@@ -16,10 +16,12 @@
 #   Espaco           mandar vir a proxima onda
 #   F                velocidade a dobrar        P   pausa
 #
-# Zero assets: tudo e desenhado com formas.
+# Zero assets: tudo e desenhado com formas. Se puseres um PNG com o nome
+# que esta em "imagem" na pasta comum/assets/imagens/, aparece a imagem.
 
 import math
 import random
+from pathlib import Path
 
 import pygame
 
@@ -29,6 +31,8 @@ ALTURA = 600
 FPS = 60                 # o jogo da 60 passos por segundo (60 frames = 1 segundo)
 TILE = 40                # cada letra do MAPA e um quadrado de 40x40 pixeis
 TOPO = 40                # altura da barra de cima (ouro, vidas, onda)
+
+PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 
 # =====================================================================
 #                 AFINAR O JOGO: MUDA UM NUMERO, JOGA, VE
@@ -142,6 +146,8 @@ MAPA = [
 #                         0.1 quase os para, 1.0 nao abranda nada)
 #             "golpe"     acerta logo, sem projetil (curto alcance)
 # cor:        (vermelho, verde, azul), cada um de 0 a 255
+# imagem:     o nome de um PNG. Se ele existir em comum/assets/imagens/,
+#             a torre aparece com essa imagem; se nao, fica a forma.
 #
 # Para inventar uma torre: copia um bloco { ... }, cola por baixo, muda o
 # nome, a tecla e os numeros. So cabem 4 botoes na barra de baixo.
@@ -149,22 +155,22 @@ TORRES = [
     {
         "nome": "Besteiro", "tecla": pygame.K_1, "custo": 50,
         "alcance": 120, "dano": 7, "cadencia": 35, "efeito": "tiro",
-        "cor": (70, 110, 200),
+        "cor": (70, 110, 200), "imagem": "besteiro.png",
     },
     {
         "nome": "Trabuco", "tecla": pygame.K_2, "custo": 100,
         "alcance": 170, "dano": 22, "cadencia": 100, "efeito": "explosao",
-        "raio_explosao": 55, "cor": (140, 100, 70),
+        "raio_explosao": 55, "cor": (140, 100, 70), "imagem": "trabuco.png",
     },
     {
         "nome": "Caldeirão", "tecla": pygame.K_3, "custo": 75,
         "alcance": 75, "dano": 2, "cadencia": 45, "efeito": "area",
-        "lentidao": 0.45, "cor": (220, 170, 40),
+        "lentidao": 0.45, "cor": (220, 170, 40), "imagem": "caldeirao.png",
     },
     {
         "nome": "Padeira", "tecla": pygame.K_4, "custo": 130,
         "alcance": 65, "dano": 30, "cadencia": 60, "efeito": "golpe",
-        "cor": (230, 220, 200),
+        "cor": (230, 220, 200), "imagem": "padeira.png",
     },
 ]
 
@@ -177,15 +183,21 @@ TORRES = [
 # estrago:    vidas que tiram se chegarem ao castelo
 # tamanho:    o tamanho do desenho, em pixeis (nao muda a dificuldade)
 # forma:      "circulo" ou "quadrado"
+# imagem:     o nome de um PNG. Se ele existir em comum/assets/imagens/,
+#             o inimigo aparece com essa imagem; se nao, fica a forma.
 INIMIGOS = {
     "Soldado": {"vida": 40, "velocidade": 1.2, "recompensa": 5, "estrago": 1,
-                "tamanho": 16, "cor": (200, 60, 60), "forma": "circulo"},
+                "tamanho": 16, "cor": (200, 60, 60), "forma": "circulo",
+                "imagem": "soldado.png"},
     "Cavaleiro": {"vida": 35, "velocidade": 2.4, "recompensa": 7, "estrago": 1,
-                  "tamanho": 18, "cor": (230, 140, 60), "forma": "circulo"},
+                  "tamanho": 18, "cor": (230, 140, 60), "forma": "circulo",
+                  "imagem": "cavaleiro.png"},
     "Aríete": {"vida": 220, "velocidade": 0.6, "recompensa": 20, "estrago": 3,
-               "tamanho": 26, "cor": (110, 75, 45), "forma": "quadrado"},
+               "tamanho": 26, "cor": (110, 75, 45), "forma": "quadrado",
+               "imagem": "ariete.png"},
     "General": {"vida": 1500, "velocidade": 0.7, "recompensa": 100, "estrago": 10,
-                "tamanho": 32, "cor": (120, 40, 140), "forma": "quadrado"},
+                "tamanho": 32, "cor": (120, 40, 140), "forma": "quadrado",
+                "imagem": "general.png"},
 }
 
 # --- As ondas ---
@@ -229,6 +241,24 @@ clock = pygame.time.Clock()
 fonte_pequena = pygame.font.SysFont(None, 22)
 fonte = pygame.font.SysFont(None, 30)
 fonte_grande = pygame.font.SysFont(None, 80)
+
+# Guardamos aqui as imagens ja carregadas, para nao ler o disco 60 vezes
+# por segundo. None quer dizer "procurei e nao ha".
+imagens_carregadas = {}
+
+
+def obter_imagem(nome_ficheiro, tamanho):
+    # Devolve a imagem ja do tamanho pedido, ou None se o ficheiro nao existir.
+    tamanho = max(1, int(tamanho))
+    chave = nome_ficheiro + str(tamanho)
+    if chave not in imagens_carregadas:
+        caminho = PASTA_ASSETS / "imagens" / nome_ficheiro
+        if caminho.is_file():
+            imagem = pygame.image.load(caminho).convert_alpha()
+            imagens_carregadas[chave] = pygame.transform.scale(imagem, (tamanho, tamanho))
+        else:
+            imagens_carregadas[chave] = None
+    return imagens_carregadas[chave]
 
 # Uma folha transparente, do tamanho do ecra, para desenhar os alcances
 # meio a ver-se. O pygame.draw normal nao sabe fazer transparencias.
@@ -667,15 +697,21 @@ def desenhar_torre(torre):
     modelo = TORRES[torre["tipo"]]
     base = pygame.Rect(0, 0, TILE - 6, TILE - 6)
     base.center = (torre["x"], torre["y"])
-    pygame.draw.rect(ecra, escurecer(modelo["cor"], 0.5), base, border_radius=6)
-    pygame.draw.circle(ecra, modelo["cor"], base.center, 13)
-    # O "cano" aponta para o ultimo alvo.
-    dx = torre["mira"][0] - torre["x"]
-    dy = torre["mira"][1] - torre["y"]
-    tamanho = math.hypot(dx, dy)
-    if tamanho > 0:
-        ponta = (torre["x"] + dx / tamanho * 18, torre["y"] + dy / tamanho * 18)
-        pygame.draw.line(ecra, escurecer(modelo["cor"], 0.4), base.center, ponta, 5)
+    imagem = None
+    if "imagem" in modelo:
+        imagem = obter_imagem(modelo["imagem"], base.width)
+    if imagem is not None:
+        ecra.blit(imagem, base)
+    else:
+        pygame.draw.rect(ecra, escurecer(modelo["cor"], 0.5), base, border_radius=6)
+        pygame.draw.circle(ecra, modelo["cor"], base.center, 13)
+        # O "cano" aponta para o ultimo alvo.
+        dx = torre["mira"][0] - torre["x"]
+        dy = torre["mira"][1] - torre["y"]
+        tamanho = math.hypot(dx, dy)
+        if tamanho > 0:
+            ponta = (torre["x"] + dx / tamanho * 18, torre["y"] + dy / tamanho * 18)
+            pygame.draw.line(ecra, escurecer(modelo["cor"], 0.4), base.center, ponta, 5)
     # Um pontinho amarelo por cada nivel.
     pontinho = 0
     while pontinho < torre["nivel"]:
@@ -691,7 +727,12 @@ def desenhar_inimigo(inimigo):
     cor = dados["cor"]
     if inimigo["lento"] > 0:
         cor = (cor[0] // 2 + 100, cor[1] // 2 + 90, cor[2] // 2 + 20)
-    if dados["forma"] == "quadrado":
+    imagem = None
+    if "imagem" in dados:
+        imagem = obter_imagem(dados["imagem"], tamanho)
+    if imagem is not None:
+        ecra.blit(imagem, imagem.get_rect(center=(x, y)))
+    elif dados["forma"] == "quadrado":
         corpo = pygame.Rect(0, 0, tamanho, tamanho)
         corpo.center = (x, y)
         pygame.draw.rect(ecra, cor, corpo, border_radius=4)

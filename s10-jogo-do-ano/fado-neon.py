@@ -6,7 +6,8 @@
 # Este ficheiro leu isso e decidiu ignorar.
 #
 # Zero assets: o som, a musica, os graficos e a saudade sao todos gerados
-# por codigo. So precisa de pygame-ce.
+# por codigo. So precisa de pygame-ce. (Se puseres um PNG com o nome que
+# esta em "imagem" na pasta comum/assets/imagens/, o inimigo fica com ele.)
 #
 # Joga-se so com o teclado (o rato tambem funciona, se quiseres):
 #   WASD                mover               Setas           disparar nessa direcao
@@ -21,6 +22,7 @@
 import array
 import math
 import random
+from pathlib import Path
 
 import pygame
 from pygame import Vector2
@@ -42,6 +44,8 @@ VERDE = (80, 255, 160)
 VERMELHO = (255, 60, 80)
 LARANJA = (255, 140, 50)
 CINZENTO = (120, 115, 150)
+
+PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 
 # ======================================================================
 #  AFINAR O JOGO: MUDA UM NUMERO, JOGA, VE
@@ -145,19 +149,21 @@ VIDA_CHEFE = 1100
 # custo:       quanto gasta do orcamento da onda (ver ORCAMENTO_BASE)
 # desde_onda:  a primeira onda em que pode aparecer. None = nunca aparece
 #              sozinho (o "pequeno" so nasce quando um divisor rebenta)
+# imagem:      o nome de um PNG. Se ele existir em comum/assets/imagens/,
+#              o inimigo aparece com essa imagem; se nao, fica a forma.
 # O comportamento (o corredor corre para ti, o atirador dispara...) esta
 # na funcao atualizar() da classe Inimigo, e depende do nome.
 PERFIS = {
     "corredor": {"raio": 12, "vida": 20, "velocidade": 150, "cor": ROSA, "lados": 3,
-                 "pontos": 10, "custo": 1, "desde_onda": 1},
+                 "pontos": 10, "custo": 1, "desde_onda": 1, "imagem": "corredor.png"},
     "atirador": {"raio": 15, "vida": 34, "velocidade": 90, "cor": LARANJA, "lados": 4,
-                 "pontos": 20, "custo": 2, "desde_onda": 2},
+                 "pontos": 20, "custo": 2, "desde_onda": 2, "imagem": "atirador.png"},
     "divisor": {"raio": 24, "vida": 60, "velocidade": 60, "cor": VERDE, "lados": 6,
-                "pontos": 25, "custo": 3, "desde_onda": 3},
+                "pontos": 25, "custo": 3, "desde_onda": 3, "imagem": "divisor.png"},
     "pequeno": {"raio": 12, "vida": 16, "velocidade": 125, "cor": VERDE, "lados": 6,
-                "pontos": 8, "custo": 0, "desde_onda": None},
+                "pontos": 8, "custo": 0, "desde_onda": None, "imagem": "pequeno.png"},
     "investida": {"raio": 14, "vida": 40, "velocidade": 70, "cor": ROXO, "lados": 4,
-                  "pontos": 25, "custo": 2, "desde_onda": 4},
+                  "pontos": 25, "custo": 2, "desde_onda": 4, "imagem": "investida.png"},
 }
 
 # ======================================================================
@@ -413,6 +419,25 @@ def escrever_glitch(surf, texto, tamanho, pos, forca):
         surf.blit(canal, r.move(dx, dy), special_flags=pygame.BLEND_ADD)
 
 
+# Guardamos aqui as imagens ja carregadas, para nao ler o disco 60 vezes
+# por segundo. None quer dizer "procurei e nao ha".
+imagens_carregadas = {}
+
+
+def obter_imagem(nome_ficheiro, tamanho):
+    # Devolve a imagem ja do tamanho pedido, ou None se o ficheiro nao existir.
+    tamanho = max(1, int(tamanho))
+    chave = nome_ficheiro + str(tamanho)
+    if chave not in imagens_carregadas:
+        caminho = PASTA_ASSETS / "imagens" / nome_ficheiro
+        if caminho.is_file():
+            imagem = pygame.image.load(caminho).convert_alpha()
+            imagens_carregadas[chave] = pygame.transform.smoothscale(imagem, (tamanho, tamanho))
+        else:
+            imagens_carregadas[chave] = None
+    return imagens_carregadas[chave]
+
+
 def poligono(centro, raio, lados, angulo):
     return [(centro[0] + math.cos(angulo + k * TAU / lados) * raio,
              centro[1] + math.sin(angulo + k * TAU / lados) * raio) for k in range(lados)]
@@ -625,6 +650,7 @@ class Inimigo:
         self.cor = perfil["cor"]
         self.lados = perfil["lados"]
         self.valor = perfil["pontos"]
+        self.imagem = perfil.get("imagem")  # pode nao haver: fica a forma
         self.ang = random.uniform(0, TAU)
         self.t = random.uniform(0, 5)
         self.flash = 0.0
@@ -701,6 +727,16 @@ class Inimigo:
             pygame.draw.circle(surf, AMARELO, p, (0.35 - self.cd_tiro) * 22, 2)
         lados = self.lados
         raio = self.raio * escala
+        imagem = None
+        if self.imagem:
+            imagem = obter_imagem(self.imagem, self.raio * 2)
+        if imagem is not None:
+            # A imagem fica direita (nao roda) e do tamanho do inimigo. Quando
+            # leva um tiro, em vez de ficar branca ganha um anel branco.
+            surf.blit(imagem, imagem.get_rect(center=p))
+            if self.flash > 0:
+                pygame.draw.circle(surf, BRANCO, p, raio + 2, 2)
+            return
         if self.tipo == "investida":
             pts = poligono(p, raio, 4, self.ang)
             pts[0] = (p.x + math.cos(self.ang) * raio * 1.6, p.y + math.sin(self.ang) * raio * 1.6)

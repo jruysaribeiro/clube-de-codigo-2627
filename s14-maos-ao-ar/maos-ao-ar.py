@@ -29,6 +29,8 @@
 # COMO E QUE ISTO FICA TEU:
 #   Mexe SO na primeira parte do ficheiro, a que diz "MEXE SÓ AQUI".
 #   Os niveis sao desenhados com letras: mudar uma letra muda o nivel.
+#   Tudo e desenhado com formas. Se puseres um PNG com o nome que esta em
+#   "imagem" na pasta comum/assets/imagens/, aparece a imagem.
 # =====================================================================
 
 
@@ -103,8 +105,13 @@ VERDE = (90, 205, 110)
 AZUL = (80, 160, 240)
 LARANJA = (245, 140, 50)
 
+# O Faisca. Se houver um PNG com este nome em comum/assets/imagens/, ele
+# aparece com essa imagem (desenhada a olhar para a direita); se nao houver,
+# e o robot de sempre, com estas duas cores.
+IMAGEM_DO_HEROI = "faisca.png"
 COR_HEROI = (70, 190, 230)
 COR_HEROI_ESCURA = (40, 110, 160)
+
 COR_TIRO = (255, 240, 120)
 COR_MOEDA = (250, 205, 60)
 COR_MADEIRA = (170, 120, 70)
@@ -143,22 +150,32 @@ MUNDOS = [
 #                "carregar"  anda devagar, mas se te ve corre contra ti
 #                "canhao"    nao sai do sitio e dispara bolas
 #                "chefe"     o Rei Sucata
+#   imagem:      o nome de um PNG. Se ele existir em comum/assets/imagens/,
+#                o inimigo aparece com essa imagem (desenhada a olhar para
+#                a direita); se nao, fica o desenho de sempre.
 # ---------------------------------------------------------------------
 INIMIGOS = {
     "a": {"nome": "Lesma", "vida": 1, "velocidade": 1.0, "pisavel": True,
-          "jeito": "andar", "largura": 38, "altura": 28, "cor": (150, 210, 90)},
+          "jeito": "andar", "largura": 38, "altura": 28, "cor": (150, 210, 90),
+          "imagem": "lesma.png"},
     "s": {"nome": "Sapo", "vida": 1, "velocidade": 2.4, "pisavel": True,
-          "jeito": "saltar", "largura": 36, "altura": 30, "cor": (60, 170, 110)},
+          "jeito": "saltar", "largura": 36, "altura": 30, "cor": (60, 170, 110),
+          "imagem": "sapo.png"},
     "m": {"nome": "Morcego", "vida": 1, "velocidade": 0.022, "pisavel": True,
-          "jeito": "voar", "largura": 40, "altura": 26, "cor": (150, 90, 190)},
+          "jeito": "voar", "largura": 40, "altura": 26, "cor": (150, 90, 190),
+          "imagem": "morcego.png"},
     "e": {"nome": "Ouriço", "vida": 2, "velocidade": 1.3, "pisavel": False,
-          "jeito": "andar", "largura": 40, "altura": 32, "cor": (200, 120, 70)},
+          "jeito": "andar", "largura": 40, "altura": 32, "cor": (200, 120, 70),
+          "imagem": "ourico.png"},
     "j": {"nome": "Javali", "vida": 2, "velocidade": 1.0, "pisavel": True,
-          "jeito": "carregar", "largura": 46, "altura": 36, "cor": (120, 85, 70)},
+          "jeito": "carregar", "largura": 46, "altura": 36, "cor": (120, 85, 70),
+          "imagem": "javali.png"},
     "t": {"nome": "Canhão", "vida": 3, "velocidade": 4.0, "pisavel": False,
-          "jeito": "canhao", "largura": 40, "altura": 40, "cor": (90, 95, 110)},
+          "jeito": "canhao", "largura": 40, "altura": 40, "cor": (90, 95, 110),
+          "imagem": "canhao.png"},
     "X": {"nome": "Rei Sucata", "vida": 24, "velocidade": 1.6, "pisavel": True,
-          "jeito": "chefe", "largura": 84, "altura": 84, "cor": (190, 70, 90)},
+          "jeito": "chefe", "largura": 84, "altura": 84, "cor": (190, 70, 90),
+          "imagem": "rei-sucata.png"},
 }
 
 
@@ -557,6 +574,12 @@ import sysconfig
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
 
+# Ha quem corra este jogo sem camara de proposito: a Oficina (pasta oficina/)
+# mostra-o numa pagina e joga-se la com o teclado. Para isso, quem o lanca
+# poe esta variavel de ambiente a "1". Assim o jogo nao instala nada, nao
+# vai buscar o modelo das maos e nunca liga a camara.
+SO_TECLADO = os.environ.get("MAOS_AO_AR_SO_TECLADO") == "1"
+
 # (nome para o import, nome para o pip)
 # O mediapipe traz consigo o numpy e o opencv: quando falta ele, basta
 # pedir esse.
@@ -700,7 +723,8 @@ def preparar_dependencias():
     print()
 
 
-preparar_dependencias()
+if not SO_TECLADO:
+    preparar_dependencias()
 
 import array
 import math
@@ -713,17 +737,19 @@ import urllib.request
 
 import pygame
 
-avisos_guardados = calar_avisos()
-try:
-    import cv2
-    import numpy
-    import mediapipe
-    from mediapipe.tasks import python as mp_tarefas
-    from mediapipe.tasks.python import vision as mp_visao
-    HA_BIBLIOTECAS_DA_CAMARA = True
-except Exception:
-    HA_BIBLIOTECAS_DA_CAMARA = False
-repor_avisos(avisos_guardados)
+HA_BIBLIOTECAS_DA_CAMARA = False
+if not SO_TECLADO:
+    avisos_guardados = calar_avisos()
+    try:
+        import cv2
+        import numpy
+        import mediapipe
+        from mediapipe.tasks import python as mp_tarefas
+        from mediapipe.tasks.python import vision as mp_visao
+        HA_BIBLIOTECAS_DA_CAMARA = True
+    except Exception:
+        HA_BIBLIOTECAS_DA_CAMARA = False
+    repor_avisos(avisos_guardados)
 
 
 def descarregar(url, destino):
@@ -1888,6 +1914,31 @@ def avisar(texto):
 # =====================================================================
 # H. DESENHAR O JOGO
 # =====================================================================
+PASTA_IMAGENS = os.path.join(os.path.dirname(PASTA), "comum", "assets", "imagens")
+
+# Guardamos aqui as imagens ja carregadas, para nao ler o disco 60 vezes
+# por segundo. None quer dizer "procurei e nao ha".
+imagens_carregadas = {}
+
+
+def obter_imagem(nome_ficheiro, largura, altura):
+    # Devolve a imagem ja do tamanho pedido, ou None se o ficheiro nao existir.
+    nome_ficheiro = str(nome_ficheiro)
+    largura = max(1, int(largura))
+    altura = max(1, int(altura))
+    chave = nome_ficheiro + " " + str(largura) + "x" + str(altura)
+    if chave not in imagens_carregadas:
+        imagens_carregadas[chave] = None
+        caminho = os.path.join(PASTA_IMAGENS, nome_ficheiro)
+        if os.path.isfile(caminho):
+            try:
+                imagem = pygame.image.load(caminho).convert_alpha()
+                imagens_carregadas[chave] = pygame.transform.scale(imagem, (largura, altura))
+            except pygame.error:
+                pass            # o ficheiro nao e uma imagem: fica o desenho
+    return imagens_carregadas[chave]
+
+
 def desenhar_fundo(camara_x):
     ecra = janela["ecra"]
     mundo = nivel["mundo"]
@@ -2059,6 +2110,20 @@ def desenhar_inimigo(inimigo, camara_x):
     t = inimigo["t"]
     frente = x + l // 2 + d * (l // 2 - 8)      # o x da cara
 
+    # Se houver uma imagem para este inimigo, e ela que aparece. As imagens
+    # estao a olhar para a direita: vira-se quando ele vai para a esquerda.
+    imagem = None
+    if "imagem" in tipo:
+        imagem = obter_imagem(tipo["imagem"], l, a)
+    if imagem is not None:
+        if d < 0:
+            imagem = pygame.transform.flip(imagem, True, False)
+        ecra.blit(imagem, (x, y))
+        if inimigo["pisca"] > 0:
+            # levou um tiro: uma moldura branca, ja que a imagem nao muda de cor
+            pygame.draw.rect(ecra, BRANCO, (x, y, l, a), 3, border_radius=6)
+        return
+
     if letra == "a":            # lesma
         pygame.draw.ellipse(ecra, cor, (x, y + 12, l, a - 12))
         pygame.draw.circle(ecra, (220, 170, 90), (x + l // 2 - d * 6, y + 12), 11)
@@ -2141,6 +2206,17 @@ def desenhar_heroi(camara_x):
     x = int(heroi["x"] - camara_x)
     y = int(heroi["y"])
     v = heroi["virado"]
+
+    # Com imagem: desenha-se a imagem (virada para onde ele anda) e o
+    # clarao do tiro, e mais nada.
+    imagem = obter_imagem(IMAGEM_DO_HEROI, LARGURA_HEROI, ALTURA_HEROI)
+    if imagem is not None:
+        if v < 0:
+            imagem = pygame.transform.flip(imagem, True, False)
+        ecra.blit(imagem, (x, y))
+        if heroi["recuo"] > 0:
+            pygame.draw.circle(ecra, COR_TIRO, (x + 15 + v * 24, y + 23), heroi["recuo"])
+        return
 
     # pernas
     perna = 0
@@ -2565,7 +2641,7 @@ def main():
     escrever("A ligar a câmara...", "g", BRANCO, LARGURA // 2, ALTURA // 2 - 30, "centro")
     pygame.display.flip()
     pygame.event.pump()
-    if USAR_CAMARA:
+    if USAR_CAMARA and not SO_TECLADO:
         if sys.platform == "darwin":
             escrever("Se o Mac perguntar, autoriza o Terminal a usar a câmara.", "m", AMARELO,
                      LARGURA // 2, ALTURA // 2 + 40, "centro")

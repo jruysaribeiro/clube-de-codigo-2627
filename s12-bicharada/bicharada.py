@@ -950,9 +950,10 @@ while a_correr:
         ecra.fill(PRETO)
         mostrar_texto("BICHARADA", 230, 170, AMARELO, fonte_grande)
         mostrar_texto("A feira dos bichos mais portugueses do mundo", 160, 260, BRANCO, fonte)
-        modelo = {"nome": "Galo de Barcelos", "vida_mostrada": 1, "tremor": 0}
+        # Os dois primeiros bichos de BICHOS, sejam eles quais forem.
+        modelo = {"nome": nomes_dos_bichos[0], "vida_mostrada": 1, "tremor": 0}
         desenhar_bicho(modelo, 300, 380, 90, 1)
-        modelo = {"nome": "Sardinhão", "vida_mostrada": 1, "tremor": 0}
+        modelo = {"nome": nomes_dos_bichos[1], "vida_mostrada": 1, "tremor": 0}
         desenhar_bicho(modelo, 500, 380, 90, -1)
         mostrar_texto("Enter para começar", 290, 490, CINZA, fonte)
     elif estado == "escolha":
