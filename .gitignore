@@ -21,3 +21,7 @@ Thumbs.db
 oficina/.originais/
 *.py.anterior
 *.py.novo
+
+# As imagens que as criancas escolhem na Oficina ficam so no computador delas
+comum/assets/imagens/*.png
+comum/assets/imagens/*.novo

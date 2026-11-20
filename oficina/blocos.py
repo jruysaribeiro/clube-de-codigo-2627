@@ -46,6 +46,22 @@ def entradas(no):
     return partes
 
 
+def valor_da_entrada(no, indice):
+    # O que esta escrito na entrada numero "indice" (a contar do 0) de uma
+    # lista [...] ou de um dicionario {...}: num dicionario e o valor, nao a
+    # chave. Devolve None se nao houver.
+    valor = no.value
+    if isinstance(valor, ast.Dict):
+        valores = valor.values
+    elif isinstance(valor, ast.List):
+        valores = valor.elts
+    else:
+        return None
+    if 0 <= indice < len(valores):
+        return valores[indice]
+    return None
+
+
 def texto_constante(no):
     if isinstance(no, ast.Constant) and isinstance(no.value, str):
         return no.value
@@ -96,6 +112,18 @@ def tirar_margem(linhas, margem):
 
 def por_margem(linhas, margem):
     return [margem + linha if linha.strip() != "" else "" for linha in linhas]
+
+
+def nomes_dados(arvore):
+    # Os nomes a que o ficheiro da um valor encostado a margem: "MAPA = ...",
+    # "VIDAS = 3". Serve para dar por uma linha dessas que foi apagada.
+    nomes = []
+    for no in arvore.body:
+        if isinstance(no, ast.Assign):
+            for alvo in no.targets:
+                if isinstance(alvo, ast.Name) and alvo.id not in nomes:
+                    nomes.append(alvo.id)
+    return nomes
 
 
 def nos_da_regiao(arvore, inicio, fim):

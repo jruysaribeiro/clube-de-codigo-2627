@@ -72,6 +72,18 @@
   summary { padding: 9px 14px; cursor: pointer; color: var(--amarelo); font-size: 15px; }
   #ajuda { margin: 0; padding: 0 14px 12px; max-height: 30vh; overflow: auto; white-space: pre; color: #cfcfe0; font: 12.5px/1.5 var(--letra-codigo); }
 
+  /* ---------- a imagem do bocado ---------- */
+  #barra-imagem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); font-size: 14px; }
+  #barra-imagem button { font-size: 14px; }
+  #miniatura {
+    width: 40px; height: 40px; flex: none; border: 1px solid var(--linha); border-radius: 6px;
+    image-rendering: pixelated; object-fit: contain;
+    background: repeating-conic-gradient(#2c2c44 0% 25%, #1e1e30 0% 50%) 50% / 12px 12px;
+  }
+  #texto-imagem { flex: 1; min-width: 150px; color: var(--fraco); }
+  #texto-imagem b { color: var(--texto); font-weight: 600; font-family: var(--letra-codigo); }
+  #texto-imagem.mal { color: var(--laranja); }
+
   .caixa { flex: 1; min-height: 140px; display: flex; background: #10101a; overflow: hidden; }
   #numeros {
     margin: 0; padding: 12px 8px 12px 12px; text-align: right; color: #565672; user-select: none;
@@ -120,6 +132,12 @@
   #conversa .falhou { color: var(--laranja); }
   #conversa code, #conversa pre { font: 14px/1.45 var(--letra-codigo); color: var(--amarelo); }
   #conversa pre { margin: 6px 0; padding: 8px 10px; background: var(--painel); border-radius: 6px; overflow: auto; white-space: pre; }
+  #conversa pre.proposta { border: 1px solid var(--linha); color: #cfcfe0; }
+  #conversa pre.proposta span { display: block; min-width: max-content; }
+  #conversa pre.proposta .nova { color: var(--amarelo); background: rgba(240, 200, 70, .13); box-shadow: inset 3px 0 var(--amarelo); margin: 0 -10px; padding: 0 10px; }
+  #conversa .aplicar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 4px; font-size: 13px; color: var(--fraco); white-space: normal; }
+  #conversa .aplicar button { font-size: 14px; border-color: var(--amarelo); color: var(--amarelo); }
+  #conversa .aplicar .desfazer { border-color: var(--linha); color: var(--texto); }
   .atalhos { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 14px 0; }
   .atalhos button { font-size: 14px; border-radius: 999px; }
   #perguntar { display: flex; gap: 8px; padding: 8px 14px 10px; }
@@ -156,6 +174,12 @@
     <summary>O que quer dizer cada coisa</summary>
     <pre id="ajuda"></pre>
   </details>
+  <div id="barra-imagem" hidden>
+    <img id="miniatura" alt="" hidden>
+    <span id="texto-imagem"></span>
+    <button type="button" id="por-imagem">Escolher uma imagem</button>
+    <button type="button" id="tirar-imagem" hidden>Tirar a imagem</button>
+  </div>
   <div class="caixa">
     <pre id="numeros" aria-hidden="true"></pre>
     <div class="folhas">
@@ -166,10 +190,10 @@
   <div id="estado" class="espera" role="status"></div>
   <div id="fala" hidden></div>
   <div id="ajudante" hidden>
-    <p class="nota">O ajudante é um programa: às vezes engana-se. Experimenta sempre no jogo.</p>
+    <p class="nota">O ajudante é um programa: às vezes engana-se. Lê o que ele muda e experimenta no jogo.</p>
     <div id="conversa" aria-live="polite"></div>
     <div class="atalhos">
-      <button type="button" id="atalho-erro" hidden>Porque é que dá erro?</button>
+      <button type="button" id="atalho-erro" hidden>Corrige-me este erro</button>
       <button type="button" id="atalho-explica">O que faz este código?</button>
     </div>
     <form id="perguntar">
@@ -188,6 +212,7 @@
 </main>
 
 <input type="file" id="escolher-ficheiro" accept=".py,text/x-python,text/plain" hidden>
+<input type="file" id="escolher-imagem" accept="image/*" hidden>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -319,6 +344,8 @@ async function abrir(jogo, escolha) {
   $("fala").textContent = "";
   $("reabrir").hidden = true;
   limparConversa();
+  imagemAVista = undefined;
+  mostrarImagem(dados.imagem);
   codigo.value = dados.codigo;
   codigo.setSelectionRange(0, 0);     // senao o Safari abre o codigo ja puxado para a direita
   linhaMal = null;
@@ -397,6 +424,7 @@ async function verEstado() {
     }
   }
   $("reabrir").hidden = estado.viva;
+  mostrarImagem(estado.imagem);
 }
 
 /* ---------------- o jogo, dentro da pagina ---------------- */
@@ -588,6 +616,85 @@ codigo.addEventListener("keydown", evento => {
   }
 });
 
+/* ---------------- a imagem do bocado ---------------- */
+// Ha coisas que no codigo dizem "imagem": "soldado.png". Aqui escolhe-se a
+// imagem que fica com esse nome: o jogo passa a desenha-la em vez da forma.
+
+const LADO_DA_IMAGEM = 256;     // as imagens vao sempre quadradas e pequenas
+let imagemAVista;               // o que a barra mostra agora, para nao a redesenhar sem precisar
+
+function mostrarImagem(imagem) {
+  const chave = JSON.stringify(imagem || null);
+  if (chave === imagemAVista) return;
+  imagemAVista = chave;
+  const barra = $("barra-imagem");
+  barra.hidden = !imagem;
+  if (!imagem) return;
+  const texto = $("texto-imagem");
+  texto.className = imagem.erro ? "mal" : "";
+  texto.textContent = "";
+  if (imagem.erro) {
+    texto.textContent = imagem.erro;
+  } else if (imagem.ha) {
+    texto.append("O jogo está a usar a imagem ", elemento("b", imagem.nome), ".");
+  } else {
+    texto.append("Sem imagem: o jogo desenha a forma. A que escolheres fica como ", elemento("b", imagem.nome), ".");
+  }
+  $("miniatura").hidden = !imagem.ha;
+  if (imagem.ha) $("miniatura").src = "/api/imagem?v=" + imagem.versao;
+  $("por-imagem").hidden = Boolean(imagem.erro);
+  $("por-imagem").textContent = imagem.ha ? "Trocar a imagem" : "Escolher uma imagem";
+  $("tirar-imagem").hidden = !imagem.ha;
+}
+
+async function encolher(ficheiro) {
+  // Qualquer imagem (PNG, JPG, uma fotografia do telemovel) passa a um PNG
+  // quadrado e pequeno, com a imagem inteira ao centro e o resto transparente.
+  const original = await createImageBitmap(ficheiro);
+  const lado = Math.max(1, Math.min(LADO_DA_IMAGEM, Math.max(original.width, original.height)));
+  const escala = lado / Math.max(original.width, original.height);
+  const largura = Math.max(1, Math.round(original.width * escala));
+  const altura = Math.max(1, Math.round(original.height * escala));
+  const tela = document.createElement("canvas");
+  tela.width = lado;
+  tela.height = lado;
+  const pincel = tela.getContext("2d");
+  pincel.imageSmoothingEnabled = escala < 1;      // pixel art pequena fica como esta
+  pincel.drawImage(original, Math.round((lado - largura) / 2), Math.round((lado - altura) / 2), largura, altura);
+  original.close();
+  return tela.toDataURL("image/png").split(",")[1];
+}
+
+$("por-imagem").onclick = () => {
+  const entrada = $("escolher-imagem");
+  entrada.value = "";
+  entrada.click();
+};
+$("escolher-imagem").onchange = async () => {
+  const ficheiro = $("escolher-imagem").files[0];
+  if (!ficheiro) return;
+  let dados;
+  try {
+    dados = await encolher(ficheiro);
+  } catch (erro) {
+    alert("Não consegui abrir esse ficheiro como imagem. Experimenta um PNG ou um JPG.");
+    return;
+  }
+  try {
+    mostrarImagem((await pedir("/api/imagem", {dados})).imagem);
+  } catch (erro) {
+    alert(erro.message);
+  }
+};
+$("tirar-imagem").onclick = async () => {
+  if (!confirm("Tirar a imagem?\n\nO jogo volta a desenhar a forma. O ficheiro da imagem é apagado.")) return;
+  try {
+    mostrarImagem((await pedir("/api/tirar-imagem", {})).imagem);
+  } catch (erro) {
+    alert(erro.message);
+  }
+};
+
 /* ---------------- o ajudante ---------------- */
 // As perguntas vao para a Oficina, que as leva a um computador da sala com
 // um modelo de linguagem. Com cada pergunta segue o codigo como esta agora
@@ -608,9 +715,27 @@ function limparConversa() {
   $("pedir-ajuda").textContent = "Pedir ajuda";
 }
 
+function linhasDe(texto) {
+  return texto.replace(/\s+$/, "").split("\n").map(linha => linha.replace(/\s+$/, ""));
+}
+
+function proposta(texto) {
+  // O bocado inteiro que o ajudante propoe, se a resposta trouxer um
+  // (um bloco ```oficina ja fechado). Senao, null.
+  const bloco = texto.match(/```oficina[^\n]*\n([\s\S]*?)```/);
+  if (!bloco || !bloco[1].trim()) return null;
+  return linhasDe(bloco[1]).join("\n");
+}
+
 function formatar(texto) {
   // Os modelos escrevem `codigo`, **negrito** e blocos entre ```.
+  const atuais = new Set(linhasDe(codigo.value));
   return texto.split("```").map((parte, i) => {
+    if (i % 2 && /^oficina/.test(parte)) {
+      // A proposta: as linhas que nao estao no codigo do aluno ficam a amarelo.
+      return '<pre class="proposta">' + linhasDe(parte.replace(/^[^\n]*\n?/, "")).map(linha =>
+        "<span" + (atuais.has(linha) ? "" : ' class="nova"') + ">" + (limpo(linha) || " ") + "</span>").join("") + "</pre>";
+    }
     if (i % 2) return "<pre>" + limpo(parte.replace(/^[a-zA-Z]*\n/, "").replace(/\n$/, "")) + "</pre>";
     return limpo(parte)
       .replace(/`([^`\n]+)`/g, "<code>$1</code>")
@@ -626,10 +751,61 @@ function bolha(classe, texto) {
   return b;
 }
 
+function porBotaoAplicar(resposta, novo) {
+  // Por baixo de uma proposta: o botao que a poe no editor. Passa pelo
+  // mesmo caminho do que se escreve a mao: so fica guardada se o jogo a aceitar.
+  const antes = linhasDe(codigo.value);
+  const depois = linhasDe(novo);
+  const linha = elemento("div", "", "aplicar");
+  if (antes.join("\n") === depois.join("\n")) {
+    linha.textContent = "Atenção: este código é igual ao que já tens, o ajudante não mudou nada. Com mapas de letras ele engana-se muito: aí, muda tu as letras.";
+    resposta.append(linha);
+    return;
+  }
+  const novas = depois.filter(l => !antes.includes(l)).length;
+  const fora = antes.filter(l => !depois.includes(l)).length;
+  let nota = "As linhas a amarelo são as que mudam.";
+  if (fora > novas) nota = "Atenção: tira " + (fora - novas) + (fora - novas === 1 ? " linha" : " linhas") + " do teu código. " + nota;
+  const aplicar = elemento("button", "Aplicar no meu código");
+  aplicar.type = "button";
+  const desfazer = elemento("button", "Desfazer", "desfazer");
+  desfazer.type = "button";
+  desfazer.hidden = true;
+  const texto = elemento("span", nota);
+  let anterior = null;
+  aplicar.onclick = () => {
+    anterior = codigo.value;
+    trocarCodigo(novo);
+    aplicar.hidden = true;
+    desfazer.hidden = false;
+    texto.textContent = "Está no editor. Vê no jogo se era isto que querias.";
+  };
+  desfazer.onclick = () => {
+    trocarCodigo(anterior);
+    desfazer.hidden = true;
+    texto.textContent = "Voltou ao que tinhas.";
+  };
+  linha.append(aplicar, desfazer, texto);
+  resposta.append(linha);
+}
+
+function trocarCodigo(novo) {
+  // Como se fosse escrito a mao: o Ctrl+Z continua a funcionar e o jogo
+  // experimenta o codigo novo.
+  codigo.focus();
+  codigo.select();
+  escrever(novo);
+  codigo.setSelectionRange(0, 0);
+  codigo.scrollTop = 0;
+  acertar();
+}
+
 async function perguntar(texto) {
   texto = texto.trim();
   if (!texto || aResponder) return;
   aResponder = true;
+  // As propostas antigas foram feitas para o codigo de entao: deixam de se poder aplicar.
+  for (const velha of $("conversa").querySelectorAll(".aplicar")) velha.remove();
   for (const botao of $("ajudante").querySelectorAll("button")) botao.disabled = true;
   const caixa = $("conversa");
   bolha("eu", texto);
@@ -657,6 +833,11 @@ async function perguntar(texto) {
     }
     if (!dito.trim()) throw new Error("O ajudante não disse nada. Pergunta outra vez.");
     conversa.push({quem: "eu", texto}, {quem: "ajudante", texto: dito});
+    const novo = proposta(dito);
+    if (novo !== null) {
+      porBotaoAplicar(resposta, novo);
+      caixa.scrollTop = caixa.scrollHeight;
+    }
   } catch (erro) {
     if (dito.trim()) {
       bolha("ajudante falhou", "A resposta ficou a meio. Pergunta outra vez.");
@@ -682,7 +863,7 @@ $("perguntar").onsubmit = evento => {
   $("pergunta").value = "";
   perguntar(texto);
 };
-$("atalho-erro").onclick = () => perguntar("Porque é que dá erro?");
+$("atalho-erro").onclick = () => perguntar("Porque é que dá erro? Corrige-o.");
 $("atalho-explica").onclick = () => perguntar("O que faz este código?");
 
 pedir("/api/ajudante").then(dados => { $("pedir-ajuda").hidden = !dados.ha; }).catch(() => {});

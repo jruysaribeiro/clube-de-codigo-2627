@@ -24,9 +24,11 @@
 
 import argparse
 import atexit
+import base64
 import importlib
 import json
 import os
+import re
 import shutil
 import socket
 import struct
@@ -47,6 +49,10 @@ import blocos  # noqa: E402
 from jogos import JOGOS  # noqa: E402
 
 ORIGINAIS = os.path.join(AQUI, ".originais")
+IMAGENS = os.path.join(RAIZ, "comum", "assets", "imagens")    # onde os jogos procuram as imagens
+NOME_DE_IMAGEM = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,59}\.png", re.IGNORECASE)
+PNG = b"\x89PNG\r\n\x1a\n"       # todos os ficheiros PNG comecam assim
+IMAGEM_MAXIMA = 1500000           # bytes (a pagina ja a encolhe antes de a mandar)
 PACIENCIA = 6                 # segundos a espera de um jogo que nao responde
 
 
@@ -130,6 +136,7 @@ class Sessao:
         self.margem = ""
         self.titulo = ""
         self.ajuda = ""
+        self.imagem = None           # o nome do PNG que o bocado aberto usa, se usar
         self.ajudante = modulo_do_ajudante.Ajudante()
         self.fim_de_linha = "\n"
         self.processo = None
@@ -241,6 +248,7 @@ class Sessao:
         if mensagem["tipo"] == "estavel" and pedido is not None:
             # Correu uns frames sem rebentar: agora sim, vai para o ficheiro.
             escrever(caminho_do_jogo(self.config), pedido[2], self.fim_de_linha)
+            self.ver_imagem(pedido[2])       # o nome da imagem pode ter mudado
             for numero in [n for n in self.pedidos if n <= mensagem["id"]]:
                 del self.pedidos[numero]
         if mensagem["tipo"] == "erro":
@@ -261,7 +269,10 @@ class Sessao:
     def lista_de_jogos(self):
         jogos = []
         for nome in JOGOS:
-            config = configuracao(nome)
+            try:
+                config = configuracao(nome)
+            except ImportError:
+                continue        # esse jogo ainda nao tem ficheiro em oficina/jogos/
             jogo = {"id": nome, "nome": config.NOME, "descricao": config.DESCRICAO, "escolhas": [], "erro": None}
             try:
                 fonte, _ = ler(caminho_do_jogo(config))
@@ -293,6 +304,7 @@ class Sessao:
             self.margem = blocos.margem_comum(bloco)
             self.titulo = regiao["titulo"]
             self.ajuda = regiao["ajuda"]
+            self.imagem = regiao.get("imagem")
             self.pedidos = {}
             self.mensagens = []
             self.a_provar = None
@@ -300,7 +312,7 @@ class Sessao:
             return {
                 "codigo": "\n".join(blocos.tirar_margem(bloco, self.margem)),
                 "titulo": regiao["titulo"], "ajuda": regiao["ajuda"], "dica": regiao["dica"],
-                "jogo": config.NOME, "desde": self.contador,
+                "jogo": config.NOME, "desde": self.contador, "imagem": self.estado_da_imagem(),
             }
 
     def codigo(self, texto):
@@ -366,6 +378,7 @@ class Sessao:
             return {
                 "mensagens": [m for m in self.mensagens if m["n"] > desde],
                 "viva": self.viva(),
+                "imagem": self.estado_da_imagem(),
             }
 
     def entrada(self, eventos):
@@ -387,6 +400,79 @@ class Sessao:
             self.parar()
             self.config = None
             return {"ok": True}
+
+    # --- A imagem do bocado aberto ---
+    # Ha coisas que no codigo dizem "imagem": "soldado.png". O jogo procura
+    # esse ficheiro em comum/assets/imagens/ e, se o encontrar, desenha a
+    # imagem em vez da forma. A crianca escolhe uma imagem na pagina e ela
+    # e guardada la, com esse nome.
+
+    def ver_imagem(self, fonte):
+        try:
+            regiao = self.config.regiao(fonte, self.escolha)
+        except (SyntaxError, ValueError):
+            return
+        self.imagem = regiao.get("imagem") if regiao else None
+
+    def estado_da_imagem(self):
+        # None: este bocado nao usa imagem nenhuma.
+        if self.config is None or not isinstance(self.imagem, str):
+            return None
+        if not NOME_DE_IMAGEM.fullmatch(self.imagem):
+            return {"nome": self.imagem, "ha": False, "versao": 0,
+                    "erro": 'O nome da imagem tem de acabar em .png e só pode ter letras sem acentos, '
+                            'números, - e _ (por exemplo "dragao.png").'}
+        caminho = os.path.join(IMAGENS, self.imagem)
+        if not os.path.isfile(caminho):
+            return {"nome": self.imagem, "ha": False, "versao": 0, "erro": None}
+        return {"nome": self.imagem, "ha": True, "versao": os.stat(caminho).st_mtime_ns, "erro": None}
+
+    def caminho_da_imagem(self):
+        estado = self.estado_da_imagem()
+        if estado is None:
+            raise Falha("Este bocado não usa nenhuma imagem.")
+        if estado["erro"]:
+            raise Falha(estado["erro"])
+        return os.path.join(IMAGENS, estado["nome"])
+
+    def avisar_das_imagens(self):
+        if self.viva():
+            self.dizer({"tipo": "imagens"})
+
+    def por_imagem(self, dados):
+        # A pagina manda sempre um PNG, ja pequeno, escrito em base64.
+        with self.tranca:
+            caminho = self.caminho_da_imagem()
+            try:
+                imagem = base64.b64decode(str(dados or ""), validate=True)
+            except ValueError:
+                raise Falha("A imagem chegou estragada. Tenta outra vez.")
+            if not imagem.startswith(PNG):
+                raise Falha("Isso não é uma imagem que eu saiba ler.")
+            if len(imagem) > IMAGEM_MAXIMA:
+                raise Falha("Essa imagem é grande demais.")
+            os.makedirs(IMAGENS, exist_ok=True)
+            with open(caminho + ".novo", "wb") as f:
+                f.write(imagem)
+            os.replace(caminho + ".novo", caminho)
+            self.avisar_das_imagens()
+            return {"imagem": self.estado_da_imagem()}
+
+    def tirar_imagem(self):
+        with self.tranca:
+            caminho = self.caminho_da_imagem()
+            if os.path.isfile(caminho):
+                os.remove(caminho)
+            self.avisar_das_imagens()
+            return {"imagem": self.estado_da_imagem()}
+
+    def ler_imagem(self):
+        with self.tranca:
+            caminho = self.caminho_da_imagem()
+            if not os.path.isfile(caminho):
+                raise Falha("Ainda não há imagem.")
+            with open(caminho, "rb") as f:
+                return f.read()
 
     # --- O ajudante ---
 
@@ -487,6 +573,11 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(lambda: sessao.estado(desde))
         elif url.path == "/api/quadro":
             self.quadro(int(parametros.get("depois", ["0"])[0]))
+        elif url.path == "/api/imagem":
+            try:
+                self.responder(200, sessao.ler_imagem(), "image/png")
+            except Falha as falha:
+                self.responder(404, {"falha": str(falha)})
         elif url.path == "/api/descarregar":
             self.tratar(lambda: sessao.descarregar(parametros.get("jogo", [""])[0]))
         else:
@@ -564,6 +655,10 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(sessao.reabrir)
         elif caminho == "/api/fechar":
             self.tratar(sessao.fechar)
+        elif caminho == "/api/imagem":
+            self.tratar(lambda: sessao.por_imagem(dados.get("dados")))
+        elif caminho == "/api/tirar-imagem":
+            self.tratar(sessao.tirar_imagem)
         elif caminho == "/api/pergunta":
             self.pergunta(dados)
         elif caminho == "/api/carregar":

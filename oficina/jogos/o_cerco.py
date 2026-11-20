@@ -53,7 +53,9 @@ def escolhas(fonte):
 
 
 def regiao(fonte, escolha):
-    # Devolve {"inicio", "fim", "ajuda", "titulo", "dica"} ou None.
+    # Devolve {"inicio", "fim", "ajuda", "titulo", "dica", "imagem"} ou None.
+    # "imagem" e o nome do PNG que essa coisa usa (None se nao usa nenhum):
+    # e com ele que a Oficina sabe onde guardar a imagem que a crianca escolher.
     arvore = ast.parse(fonte)
     linhas = fonte.split("\n")
     tipo, _, numero = escolha.partition(":")
@@ -63,7 +65,7 @@ def regiao(fonte, escolha):
     no = blocos.instrucao(arvore, nomes[tipo])
     if no is None:
         return None
-    resposta = {"ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo]}
+    resposta = {"ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo], "imagem": None}
 
     if tipo == "mapa":
         resposta.update(inicio=no.lineno, fim=no.end_lineno, titulo="O mapa")
@@ -77,7 +79,9 @@ def regiao(fonte, escolha):
         titulo = blocos.texto_constante(parte)
     else:
         titulo = blocos.valor_da_chave(parte, "nome")
-    resposta.update(inicio=inicio, fim=fim, titulo=titulo or escolha)
+    ficha = blocos.valor_da_entrada(no, int(numero))
+    resposta.update(inicio=inicio, fim=fim, titulo=titulo or escolha,
+                    imagem=blocos.valor_da_chave(ficha, "imagem"))
     return resposta
 
 
@@ -123,6 +127,11 @@ def _ver_cor(ficha, quem, problemas):
         problemas.append(quem + ': a "cor" são três números de 0 a 255, como (200, 60, 60).')
 
 
+def _ver_imagem(ficha, quem, problemas):
+    if "imagem" in ficha and not isinstance(ficha["imagem"], str):
+        problemas.append(quem + ': a "imagem" é o nome de um ficheiro, entre aspas, como "soldado.png".')
+
+
 def _ver_inimigos(ns, problemas, avisos):
     inimigos = ns.get("INIMIGOS")
     if not isinstance(inimigos, dict) or len(inimigos) == 0:
@@ -142,6 +151,7 @@ def _ver_inimigos(ns, problemas, avisos):
         if _numero(ficha.get("vida")) and 0 <= ficha["vida"] < 1:
             problemas.append(quem + ': a "vida" tem de ser pelo menos 1.')
         _ver_cor(ficha, quem, problemas)
+        _ver_imagem(ficha, quem, problemas)
         forma = ficha.get("forma")
         if forma not in ("circulo", "quadrado"):
             avisos.append(quem + ': a "forma" só pode ser "circulo" ou "quadrado". Fica círculo.')
@@ -180,6 +190,7 @@ def _ver_torres(ns, problemas, avisos):
         _ver_maximo(ficha, quem, "alcance", 2000, problemas)
         _ver_maximo(ficha, quem, "raio_explosao", 2000, problemas)
         _ver_cor(ficha, quem, problemas)
+        _ver_imagem(ficha, quem, problemas)
         efeito = ficha.get("efeito")
         if efeito not in EFEITOS:
             problemas.append(quem + ': o "efeito" tem de ser "tiro", "explosao", "area" ou "golpe".')

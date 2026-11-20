@@ -272,6 +272,18 @@ class Corrida:
             self.foto = pedido["ficheiro"]     # tira-se depois de o palco desenhar
         if tipo == "codigo":
             self.trocar(pedido)
+        if tipo == "imagens":
+            self.esquecer_imagens()
+
+    def esquecer_imagens(self):
+        # Chegou (ou saiu) uma imagem da pasta. Os jogos guardam as imagens
+        # que ja leram em "imagens_carregadas": esvazia-se, e eles voltam a
+        # ir busca-las ao disco.
+        guardadas = (self.ns or {}).get("imagens_carregadas")
+        if isinstance(guardadas, dict):
+            guardadas.clear()
+        if hasattr(self.palco, "ao_mudar_imagens"):
+            self.palco.ao_mudar_imagens(self.ns)
 
     def trocar(self, pedido):
         numero = pedido["id"]
@@ -279,6 +291,24 @@ class Corrida:
         try:
             arvore = ast.parse(nova, self.ficheiro)
             nos = blocos.nos_da_regiao(arvore, pedido["inicio"], pedido["fim"])
+            if len(nos) == 0:
+                # Apagaram tudo: sem isto, a instrucao inteira (o MAPA, por
+                # exemplo) desaparecia do ficheiro e o jogo deixava de abrir.
+                enviar({"tipo": "problemas", "id": numero, "avisos": [],
+                        "problemas": ["Apagaste tudo. O jogo precisa deste bocado: "
+                                      "escreve-o outra vez, ou carrega em Repor o original."]})
+                return
+            # Uma linha "NOME = ..." apagada nao rebenta logo (o jogo ainda
+            # se lembra do valor antigo), mas o ficheiro ficava sem ela e o
+            # jogo ja nao abria da proxima vez.
+            agora = blocos.nomes_dados(arvore)
+            em_falta = [nome for nome in blocos.nomes_dados(ast.parse(self.fonte)) if nome not in agora]
+            if em_falta:
+                enviar({"tipo": "problemas", "id": numero, "avisos": [],
+                        "problemas": ['Falta a linha "' + nome + ' = ...". O jogo precisa dela: '
+                                      "escreve-a outra vez, ou carrega em Repor o original."
+                                      for nome in em_falta]})
+                return
             codigo = compile(ast.Module(body=nos, type_ignores=[]), self.ficheiro, "exec")
             # Primeiro num rascunho: uma copia dos nomes do jogo. Se o
             # bocado novo rebentar ou nao fizer sentido, o jogo nem da por ela.
