@@ -111,8 +111,8 @@ LARANJA = (245, 140, 50)
 # SOM_DO_SALTO e o nome de um WAV: se ele existir em comum/assets/sons/, e
 # esse o som do salto; se nao houver, fica o som de sempre.
 IMAGEM_DO_HEROI = "faisca.png"
-COR_HEROI = (255, 255, 0)         # preto
-COR_HEROI_ESCURA =   (0,0,0) #amarelo
+COR_HEROI = (255, 255, 0)         # amarelo
+COR_HEROI_ESCURA = (0, 0, 0)        # preto
 SOM_DO_SALTO = "salto.wav"
 
 # O tiro do Faisca: a cor dele, e o som (um WAV, tal como o do salto).
