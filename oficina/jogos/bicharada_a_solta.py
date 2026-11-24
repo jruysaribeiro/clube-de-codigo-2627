@@ -42,11 +42,49 @@ SOBRE_OS_GRUPOS = {
 
 # Escolher de uma lista os bichos de um treinador faz-se como na Bicharada.
 # (Apagar tambem, mas aqui ha o mapa para acertar: ve o apagar, mais abaixo.)
-lista = base.lista
+# Os bonecos que vem com o jogo (as imagens estao em oficina/modelos/): o
+# nome dos ficheiros de cada um, e como a Oficina lhe chama.
+BONECOS = [("jogador", "Cabelo castanho, camisola amarela"), ("jogador2", "Cabelo comprido, camisola vermelha"),
+           ("jogador3", "Cabelo louro, camisola verde"), ("jogador4", "Cabelo aos caracóis, camisola roxa")]
+IMAGENS_DO_BONECO = [("imagem", "", "De frente"), ("imagem_passo", "-passo", "De frente, a andar"),
+                     ("imagem_costas", "-costas", "De costas"), ("imagem_costas_passo", "-costas-passo", "De costas, a andar"),
+                     ("imagem_lado", "-lado", "De lado"), ("imagem_lado_passo", "-lado-passo", "De lado, a andar")]
+
+
+def lista(fonte, escolha, codigo, escolhidos=None):
+    if escolha != "jogador":
+        return base.lista(fonte, escolha, codigo, escolhidos)
+    # "Escolher o boneco": as seis imagens do JOGADOR passam a ser as desse.
+    nomes = [nome for _, nome in BONECOS]
+    if escolhidos is None:
+        agora = re.search(r'"imagem": "([^"]*)\.png"', codigo)
+        agora = [nome for ficheiro, nome in BONECOS if agora and agora.group(1) == ficheiro]
+        return {"titulo": "Que boneco queres ser?", "opcoes": nomes, "escolhidos": agora,
+                "nota": "Carrega no boneco que queres (se carregares em vários, fica o último). "
+                        "Depois podes mudá-lo à tua maneira, com «Desenhar»."}
+    escolhidos = [nome for nome in escolhidos if nome in nomes] if isinstance(escolhidos, list) else []
+    if not escolhidos:
+        raise ValueError("escolhe um boneco.")
+    ficheiro = BONECOS[nomes.index(escolhidos[-1])][0]
+    linhas = codigo.rstrip().split("\n")
+    fecho = [numero for numero, linha in enumerate(linhas) if linha.strip().startswith("}")]
+    if not fecho:
+        raise ValueError("o código tem um erro: corrige-o primeiro, ou carrega em Repor o original.")
+    margem = "    "
+    for chave, fim, _ in IMAGENS_DO_BONECO:
+        nova = '"' + chave + '": "' + ficheiro + fim + '.png",'
+        onde = [numero for numero, linha in enumerate(linhas) if linha.strip().startswith('"' + chave + '":')]
+        if onde:
+            margem = linhas[onde[0]][:len(linhas[onde[0]]) - len(linhas[onde[0]].lstrip())]
+            linhas[onde[0]] = margem + nova
+        else:
+            linhas.insert(fecho[-1], margem + nova)
+            fecho[-1] = fecho[-1] + 1
+    return {"codigo": "\n".join(linhas)}
 
 CRIAVEIS = dict(base.CRIAVEIS)
 CRIAVEIS["Mapa"] = "Nova zona"
-CRIAVEIS["Edifícios"] = "Novo edifício"
+CRIAVEIS["Edifícios"] = ["Novo edifício", "Novo andar"]       # dois botoes no mesmo grupo
 CRIAVEIS["Blocos"] = "Novo bloco"
 
 QUE_FAZER = "O que posso fazer aqui?"
@@ -89,7 +127,7 @@ SUGESTOES = {
     "ao_descansar": ["A avó dá-me uma sopa a mais", "A avó diz uma frase diferente de cada vez", QUE_FAZER],
     "a_cada_frame": ["Faz um relógio que diz há quantos segundos ando no mapa",
                      "Os meus bichos recuperam 1 de vida a cada 2 segundos", QUE_FAZER],
-    "jogador": ["Muda a cor da minha camisola para azul", "Para que servem as três imagens?",
+    "jogador": ["Faz as minhas pernas mexerem mais depressa", "Para que servem as seis imagens?",
                 "Como é que desenho o meu boneco?"],
     "desenhar_bicho_de_costas": ["Põe uma cauda nas costas do bicho", "Faz as costas mais escuras do que a frente",
                                  "Explica-me este desenho linha a linha"],
@@ -153,7 +191,8 @@ DICAS = {
     "portas": "Estás a ver o mundo todo, em ponto pequeno, e os edifícios por baixo. Cada porta é uma"
               " letra, escrita cá fora e lá dentro. O ponto amarelo és tu: clica no jogo e anda com as setas.",
     "jogador": "És tu, no mapa: clica no jogo e anda com as setas para te veres de frente, de costas e de lado."
-               " Por cima do código escolhes qual das três imagens queres desenhar ou trocar.",
+               " «Escolher o boneco» troca-te por um dos quatro que vêm com o jogo. Por cima do código escolhes"
+               " qual das seis imagens queres desenhar: três paradas e três a meio de um passo.",
     "bicho": "O teu bicho é o de baixo, visto de costas; lá em cima vês-o de frente, na ficha."
              " «Escolher os ataques» mostra os ataques que existem; os de «aprende» só aparecem a partir desse nível."
              " Por cima do código escolhes se desenhas a imagem de frente ou a de costas."
@@ -509,8 +548,8 @@ def regiao(fonte, escolha):
                     "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[escolha],
                     "sugestoes": SUGESTOES[escolha]}
         if escolha == "jogador":
-            _juntar_imagens(resposta, no.value, [("imagem", "De frente"), ("imagem_costas", "De costas"),
-                                                 ("imagem_lado", "De lado")])
+            _juntar_imagens(resposta, no.value, [(chave, nome) for chave, _, nome in IMAGENS_DO_BONECO])
+            resposta["lista"] = "Escolher o boneco"
         return resposta
 
     if tipo == "bloco":
@@ -631,9 +670,10 @@ def _ler_mundo(fonte, treinadores=None):
     return arvore, Mundo(zonas, mundo, portas, treinadores, os_blocos=_valor(arvore, "BLOCOS"))
 
 
-def _escrever_na_zona(arvore, linhas, nome, coluna, linha, texto):
+def _escrever_na_zona(arvore, linhas, nome, coluna, linha, texto, sobre="."):
     # Troca letras de uma zona, no ficheiro: "texto" fica a partir dessa
-    # coluna dessa linha da zona. So troca relva, e diz se trocou.
+    # coluna dessa linha da zona. So troca relva (ou a letra que se disser
+    # em "sobre"), e diz se trocou.
     no = blocos.instrucao(arvore, "ZONAS")
     if no is None or not isinstance(no.value, ast.Dict):
         return False
@@ -645,7 +685,7 @@ def _escrever_na_zona(arvore, linhas, nome, coluna, linha, texto):
             return False
         escrito = linhas[fila.lineno - 1]
         onde = base._coluna(escrito, fila.col_offset) + 1 + coluna
-        if escrito[onde:onde + len(texto)] != "." * len(texto):
+        if escrito[onde:onde + len(texto)] != sobre * len(texto):
             return False
         linhas[fila.lineno - 1] = escrito[:onde] + texto + escrito[onde + len(texto):]
         return True
@@ -803,6 +843,159 @@ def _novo_edificio(fonte):
     return "\n".join(linhas), "zona:" + str(len(mundo.zonas)), aviso
 
 
+def _escadas_para_cima(mundo, zona):
+    # A zona para onde sobem as escadas que ha nesta (None se nao tem): uma
+    # porta escrita aqui que leva a outro interior.
+    interiores = set(mundo.portas.values())
+    escrito = "".join(mundo.zonas[zona])
+    for letra, destino in mundo.portas.items():
+        if destino != zona and destino in mundo.zonas and zona in interiores and letra in escrito:
+            return destino
+    return None
+
+
+def _a_pe_na_zona(mundo, zona, partida):
+    # Os quadrados de uma zona a que se chega a pe a partir de um deles, sem
+    # sair dela nem passar por portas.
+    vistos = {partida}
+    fila = collections.deque([partida])
+    while fila:
+        coluna, linha = fila.popleft()
+        for passo_coluna, passo_linha in PASSOS:
+            vizinho = (coluna + passo_coluna, linha + passo_linha)
+            if not (0 <= vizinho[0] < ZONA[0] and 0 <= vizinho[1] < ZONA[1]) or vizinho in vistos:
+                continue
+            if mundo.livre(mundo.letra(zona, vizinho[0], vizinho[1])):
+                vistos.add(vizinho)
+                fila.append(vizinho)
+    return vistos
+
+
+def _novo_andar(fonte):
+    # Um andar por cima do ultimo edificio (o ultimo interior escrito em
+    # ZONAS): uma zona com a mesma forma do andar de baixo, umas escadas que
+    # ligam os dois e, ca fora, mais uma fila de parede por cima do edificio.
+    arvore, mundo = _ler_mundo(fonte)
+    if mundo is None:
+        raise ValueError("não percebi como estão escritas as ZONAS, o MUNDO ou as PORTAS no ficheiro.")
+    interiores = [nome for nome in mundo.zonas if nome in mundo.portas.values()]
+    if not interiores:
+        raise ValueError("ainda não há nenhum edifício: faz primeiro um, com «+ Novo edifício».")
+    baixo = interiores[-1]
+    for _ in range(len(interiores)):             # ate ao andar mais alto desse edificio
+        acima = _escadas_para_cima(mundo, baixo)
+        if acima is None:
+            break
+        baixo = acima
+    usadas = "".join("".join(filas) for filas in mundo.zonas.values()) + "".join(mundo.portas)
+    usadas = usadas + "".join(str(letra) for letra in mundo.blocos)
+    letras = [letra for letra in LETRAS_DE_PORTA if letra not in usadas]
+    if not letras:
+        raise ValueError("já não há letras livres para mais umas escadas.")
+    letra = letras[0]
+    # O nome: "mercearia (1.º andar)", "mercearia (2.º andar)"...
+    andar = re.fullmatch(r"(.*) \((\d+)\.º andar\)", baixo)
+    raiz, numero = (andar.group(1), int(andar.group(2)) + 1) if andar else (baixo, 1)
+    nome = base._nome_livre(raiz + " (" + str(numero) + ".º andar)", list(mundo.zonas))
+
+    # As escadas, no andar de baixo: num canto do soalho (o quadrado com mais
+    # paredes e moveis a volta), e que nao corte o caminho a nada.
+    filas = mundo.zonas[baixo]
+    partida = mundo.partida()
+    antes = mundo.andar(partida)[0] if partida is not None else {}
+    cantos = []
+    for linha in range(len(filas)):
+        for coluna in range(len(filas[linha])):
+            if filas[linha][coluna] != CHAO_DE_DENTRO:
+                continue
+            a_volta = [mundo.letra(baixo, coluna + dc, linha + dl) for dc, dl in PASSOS]
+            tapados = len([esta for esta in a_volta if not mundo.livre(esta)])
+            portas_ao_lado = len([esta for esta in a_volta if esta in mundo.portas or mundo.contra(esta)])
+            if tapados < 4 and portas_ao_lado == 0:
+                cantos.append((-tapados, linha, coluna))
+    linhas = fonte.split("\n")
+    sitio = None
+    for _, linha, coluna in sorted(cantos):
+        tentativa = list(linhas)
+        if not _escrever_na_zona(arvore, tentativa, baixo, coluna, linha, letra, CHAO_DE_DENTRO):
+            continue
+        # (Com as escadas ali, ainda se chega a todo o lado onde se chegava?)
+        outro = _ler_mundo("\n".join(tentativa))[1]
+        depois = outro.andar(partida)[0] if outro is not None and partida is not None else {}
+        if len([s for s in depois if s[0] == baixo]) >= len([s for s in antes if s[0] == baixo]) - 1:
+            linhas, sitio = tentativa, (coluna, linha)
+            break
+    if sitio is None:
+        raise ValueError('não encontrei sítio para as escadas em "' + baixo + '": deixa um bocado de soalho livre '
+                         "junto a uma parede.")
+
+    # O andar novo: as paredes e as janelas do de baixo, soalho no resto, e
+    # as escadas no mesmo sitio.
+    de_fora = [esta for esta in mundo.portas if mundo.portas[esta] == baixo
+               and mundo.encontrar(esta, mundo.no_mundo()) is not None]
+    novas = []
+    for linha in range(len(filas)):
+        fila = ""
+        for coluna in range(len(filas[linha])):
+            esta = filas[linha][coluna]
+            if (coluna, linha) == sitio:
+                fila = fila + letra
+            elif esta in "# j" and (esta != "j" or "j" in mundo.blocos):
+                fila = fila + esta
+            elif esta in de_fora:
+                fila = fila + "#"            # onde em baixo e a porta da rua, em cima e parede
+            else:
+                fila = fila + CHAO_DE_DENTRO
+        novas.append(fila)
+
+    # Ca fora: mais uma fila de parede por cima do edificio, se couber e nao
+    # tapar o caminho a nada.
+    chao = baixo
+    for _ in range(len(interiores)):             # desce ate ao res-do-chao
+        por_baixo = [zona for zona in interiores if _escadas_para_cima(mundo, zona) == chao]
+        if not por_baixo:
+            break
+        chao = por_baixo[0]
+    fachada = "não coube"
+    porta = None
+    for esta in mundo.portas:
+        if mundo.portas[esta] == chao and porta is None:
+            porta = mundo.encontrar(esta, mundo.no_mundo())
+    if porta is not None:
+        zona, coluna, topo = porta
+        while topo > 0 and all(mundo.letra(zona, coluna + dc, topo - 1) in "#j" for dc in (-1, 0, 1)):
+            topo = topo - 1
+        por_cima = [mundo.letra(zona, coluna + dc, topo - 1) for dc in (-1, 0, 1)]
+        janela = mundo.blocos.get("j") if isinstance(mundo.blocos.get("j"), dict) else {}
+        parede = "#j#" if janela.get("sempre") is True else "###"
+        if topo - 1 >= 0 and len(set(por_cima)) == 1 and mundo.livre(por_cima[0]) and not mundo.erva(por_cima[0]):
+            tentativa = list(linhas)
+            if _escrever_na_zona(arvore, tentativa, zona, coluna - 1, topo - 1, parede, por_cima[0]):
+                # (Dentro dessa zona, a partir da frente da porta, ainda se
+                # chega a todos os quadrados a que se chegava?)
+                outro = _ler_mundo("\n".join(tentativa))[1]
+                frente = (coluna, porta[2] + 1)
+                if outro is not None and len(_a_pe_na_zona(outro, zona, frente)) >= len(_a_pe_na_zona(mundo, zona, frente)) - 3:
+                    linhas = tentativa
+                    fachada = zona
+                else:
+                    fachada = "tapava"
+
+    acrescentos = {"ZONAS": _texto_da_zona(nome, novas), "PORTAS": ['    "' + letra + '": "' + nome + '",']}
+    for dicionario in sorted(acrescentos, key=lambda qual: blocos.instrucao(arvore, qual).lineno, reverse=True):
+        _juntar_ao_dicionario(arvore, linhas, dicionario, acrescentos[dicionario])
+    aviso = ('Criei "' + nome + '", por cima de "' + baixo + '": as escadas são a letra ' + letra
+             + ". Quem as pisa em baixo sobe, e em cima desce.")
+    if fachada == zona if porta is not None else False:
+        aviso = aviso + ' Cá fora, na zona "' + fachada + '", o edifício ficou com mais uma fila de parede por cima.'
+    elif fachada == "tapava":
+        aviso = aviso + " Cá fora não lhe pus mais parede por cima, porque tapava um caminho."
+    else:
+        aviso = aviso + " Cá fora não coube mais uma fila de parede por cima dele: precisa de três quadrados de relva livres."
+    aviso = aviso + " (O andar novo vai sempre para o último edifício que foi feito.)"
+    return "\n".join(linhas), "zona:" + str(len(mundo.zonas)), aviso
+
+
 def _ficheiro_sem_acentos(nome):
     # "Campeã da Feira" -> "campea-da-feira": os nomes dos ficheiros de
     # imagem so levam letras sem acentos, algarismos, "-" e "_".
@@ -832,7 +1025,7 @@ def _novo_treinador(fonte):
         '        "frase": "Vamos a isto!",',
         '        "falas_depois": ["Boa luta!"],',
         '        "cor_fundo": (200, 190, 150),',
-        '        "imagem": "' + _ficheiro_sem_acentos(nome) + '.png",',
+        '        "imagem": "' + blocos.corpo_livre(fonte, _ficheiro_sem_acentos(nome), (".png",)) + '.png",',
         '        "equipa": [',
         '            {"bicho": "' + str(bichos[0][0]) + '", "nivel": 5},',
         "        ],",
@@ -864,7 +1057,7 @@ def _novo_bloco(fonte):
         '        "dentro": False,',
         '        "por_baixo": ".",',
         '        "cor": ' + str(cor) + ",",
-        '        "imagem": "' + base._ficheiro(nome) + '.png",',
+        '        "imagem": "' + blocos.corpo_livre(fonte, base._ficheiro(nome), (".png",)) + '.png",',
         "    },",
     ])
     aviso = ('Criei o bloco "' + nome + '": é a letra ' + letra + ". Dá-lhe um nome, desenha-o (ou começa por um modelo) "
@@ -904,7 +1097,9 @@ def _apagar_bloco(fonte, escolha):
     return base._aplicar(linhas, [(inicio, fim)], trocas), aviso
 
 
-def novo(fonte, grupo):
+def novo(fonte, grupo, qual=None):
+    if grupo == "Edifícios" and qual == "Novo andar":
+        return _novo_andar(fonte)
     if grupo == "Blocos":
         return _novo_bloco(fonte)
     if grupo == "Mapa":
@@ -920,8 +1115,10 @@ def novo(fonte, grupo):
         linhas = nova.split("\n")
         nome, _, inicio, fim = base._fichas(blocos.instrucao(ast.parse(nova), "BICHOS"))[-1]
         for linha in range(inicio - 1, fim):
-            linhas[linha] = re.sub(r'"imagem_costas": "[^"]*"',
-                                   '"imagem_costas": "' + base._ficheiro(nome) + '-costas.png"', linhas[linha])
+            # (Com o mesmo nome que a copia deu a imagem de frente.)
+            de_frente = re.search(r'"imagem": "([^"]*)\.png"', "\n".join(linhas[inicio - 1:fim]))
+            corpo = de_frente.group(1) if de_frente else base._ficheiro(nome)
+            linhas[linha] = re.sub(r'"imagem_costas": "[^"]*"', '"imagem_costas": "' + corpo + '-costas.png"', linhas[linha])
         nova = "\n".join(linhas)
         aviso = aviso.replace(" No jogo inteiro já aparece no ecrã de escolha.", "") + " Pode saltar da erva, à solta."
     if grupo == "Treinadores":
@@ -1100,12 +1297,18 @@ def _apagar_zona(fonte, escolha):
     for (chave, primeira, ultima), valor in zip(blocos.entradas(no) or [], no.value.values):
         if blocos.texto_constante(valor) == nome:
             cortes.append((primeira, ultima))
-    trocas += _trocas_nas_zonas(arvore, linhas, lambda _, texto: "".join("#" if letra in portas else letra
-                                                                          for letra in texto), menos=nome)
+    # (Umas escadas, no andar de onde se subia para ela, passam a soalho.)
+    interiores = _interiores(arvore)
+    trocas += _trocas_nas_zonas(arvore, linhas, lambda zona, texto: "".join(
+        (CHAO_DE_DENTRO if zona in interiores else "#") if letra in portas else letra for letra in texto), menos=nome)
 
     interior = len(portas) > 0
-    aviso = ('Apaguei o edifício "' if interior else 'Apaguei a zona "') + str(nome) + '".'
-    if interior:
+    andar = interior and all(mundo.encontrar(letra, mundo.no_mundo()) is None for letra in portas)
+    aviso = ('Apaguei o andar "' if andar else 'Apaguei o edifício "' if interior else 'Apaguei a zona "') + str(nome) + '".'
+    if andar:
+        aviso = (aviso + " No andar de baixo, onde eram as escadas ficou soalho. Cá fora, a fila de parede que ele "
+                 "tinha por cima continua lá: podes tirá-la.")
+    elif interior:
         aviso = aviso + " Cá fora, onde era a porta ficou parede: as paredes dele continuam lá, podes tirá-las."
     perdidos = [letra for letra in "123456789" if letra in letras and mundo.e_treinador(letra)]
     if perdidos:
@@ -1129,6 +1332,9 @@ def _apagar_ataque(fonte, escolha):
     if not numero.isdigit() or int(numero) >= len(partes):
         return base.apagar(fonte, escolha)
     nome = partes[int(numero)][0]
+    if nome == _valor(arvore, "ATAQUE_SEM_FORCAS"):
+        raise ValueError('"' + str(nome) + '" é o ataque de quem já não tem forças (o ATAQUE_SEM_FORCAS): sem ele, '
+                         "um bicho que gastasse os usos todos ficava sem nada para fazer. Não se pode apagar.")
     linhas = fonte.split("\n")
     cortes, trocas, donos = [], [], []
     for bicho, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "BICHOS")):
@@ -1187,6 +1393,22 @@ def renomear(fonte, escolha, nome):
             fonte, mexidos = _tipo_nos_blocos(fonte, antigo, novo)
             if mexidos:
                 aviso = aviso + " Mudei-o também nos blocos de onde saltam bichos desse tipo (" + ", ".join(mexidos) + ")."
+        return fonte, escolha, aviso
+    if tipo == "ataque":
+        # O ataque de quem ja nao tem forcas muda de nome tambem na constante.
+        arvore = ast.parse(fonte)
+        partes = base._fichas(blocos.instrucao(arvore, "ATAQUES"))
+        antigo = partes[int(numero)][0] if numero.isdigit() and int(numero) < len(partes) else None
+        e_o_recurso = antigo is not None and antigo == _valor(arvore, "ATAQUE_SEM_FORCAS")
+        fonte, escolha, aviso = base.renomear(fonte, escolha, nome)
+        if e_o_recurso:
+            arvore = ast.parse(fonte)
+            novo_nome = base._fichas(blocos.instrucao(arvore, "ATAQUES"))[int(numero)][0]
+            no = blocos.instrucao(arvore, "ATAQUE_SEM_FORCAS")
+            linhas = fonte.split("\n")
+            trocas = []
+            base._trocar_no(linhas, no.value, '"' + str(novo_nome) + '"', trocas)
+            fonte = base._aplicar(linhas, [], trocas)
         return fonte, escolha, aviso
     if tipo != "zona":
         return base.renomear(fonte, escolha, nome)
@@ -1336,7 +1558,7 @@ def _ver_mundo(ns, treinadores, aberto, problemas, avisos, zona_aberta=False):
         if letra not in "".join(zonas[nome]):
             avisos.append('Falta a porta "' + letra + '" dentro de "' + nome + '": é por ela que se sai.')
         if este.encontrar(letra, [outra for outra in zonas if outra != nome]) is None:
-            avisos.append('A porta "' + letra + '" não está em nenhuma zona cá fora: não se entra em "' + nome + '".')
+            avisos.append('A porta "' + letra + '" não está escrita em mais nenhuma zona: não se entra em "' + nome + '".')
 
     if "P" not in tudo:
         avisos.append("Falta o P, a partida: assim começas no primeiro bocado de relva.")
@@ -1476,6 +1698,25 @@ def _ver_aprende(ns, bichos, aberto, problemas, avisos):
         base._ver_tipo_dos_ataques(str(nome), ficha, list(aprende), ' em "aprende"', ns, aberto, problemas, avisos)
 
 
+def _ver_usos(ns, problemas):
+    # Os "usos" dos ataques, e o ataque de quem ja nao tem forcas.
+    ataques = ns.get("ATAQUES") if isinstance(ns.get("ATAQUES"), dict) else {}
+    for nome, ficha in ataques.items():
+        if isinstance(ficha, dict) and "usos" in ficha:
+            usos = ficha["usos"]
+            if isinstance(usos, bool) or not isinstance(usos, int) or usos < 1 or usos > 99:
+                problemas.append(str(nome) + ': os "usos" são um número inteiro de 1 a 99, sem aspas. '
+                                 "Para se poder usar sempre, apaga os \"usos\".")
+    recurso = ns.get("ATAQUE_SEM_FORCAS")
+    if "ATAQUE_SEM_FORCAS" not in ns:
+        return
+    if not isinstance(recurso, str) or recurso not in ataques:
+        problemas.append("O ATAQUE_SEM_FORCAS tem de ser o nome de um ataque que exista em ATAQUES: é o que um bicho "
+                         "dá quando já gastou os usos do ataque que escolheste." + base._parecido(str(recurso), list(ataques)))
+    elif isinstance(ataques[recurso], dict) and "usos" in ataques[recurso]:
+        problemas.append('"' + recurso + '" é o ATAQUE_SEM_FORCAS: não pode ter "usos", senão também se gastava.')
+
+
 def _ver_blocos(ns, problemas, avisos):
     os_blocos = ns.get("BLOCOS")
     if not isinstance(os_blocos, dict):
@@ -1543,7 +1784,7 @@ def _ver_loja_e_jogador(ns, problemas, avisos):
         problemas.append("O JOGADOR tem de estar entre { }.")
         return
     base._ver_cor(jogador, "JOGADOR", "cor", problemas)
-    for chave in ("imagem", "imagem_costas", "imagem_lado"):
+    for chave, _, _ in IMAGENS_DO_BONECO:
         if chave in jogador:
             _ver_imagem(jogador, "JOGADOR", chave, ns, problemas)
     for nome, ficha in ns["BICHOS"].items() if isinstance(ns.get("BICHOS"), dict) else []:
@@ -1645,6 +1886,7 @@ class Palco(base.Palco):
         _ver_aprende(ns, self.ler(ns, "BICHOS"), self.tipo == "bicho", problemas, avisos)
         _ver_loja_e_jogador(ns, problemas, avisos)
         _ver_blocos(ns, problemas, avisos)
+        _ver_usos(ns, problemas)
         if self.regra in REGRAS and self.preparado and not problemas:
             _experimentar(ns, self.regra, problemas)
         base._resumir_avisos_de_tipo(avisos)
@@ -2054,6 +2296,12 @@ class Palco(base.Palco):
             self.quadro_do_falador(ns, pygame)
             return
         if not self.no_mapa:
+            # (Quando o que esta aberto e um ataque, o bicho usa-o sem parar:
+            # ao gastar os usos, e como se fosse a casa da avo e voltasse.)
+            if self.ataque is not None and self.ataque in ns["ATAQUES"] and "usos_que_restam" in ns:
+                for bicho in ns["minha_equipa"]:
+                    if "gastos" in bicho and ns["usos_que_restam"](bicho, self.ataque) == 0:
+                        bicho["gastos"] = {}
             super().quadro(ns, pygame)
             return
         if not self.preparado:

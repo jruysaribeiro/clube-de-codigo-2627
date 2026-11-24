@@ -366,61 +366,95 @@ CALCAS = (60, 96, 180)
 CABELO = (96, 58, 34)
 
 
-@modelo("jogador.png")
-def jogador(t):
-    t.caixa(CALCAS, 11, 23, 4, 6)
-    t.caixa(CALCAS, 17, 23, 4, 6)
-    t.caixa(PRETO, 10, 28, 5, 3, 1)                                          # os sapatos
+# Ha quatro bonecos a escolha (na Oficina: "Tu", "Escolher o boneco"). Cada
+# um tem seis imagens: de frente, de costas e de lado, parado e a meio de um
+# passo (o jogo troca entre as duas enquanto andas).
+BONECOS = {
+    "jogador": {"camisola": CAMISOLA, "calcas": CALCAS, "cabelo": CABELO, "pele": PELE, "penteado": "curto"},
+    "jogador2": {"camisola": (214, 72, 72), "calcas": (70, 64, 96), "cabelo": (40, 32, 36), "pele": (222, 170, 120),
+                 "penteado": "comprido"},
+    "jogador3": {"camisola": (84, 170, 110), "calcas": (112, 112, 124), "cabelo": (232, 196, 96), "pele": PELE,
+                 "penteado": "curto"},
+    "jogador4": {"camisola": (150, 104, 206), "calcas": (58, 84, 150), "cabelo": (44, 30, 26), "pele": (150, 100, 68),
+                 "penteado": "caracois"},
+}
+
+
+def boneco_de_frente(t, b, passo, costas=False):
+    # As pernas: a meio de um passo, uma esta levantada.
+    t.caixa(b["calcas"], 11, 23, 4, 4 if passo else 6)
+    t.caixa(b["calcas"], 17, 23, 4, 6)
+    t.caixa(PRETO, 10, 26 if passo else 28, 5, 3, 1)                         # os sapatos
     t.caixa(PRETO, 17, 28, 5, 3, 1)
-    t.caixa(CAMISOLA, 10, 14, 12, 10, 2)
-    t.caixa(escurecer(CAMISOLA, 30), 7, 15, 3, 7, 1)                         # os bracos
-    t.caixa(escurecer(CAMISOLA, 30), 22, 15, 3, 7, 1)
-    t.caixa(PELE, 7, 21, 3, 2)
-    t.caixa(PELE, 22, 21, 3, 2)
-    t.oval(PELE, 9, 2, 14, 13)                                               # a cabeca
-    t.oval(CABELO, 9, 1, 14, 7)
-    t.caixa(CABELO, 9, 4, 2, 5)
-    t.caixa(CABELO, 21, 4, 2, 5)
+    t.caixa(b["camisola"], 10, 14, 12, 10, 2)
+    t.caixa(escurecer(b["camisola"], 30), 7, 15, 3, 7, 1)                    # os bracos: um vai a frente
+    t.caixa(escurecer(b["camisola"], 30), 22, 14 if passo else 15, 3, 7, 1)
+    t.caixa(b["pele"], 7, 21, 3, 2)
+    t.caixa(b["pele"], 22, 20 if passo else 21, 3, 2)
+    if costas:
+        t.caixa((170, 70, 50), 12, 15, 8, 8, 2)                              # a mochila
+        t.caixa((120, 44, 34), 12, 19, 8, 1)
+        if b["penteado"] == "caracois":
+            t.oval(b["cabelo"], 7, -1, 18, 17)
+        else:
+            t.oval(b["cabelo"], 9, 1, 14, 14)                                # a cabeca, de tras
+        if b["penteado"] == "comprido":
+            t.caixa(b["cabelo"], 9, 8, 14, 11, 3)
+        else:
+            t.caixa(b["pele"], 14, 13, 4, 2)
+        t.contornar()
+        return
+    if b["penteado"] == "comprido":
+        t.caixa(b["cabelo"], 7, 5, 4, 14, 2)                                 # o cabelo, de cada lado da cara
+        t.caixa(b["cabelo"], 21, 5, 4, 14, 2)
+    if b["penteado"] == "caracois":
+        t.oval(b["cabelo"], 7, -1, 18, 13)
+    t.oval(b["pele"], 9, 2, 14, 13)                                          # a cabeca
+    t.oval(b["cabelo"], 9, 1, 14, 7)
+    t.caixa(b["cabelo"], 9, 4, 2, 5)
+    t.caixa(b["cabelo"], 21, 4, 2, 5)
     t.contornar()
     t.caixa(PRETO, 13, 8, 2, 3)
     t.caixa(PRETO, 17, 8, 2, 3)
-    t.caixa(PELE_ESCURA, 14, 12, 4, 1)
+    t.caixa(escurecer(b["pele"], 45), 14, 12, 4, 1)
 
 
-@modelo("jogador-costas.png")
-def jogador_costas(t):
-    t.caixa(CALCAS, 11, 23, 4, 6)
-    t.caixa(CALCAS, 17, 23, 4, 6)
-    t.caixa(PRETO, 10, 28, 5, 3, 1)
-    t.caixa(PRETO, 17, 28, 5, 3, 1)
-    t.caixa(CAMISOLA, 10, 14, 12, 10, 2)
-    t.caixa(escurecer(CAMISOLA, 30), 7, 15, 3, 7, 1)
-    t.caixa(escurecer(CAMISOLA, 30), 22, 15, 3, 7, 1)
-    t.caixa(PELE, 7, 21, 3, 2)
-    t.caixa(PELE, 22, 21, 3, 2)
-    t.caixa((170, 70, 50), 12, 15, 8, 8, 2)                                  # a mochila
-    t.caixa((120, 44, 34), 12, 19, 8, 1)
-    t.oval(CABELO, 9, 1, 14, 14)                                             # a cabeca, de tras
-    t.caixa(PELE, 14, 13, 4, 2)
+def boneco_de_lado(t, b, passo):
+    if passo:
+        t.caixa(b["calcas"], 13, 23, 5, 6)                                   # as pernas juntas
+        t.caixa(PRETO, 13, 28, 7, 3, 1)
+    else:
+        t.caixa(b["calcas"], 11, 23, 4, 6)                                   # uma perna atras, outra a frente
+        t.caixa(escurecer(b["calcas"], 25), 16, 23, 4, 5)
+        t.caixa(PRETO, 11, 28, 6, 3, 1)
+        t.caixa(PRETO, 16, 27, 6, 3, 1)
+    t.caixa(b["camisola"], 11, 14, 10, 10, 2)
+    t.caixa(escurecer(b["camisola"], 30), 17 if passo else 15, 15, 3, 7, 1)  # o braco
+    t.caixa(b["pele"], 17 if passo else 15, 21, 3, 2)
+    if b["penteado"] == "caracois":
+        t.oval(b["cabelo"], 7, -1, 14, 12)
+    t.oval(b["pele"], 10, 2, 13, 13)
+    t.oval(b["cabelo"], 9, 1, 12, 8)
+    t.caixa(b["cabelo"], 9, 4, 5, 13 if b["penteado"] == "comprido" else 7)
+    t.caixa(b["pele"], 22, 8, 2, 2)                                          # o nariz
     t.contornar()
-
-
-@modelo("jogador-lado.png")
-def jogador_lado(t):
-    t.caixa(CALCAS, 11, 23, 4, 6)                                            # uma perna atras, outra a frente
-    t.caixa(escurecer(CALCAS, 25), 16, 23, 4, 5)
-    t.caixa(PRETO, 11, 28, 6, 3, 1)
-    t.caixa(PRETO, 16, 27, 6, 3, 1)
-    t.caixa(CAMISOLA, 11, 14, 10, 10, 2)
-    t.caixa(escurecer(CAMISOLA, 30), 15, 15, 3, 7, 1)                        # o braco
-    t.caixa(PELE, 15, 21, 3, 2)
-    t.oval(PELE, 10, 2, 13, 13)
-    t.oval(CABELO, 9, 1, 12, 8)
-    t.caixa(CABELO, 9, 4, 5, 7)
-    t.caixa(PELE, 22, 8, 2, 2)                                               # o nariz
-    t.contornar()
+    t.caixa(BRANCO, 18, 7, 1, 3)
     t.caixa(PRETO, 19, 7, 2, 3)
-    t.caixa(PELE_ESCURA, 20, 12, 3, 1)
+    t.caixa(escurecer(b["pele"], 45), 20, 12, 3, 1)
+
+
+def registar_boneco(nome):
+    b = BONECOS[nome]
+    modelo(nome + ".png")(lambda t: boneco_de_frente(t, b, False))
+    modelo(nome + "-passo.png")(lambda t: boneco_de_frente(t, b, True))
+    modelo(nome + "-costas.png")(lambda t: boneco_de_frente(t, b, False, True))
+    modelo(nome + "-costas-passo.png")(lambda t: boneco_de_frente(t, b, True, True))
+    modelo(nome + "-lado.png")(lambda t: boneco_de_lado(t, b, False))
+    modelo(nome + "-lado-passo.png")(lambda t: boneco_de_lado(t, b, True))
+
+
+for nome_do_boneco in BONECOS:
+    registar_boneco(nome_do_boneco)
 
 
 # =====================================================================

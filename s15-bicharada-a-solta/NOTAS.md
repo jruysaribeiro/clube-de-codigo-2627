@@ -46,9 +46,10 @@ horta    praia     farol
 | Cada zona, desenhada com letras (20 por linha, 14 linhas) | `ZONAS` |
 | Como as zonas se juntam | `MUNDO` |
 | Os blocos: todos os quadrados das zonas (relva, árvores, água, mobília, areia, neve...) e o que cada um faz | `BLOCOS` |
-| Os edifícios: que letra é a porta de que interior | `PORTAS` |
+| Os edifícios: que letra é a porta de que interior, e as escadas entre andares | `PORTAS` |
+| Quantas vezes se pode usar cada ataque até voltar a casa da avó | `ATAQUES` (`usos`), `ATAQUE_SEM_FORCAS`, `usos_que_restam()` |
 | O que se vende, e por quanto | `LOJA` |
-| O teu boneco: a cor e as três imagens | `JOGADOR` |
+| O teu boneco: qual dos quatro, a cor e as seis imagens (paradas e a andar) | `JOGADOR` |
 | As falas, as perguntas, quem dá a rede e o boneco de cada treinador | `TREINADORES` (`falas`, `falas_depois`, `falas_rede`, `da_rede`, `imagem`) |
 | Os ataques que um bicho sabe, e os que aprende a um certo nível | `BICHOS` (`ataques`, `aprende`), `ataques_de()` |
 | O tamanho de cada bicho na batalha (1.0 é o normal) | `BICHOS` (`tamanho`), `tamanho_na_batalha()` |
@@ -74,6 +75,20 @@ um `P` no mundo todo, uma letra livre para cada porta, e seis bichos na equipa.
 Os de `ataques` sabe-os desde o início; os de `aprende` passam a aparecer no
 menu quando o bicho chega a esse nível (e o jogo avisa: «aprendeu Estalido!»).
 Um bicho só sabe ataques do tipo dele ou do tipo normal.
+
+### Os usos dos ataques
+
+```python
+"Estalido": {"tipo": "fogo", "poder": 75, "precisao": 80, "efeito": "dano", "usos": 5},
+```
+
+Cada bicho **da criança** só pode usar um ataque esse número de vezes; a casa
+da avó (e acordar lá, depois de uma derrota) devolve-os todos. No menu vê-se
+quantos restam (`3/5`). Quem escolhe um ataque já gasto dá em vez dele o
+`ATAQUE_SEM_FORCAS` (o «Encontrão», fraquinho), para nunca ficar sem nada
+para fazer. Os bichos dos treinadores e os que andam à solta não se cansam.
+Um ataque sem `usos` usa-se sempre. Os mais fortes vêm com 5, os mais fracos
+com 15.
 
 ### As falas
 
@@ -114,6 +129,13 @@ moedas), é o acontecimento `ao_responder()`.
   sítios: uma praia de areia, uma serra de neve, um deserto de catos. Além
   dos que já vinham com o jogo há mais oito: areia, palmeira, canas, rocha,
   neve, cato, flores e ponte;
+- **+ Novo andar** põe um andar por cima do último edifício que foi feito:
+  uma zona com as paredes do andar de baixo, umas escadas que ligam os dois
+  (uma letra, como as portas: quem a pisa em baixo sobe, em cima desce) e,
+  cá fora, mais uma fila de parede com janela por cima do edifício, se
+  couber sem tapar o caminho. Carregar outra vez faz mais um andar. Para pôr
+  um andar noutro edifício faz-se à mão: uma zona nova, uma linha em
+  `PORTAS` e a letra escrita nos dois andares;
 - **+ Nova zona**, **+ Novo edifício**, **+ Novo treinador**, **+ Novo
   bicho**, **+ Novo ataque**, **+ Novo tipo** criam, e o botão vermelho
   **Apagar** tira (e acerta o resto: o `MUNDO`, as `PORTAS`, os números no
@@ -130,10 +152,15 @@ moedas), é o acontecimento `ao_responder()`.
   usam-se como estão, ou servem de começo;
 - cada **treinador** tem a sua imagem no mapa (`imagem`), que se desenha com
   «Desenhar». Sem imagem é um boneco de formas, com a camisola da `cor_fundo`;
-- um **bicho** tem as imagens **De frente** e **De costas**, e o **teu
-  boneco** três (de frente, de costas, de lado): os botões por cima do código
-  escolhem qual se desenha ou se troca. Quem não tiver imagem é desenhado
-  com formas;
+- um **bicho** tem as imagens **De frente** e **De costas**: os botões por
+  cima do código escolhem qual se desenha ou se troca. Um bicho sem imagem é
+  desenhado com formas;
+- o **teu boneco** já aparece desenhado desde o início, e mexe as pernas
+  enquanto anda. **Escolher o boneco** troca-o por um dos quatro que vêm com
+  o jogo. Tem seis imagens (de frente, de costas e de lado; parado e a meio
+  de um passo), e cada uma pode ser redesenhada: a que a criança desenhar
+  passa à frente da que vem com o jogo. Quem desenhar só a parada fica com
+  um boneco que dá um saltinho a cada passo;
 - **A loja** abre ao balcão, com moedas para experimentar;
 - as funções abrem com o boneco a andar sozinho: foge dos bichos, ou
   atira-lhes a rede, ou vai responder às perguntas, conforme a função.
@@ -183,6 +210,7 @@ preços da `LOJA`, os níveis em `TREINADORES`, e as contas de
 | Não se passa de uma zona para a do lado | «Há um bloco por onde se anda na borda das duas, na mesma linha? E no `MUNDO`, estão mesmo lado a lado?» |
 | Uma zona aparece toda desalinhada | «Falta uma vírgula no fim de uma linha?» (Sem ela, o Python cola duas linhas numa.) |
 | A porta de um edifício deixou de funcionar depois de lhe mudarem o nome | «Mudaste o nome no código, ou com o botão **Mudar o nome**?» (Só o botão acerta o `MUNDO` e as `PORTAS`.) |
+| O ataque mais forte deixou de sair | «Quantos usos lhe restam? Já foste a casa da avó?» |
 | Entra-se na porta e não acontece nada | «A letra está em `PORTAS`? E está escrita lá dentro, na parede do interior?» |
 | Compra-se uma coisa nova e não acontece nada | «O `receber_compra()` sabe o que fazer com esse nome? Está escrito igual ao da `LOJA`?» |
 | Uma pergunta dá erro ao abrir | «Tem `"pergunta"` e `"respostas"`? As respostas estão entre `{ }`, cada uma com o que ele diz?» |

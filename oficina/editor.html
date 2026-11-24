@@ -545,9 +545,14 @@ async function mostrarJogos() {
         linha.append(botao);
       }
       if (jogo.criaveis && jogo.criaveis[grupo]) {
-        const novo = elemento("button", "+ " + jogo.criaveis[grupo], "novo");
-        novo.onclick = () => criarNovo(jogo.id, grupo);
-        linha.append(novo);
+        // (Um grupo pode ter mais do que um botao "+": nos edificios, um
+        // edificio novo e um andar novo.)
+        const varios = Array.isArray(jogo.criaveis[grupo]);
+        for (const nome of varios ? jogo.criaveis[grupo] : [jogo.criaveis[grupo]]) {
+          const novo = elemento("button", "+ " + nome, "novo");
+          novo.onclick = () => criarNovo(jogo.id, grupo, varios ? nome : undefined);
+          linha.append(novo);
+        }
       }
       cartao.append(linha);
     }
@@ -566,11 +571,11 @@ async function mostrarJogos() {
   }
 }
 
-async function criarNovo(jogo, grupo) {
+async function criarNovo(jogo, grupo, qual) {
   // Uma coisa nova no jogo: nasce como copia de uma que ja la estava.
   let dados;
   try {
-    dados = await pedir("/api/criar", {jogo, grupo});
+    dados = await pedir("/api/criar", {jogo, grupo, qual});
   } catch (erro) {
     alert(erro.message);
     return;

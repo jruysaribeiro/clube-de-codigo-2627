@@ -280,6 +280,9 @@ MUNDO = [
 # la dentro, na parede do interior. Quem pisa uma, aparece ao lado da outra.
 # Para fazeres um edificio novo: uma zona nova em ZONAS (o interior), uma
 # linha aqui com uma letra que ainda nao uses, e essa letra nos dois sitios.
+# AS ESCADAS sao portas entre dois andares do mesmo edificio. Le-se: "a letra
+# S sobe para o 1.o andar da mercearia". Escreve-se a letra no andar de baixo
+# e no de cima (que e outra zona): quem a pisa em baixo, sobe; em cima, desce.
 PORTAS = {
     "M": "mercearia",
 }
@@ -401,6 +404,7 @@ BLOCOS = {
         "passa": False,
         "erva": False,
         "dentro": True,
+        "sempre": True,
         "cor": (70, 140, 230),
         "desenho": "janela",
         "imagem": "janela.png",
@@ -578,31 +582,41 @@ EFICACIA = {
 # precisao: de 0 a 100, a probabilidade de acertar
 # efeito:   "dano", "cura", "sobe_ataque", "sobe_defesa",
 #           "baixa_ataque" ou "baixa_defesa"
+# usos:     (so se quiseres) quantas vezes cada bicho TEU o pode usar ate
+#           voltares a casa da avo. Quando se gastam, quem o escolher da
+#           em vez dele o ATAQUE_SEM_FORCAS, que e fraquinho. Sem "usos",
+#           usa-se as vezes que se quiser.
+#           (Os bichos dos outros nao se cansam.)
 # som:      (so se quiseres) o nome de um WAV, assim: "som": "bicada.wav".
 #           Se ele existir em comum/assets/sons/, ouve-se quando o ataque
 #           e usado.
 ATAQUES = {
-    "Investida": {"tipo": "normal", "poder": 40, "precisao": 100, "efeito": "dano"},
-    "Arranhão": {"tipo": "normal", "poder": 40, "precisao": 100, "efeito": "dano"},
-    "Bicada": {"tipo": "normal", "poder": 35, "precisao": 100, "efeito": "dano"},
-    "Patada": {"tipo": "normal", "poder": 50, "precisao": 95, "efeito": "dano"},
-    "Salto Felino": {"tipo": "normal", "poder": 65, "precisao": 85, "efeito": "dano"},
-    "Rugido": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "baixa_ataque"},
-    "Cocoricó": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "sobe_ataque"},
-    "Casca Dura": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "sobe_defesa"},
-    "Escamas": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "sobe_defesa"},
-    "Crista em Brasa": {"tipo": "fogo", "poder": 55, "precisao": 95, "efeito": "dano"},
-    "Fumarada": {"tipo": "fogo", "poder": 45, "precisao": 100, "efeito": "dano"},
-    "Estalido": {"tipo": "fogo", "poder": 75, "precisao": 80, "efeito": "dano"},
-    "Esguicho": {"tipo": "agua", "poder": 40, "precisao": 100, "efeito": "dano"},
-    "Tentáculo": {"tipo": "agua", "poder": 55, "precisao": 95, "efeito": "dano"},
-    "Onda da Nazaré": {"tipo": "agua", "poder": 85, "precisao": 70, "efeito": "dano"},
-    "Tinta de Choco": {"tipo": "agua", "poder": 0, "precisao": 100, "efeito": "baixa_defesa"},
-    "Chicote de Cortiça": {"tipo": "planta", "poder": 45, "precisao": 100, "efeito": "dano"},
-    "Folha de Couve": {"tipo": "planta", "poder": 55, "precisao": 95, "efeito": "dano"},
-    "Bolotada": {"tipo": "planta", "poder": 70, "precisao": 85, "efeito": "dano"},
-    "Seiva": {"tipo": "planta", "poder": 0, "precisao": 100, "efeito": "cura"},
+    "Investida": {"tipo": "normal", "poder": 40, "precisao": 100, "efeito": "dano", "usos": 15},
+    "Arranhão": {"tipo": "normal", "poder": 40, "precisao": 100, "efeito": "dano", "usos": 15},
+    "Bicada": {"tipo": "normal", "poder": 35, "precisao": 100, "efeito": "dano", "usos": 15},
+    "Patada": {"tipo": "normal", "poder": 50, "precisao": 95, "efeito": "dano", "usos": 12},
+    "Salto Felino": {"tipo": "normal", "poder": 65, "precisao": 85, "efeito": "dano", "usos": 8},
+    "Rugido": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "baixa_ataque", "usos": 15},
+    "Cocoricó": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "sobe_ataque", "usos": 15},
+    "Casca Dura": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "sobe_defesa", "usos": 15},
+    "Escamas": {"tipo": "normal", "poder": 0, "precisao": 100, "efeito": "sobe_defesa", "usos": 15},
+    "Crista em Brasa": {"tipo": "fogo", "poder": 55, "precisao": 95, "efeito": "dano", "usos": 8},
+    "Fumarada": {"tipo": "fogo", "poder": 45, "precisao": 100, "efeito": "dano", "usos": 12},
+    "Estalido": {"tipo": "fogo", "poder": 75, "precisao": 80, "efeito": "dano", "usos": 5},
+    "Esguicho": {"tipo": "agua", "poder": 40, "precisao": 100, "efeito": "dano", "usos": 15},
+    "Tentáculo": {"tipo": "agua", "poder": 55, "precisao": 95, "efeito": "dano", "usos": 8},
+    "Onda da Nazaré": {"tipo": "agua", "poder": 85, "precisao": 70, "efeito": "dano", "usos": 5},
+    "Tinta de Choco": {"tipo": "agua", "poder": 0, "precisao": 100, "efeito": "baixa_defesa", "usos": 15},
+    "Chicote de Cortiça": {"tipo": "planta", "poder": 45, "precisao": 100, "efeito": "dano", "usos": 12},
+    "Folha de Couve": {"tipo": "planta", "poder": 55, "precisao": 95, "efeito": "dano", "usos": 8},
+    "Bolotada": {"tipo": "planta", "poder": 70, "precisao": 85, "efeito": "dano", "usos": 5},
+    "Seiva": {"tipo": "planta", "poder": 0, "precisao": 100, "efeito": "cura", "usos": 5},
+    "Encontrão": {"tipo": "normal", "poder": 20, "precisao": 100, "efeito": "dano"},
 }
+
+# O que um bicho teu faz quando escolhes um ataque de que ja gastou os usos:
+# um ataque fraquinho, que tem de existir em ATAQUES e nao pode ter "usos".
+ATAQUE_SEM_FORCAS = "Encontrão"
 
 # --- Os bichos ---
 # Os numeros sao os valores BASE, ao nivel 1. Cada nivel acima soma 10%.
@@ -678,18 +692,27 @@ BICHOS = {
 }
 
 # --- Tu ---
-# O teu boneco, no mapa. As tres imagens sao PNG em comum/assets/imagens/:
-# quando existem, aparecem; quando nao, o boneco e desenhado com formas.
-#   cor             a cor da camisola do boneco desenhado
+# O teu boneco, no mapa. Cada imagem e um PNG. Se desenhares a tua (fica em
+# comum/assets/imagens/), e ela que aparece; se nao, aparece a que vem com o
+# jogo com esse nome (ha quatro bonecos: jogador, jogador2, jogador3 e
+# jogador4). Se nao houver nenhuma, o boneco e desenhado com formas.
+#   cor             a cor da camisola do boneco desenhado com formas
 #   imagem          de frente (quando andas para baixo)
 #   imagem_costas   de costas (quando andas para cima)
 #   imagem_lado     de lado, a olhar para a DIREITA (para a esquerda, o jogo
 #                   vira-a ao contrario)
+#   imagem_passo, imagem_costas_passo, imagem_lado_passo
+#                   as mesmas tres, a meio de um passo: enquanto andas, o
+#                   jogo troca entre a parada e esta. Se desenhares a parada
+#                   e nao desenhares esta, o boneco da um saltinho
 JOGADOR = {
     "cor": (240, 200, 70),
     "imagem": "jogador.png",
+    "imagem_passo": "jogador-passo.png",
     "imagem_costas": "jogador-costas.png",
+    "imagem_costas_passo": "jogador-costas-passo.png",
     "imagem_lado": "jogador-lado.png",
+    "imagem_lado_passo": "jogador-lado-passo.png",
 }
 
 # --- Os treinadores ---
@@ -841,6 +864,20 @@ def obter_imagem(nome_ficheiro, tamanho):
     return imagens_carregadas[chave]
 
 
+def obter_modelo(nome_ficheiro, tamanho):
+    # Igual, para as imagens que vem com o jogo (as do teu boneco): estao em
+    # oficina/modelos/.
+    chave = "modelo:" + nome_ficheiro + str(tamanho)
+    if chave not in imagens_carregadas:
+        caminho = PASTA_ASSETS.parent.parent / "oficina" / "modelos" / nome_ficheiro
+        if caminho.is_file():
+            imagem = pygame.image.load(caminho).convert_alpha()
+            imagens_carregadas[chave] = pygame.transform.scale(imagem, (tamanho, tamanho))
+        else:
+            imagens_carregadas[chave] = None
+    return imagens_carregadas[chave]
+
+
 # Com os sons e igual: ficam aqui depois de lidos, e None quer dizer "nao ha".
 sons_carregados = {}
 
@@ -904,6 +941,7 @@ def escurecer(cor, quanto):
 #   equipa_inimiga[ativo_inimigo]       o bicho inimigo que esta em campo
 #   BICHOS[bicho["nome"]]               a ficha dele, la em cima ("tipo"...)
 #   ataques_de(bicho)                   os nomes dos ataques que ele sabe agora
+#   usos_que_restam(bicho, nome)        quantas vezes ainda pode usar esse ataque
 #   ATAQUES[nome]                       a ficha de um ataque ("tipo", "poder",
 #                                       "precisao", "efeito")
 #   eficacia(tipo_do_ataque, tipo_do_alvo)    2.0, 0.5 ou 1.0, pela tabela EFICACIA
@@ -952,6 +990,7 @@ def criar_bicho(nome, nivel):
         "xp": 0,
         "mod_ataque": 1.0,
         "mod_defesa": 1.0,
+        "gastos": {},         # quantas vezes ja usou cada ataque, desde a ultima ida a casa da avo
         "anunciado": False,   # ja dissemos "desmaiou"?
         "tremor": 0,          # quantos frames ainda treme depois de levar
     }
@@ -967,6 +1006,7 @@ def curar_tudo(equipa):
         bicho["mod_ataque"] = 1.0
         bicho["mod_defesa"] = 1.0
         bicho["anunciado"] = False
+        bicho["gastos"] = {}      # e os ataques voltam a ter os usos todos
 
 
 def ataques_de(bicho):
@@ -980,6 +1020,27 @@ def ataques_de(bicho):
             if bicho["nivel"] >= dados["aprende"][nome] and nome not in sabe:
                 sabe.append(nome)
     return sabe[-4:]
+
+
+def usos_que_restam(bicho, nome):
+    # Quantas vezes este bicho ainda pode usar este ataque antes de voltar a
+    # casa da avo. Devolve -1 se o ataque nao tem "usos" (usa-se sempre).
+    if "usos" not in ATAQUES[nome]:
+        return -1
+    gastos = 0
+    if nome in bicho["gastos"]:
+        gastos = bicho["gastos"][nome]
+    if gastos >= ATAQUES[nome]["usos"]:
+        return 0
+    return ATAQUES[nome]["usos"] - gastos
+
+
+def gastar_um_uso(bicho, nome):
+    # Chamada quando um bicho TEU usa um ataque (acerte ou falhe).
+    if nome in bicho["gastos"]:
+        bicho["gastos"][nome] = bicho["gastos"][nome] + 1
+    else:
+        bicho["gastos"][nome] = 1
 
 
 def nivel_mais_alto(equipa):
@@ -1077,6 +1138,9 @@ troca_obrigatoria = False
 
 # No mapa: onde estas, para onde olhas e quantos passos ja deste.
 jogador = {"zona": "", "coluna": 1, "linha": 1, "olha": "baixo", "passos": 0}
+# Quando deste o ultimo passo (em milesimos de segundo): e para o boneco
+# mexer as pernas enquanto andas, e parar quando paras.
+hora_do_ultimo_passo = -1000
 # Onde acordas se a equipa toda desmaiar: o ultimo sitio onde descansaste.
 descanso = {"zona": "", "coluna": 1, "linha": 1}
 # Por que porta entraste em cada edificio, para saires pela mesma:
@@ -1353,6 +1417,18 @@ def chao_livre(letra):
     return pode_andar(letra)
 
 
+def e_escada(letra):
+    # Uma porta e uma escada quando os dois lados dela ficam dentro de
+    # edificios: a letra esta escrita no interior de um edificio que nao e
+    # aquele para onde ela leva.
+    for nome in ZONAS:
+        if nome != PORTAS[letra] and nome in PORTAS.values():
+            for fila in ZONAS[nome]:
+                if letra in fila:
+                    return True
+    return False
+
+
 def passar_a_porta(letra):
     # Pisaste uma porta: apareces ao lado da porta igual, do outro lado.
     # De fora vai-se para dentro; de dentro volta-se a porta por onde se
@@ -1545,7 +1621,7 @@ def descansar():
     descanso["zona"] = jogador["zona"]
     descanso["coluna"] = jogador["coluna"]
     descanso["linha"] = jogador["linha"]
-    dizer("A avó deu sopa a todos. A equipa está curada!")
+    dizer("A avó deu sopa a todos. A equipa está curada, e com forças para todos os ataques!")
     ao_descansar()
 
 
@@ -1693,7 +1769,7 @@ def tecla_no_encontro(tecla):
 def andar(passo_coluna, passo_linha):
     # Tenta dar um passo: andar(1, 0) e para a direita, andar(0, -1) e para
     # cima. O que acontece depende da letra do quadrado para onde vais.
-    global aviso
+    global aviso, hora_do_ultimo_passo
     if passo_coluna == 1:
         jogador["olha"] = "direita"
     elif passo_coluna == -1:
@@ -1724,13 +1800,19 @@ def andar(passo_coluna, passo_linha):
     antes = jogador["zona"]
     ir_para(zona, coluna, linha)
     jogador["passos"] = jogador["passos"] + 1
+    hora_do_ultimo_passo = pygame.time.get_ticks()
     aviso = ""
     if letra in PORTAS and PORTAS[letra] in ZONAS:
         passar_a_porta(letra)
     # Mudaste de zona, por um lado do ecra ou por uma porta? E a zona nova
     # que o desenhar_mundo passa a mostrar.
     if jogador["zona"] != antes:
-        dizer("Entraste em: " + jogador["zona"])
+        if letra in PORTAS and e_escada(letra) and jogador["zona"] == PORTAS[letra]:
+            dizer("Subiste para: " + jogador["zona"])
+        elif letra in PORTAS and e_escada(letra):
+            dizer("Desceste para: " + jogador["zona"])
+        else:
+            dizer("Entraste em: " + jogador["zona"])
     ao_dar_passo(letra)
     if estado == "mundo" and e_erva(letra) and ha_batalha_na_erva():
         encontrar_bicho()
@@ -1997,6 +2079,9 @@ def mudar_modificador(bicho, chave, fator, nome_do_valor):
 def usar_ataque(atacante, alvo, nome):
     dados = ATAQUES[nome]
     mensagens.append(atacante["nome"] + " usa " + nome + "!")
+    for meu in minha_equipa:
+        if meu is atacante:
+            gastar_um_uso(atacante, nome)      # so os teus bichos se cansam
     if "som" in dados:
         tocar_som(dados["som"])
     if random.randint(1, 100) > dados["precisao"]:
@@ -2251,7 +2336,15 @@ def tecla_na_batalha(tecla):
             cursor = 0
         elif confirmar:
             nome = ataques_de(eu)[cursor]
-            jogador_escolheu({"quem": "jogador", "tipo": "atacar", "ataque": nome})
+            if usos_que_restam(eu, nome) == 0 and ATAQUE_SEM_FORCAS in ATAQUES:
+                # Ja gastou os usos desse: sai o ataque de quem nao tem forcas.
+                mensagens.append(eu["nome"] + " já não tem forças para " + nome + "!")
+                jogador_escolheu({"quem": "jogador", "tipo": "atacar", "ataque": ATAQUE_SEM_FORCAS})
+            elif usos_que_restam(eu, nome) == 0:
+                mensagens.append(eu["nome"] + " já não tem forças para " + nome + ". Só depois de ir a casa da avó!")
+                fase = "texto"
+            else:
+                jogador_escolheu({"quem": "jogador", "tipo": "atacar", "ataque": nome})
 
     elif fase == "equipa":
         if voltar and not troca_obrigatoria:
@@ -2437,11 +2530,20 @@ def desenhar_barra_vida(bicho, x, y, largura):
 # letra: a letra desse quadrado, na zona. Se e de um bloco, desenha o bloco;
 # se e de uma porta, desenha a porta; se o jogo nao a conhece, desenha relva.
 # (Tu e os treinadores sao desenhados depois, por outras funcoes.)
-# Ideias: outro desenho para as portas; um quadrado que muda com as horas
+# Ideias: outro desenho para as portas e para as escadas; um quadrado que muda com as horas
 # (mais escuro "a noite", usando a memoria e o a_cada_frame).
 def desenhar_quadrado(letra, x, y):
     if letra in BLOCOS:
         desenhar_bloco(letra, x, y)
+    elif letra in PORTAS and e_escada(letra):
+        # Umas escadas: quatro degraus. No andar de cima (para onde a porta
+        # leva) veem-se a descer, mais escuras.
+        cor = TRONCO
+        if PORTAS[letra] == jogador["zona"]:
+            cor = escurecer(TRONCO, 0.7)
+        pygame.draw.rect(ecra, escurecer(cor, 0.5), (x, y, QUADRADO, QUADRADO))
+        for degrau in range(4):
+            pygame.draw.rect(ecra, cor, (x + 3 + degrau * 3, y + 3 + degrau * 9, QUADRADO - 6 - degrau * 6, 7))
     elif letra in PORTAS:
         pygame.draw.rect(ecra, PAREDE, (x, y, QUADRADO, QUADRADO))
         pygame.draw.rect(ecra, TRONCO, (x + 8, y + 4, 24, 36))
@@ -2570,24 +2672,44 @@ def desenhar_bloco(letra, x, y):
 
 # TU, NO MAPA
 # olha_para: "cima", "baixo", "esquerda" ou "direita". Como esta: mostra a
-# imagem do JOGADOR para esse lado (de frente, de costas ou de lado). Se ela
-# nao existir, desenha um corpo com a "cor" do JOGADOR, uma cabeca, e dois
-# olhos virados para onde vais (de costas nao se veem).
-# Ideias: outra cor de camisola; um chapeu; o teu primeiro bicho a andar
-# atras de ti, pequenino (desenhar_bicho(minha_equipa[0], x, y, 20, 1)).
+# imagem do JOGADOR para esse lado (de frente, de costas ou de lado): a que
+# desenhaste ou, se nao desenhaste nenhuma, a que vem com o jogo. Enquanto
+# andas, troca entre a imagem parada e a do passo. Se nao houver imagem
+# nenhuma, desenha um corpo com a "cor" do JOGADOR, uma cabeca, e dois olhos
+# virados para onde vais (de costas nao se veem).
+# Ideias: andar mais devagar ou mais depressa com as pernas (muda o 250); um
+# chapeu por cima da imagem; o teu primeiro bicho a andar atras de ti,
+# pequenino (desenhar_bicho(minha_equipa[0], x, y, 20, 1)).
 def desenhar_jogador(x, y, olha_para):
     chave = "imagem"
     if olha_para == "cima":
         chave = "imagem_costas"
     if olha_para == "esquerda" or olha_para == "direita":
         chave = "imagem_lado"
+    # A meio de um passo? Nos passos impares, e so logo a seguir a andar.
+    a_andar = pygame.time.get_ticks() - hora_do_ultimo_passo < 250 and jogador["passos"] % 2 == 1
+
+    imagem = None
     if chave in JOGADOR:
-        imagem = obter_imagem(JOGADOR[chave], QUADRADO)
-        if imagem is not None:
-            if olha_para == "esquerda":
-                imagem = pygame.transform.flip(imagem, True, False)
-            ecra.blit(imagem, (x, y))
-            return
+        # Primeiro a tua; se nao a desenhaste, a que vem com o jogo.
+        obter = obter_imagem
+        imagem = obter(JOGADOR[chave], QUADRADO)
+        if imagem is None:
+            obter = obter_modelo
+            imagem = obter(JOGADOR[chave], QUADRADO)
+        if imagem is not None and a_andar:
+            do_passo = None
+            if chave + "_passo" in JOGADOR:
+                do_passo = obter(JOGADOR[chave + "_passo"], QUADRADO)
+            if do_passo is not None:
+                imagem = do_passo
+            else:
+                y = y - 2        # sem imagem do passo, da um saltinho
+    if imagem is not None:
+        if olha_para == "esquerda":
+            imagem = pygame.transform.flip(imagem, True, False)
+        ecra.blit(imagem, (x, y))
+        return
 
     meio = x + QUADRADO // 2
     pygame.draw.rect(ecra, JOGADOR["cor"], (meio - 9, y + 20, 18, 17), border_radius=5)
@@ -2877,8 +2999,14 @@ def desenhar_batalha():
             if indice == cursor:
                 cor = AMARELO
                 mostrar_texto(">", 22, y, AMARELO, fonte)
+            # Quantos usos lhe restam (os gastos ficam a cinzento).
+            restam = usos_que_restam(eu, nome)
+            if restam == 0 and indice != cursor:
+                cor = CINZA
             pygame.draw.circle(ecra, CORES_TIPO[ATAQUES[nome]["tipo"]], (52, y + 10), 7)
             mostrar_texto(nome, 66, y, cor, fonte)
+            if restam != -1:
+                mostrar_texto(str(restam) + "/" + str(ATAQUES[nome]["usos"]), 340, y + 3, cor, fonte_pequena)
             y = y + 32
             indice = indice + 1
         # A ficha do ataque escolhido, do lado direito.

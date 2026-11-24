@@ -623,8 +623,9 @@ def _novo_inimigo(fonte):
 
     texto = "\n".join(linhas[inicio - 1:fim])
     texto = texto.replace('"' + antigo + '"', '"' + nome + '"', 1)
-    texto = re.sub(r'"imagem": "[^"]*"', '"imagem": "' + nome + '.png"', texto)
-    texto = re.sub(r'"som": "[^"]*"', '"som": "' + nome + '.wav"', texto)
+    corpo = blocos.corpo_livre("\n".join(linhas), nome)      # ficheiros so dele
+    texto = re.sub(r'"imagem": "[^"]*"', '"imagem": "' + corpo + '.png"', texto)
+    texto = re.sub(r'"som": "[^"]*"', '"som": "' + corpo + '.wav"', texto)
     # Para aparecer logo na onda 1 do jogo, e para nao se confundir com o
     # outro: fica amarelo.
     texto = re.sub(r'"desde_onda": \w+', '"desde_onda": 1', texto)

@@ -315,8 +315,9 @@ def _copiar_entrada(linhas, inicio, fim, antigo, nome, ultima):
     # novos. "ultima" e a linha onde acaba a ultima entrada: a copia vai a seguir.
     texto = "\n".join(linhas[inicio - 1:fim])
     texto = texto.replace('"' + antigo + '"', '"' + nome + '"', 1)
-    texto = re.sub(r'"imagem": "[^"]*"', '"imagem": "' + _ficheiro(nome) + '.png"', texto)
-    texto = re.sub(r'"som": "[^"]*"', '"som": "' + _ficheiro(nome) + '.wav"', texto)
+    corpo = blocos.corpo_livre("\n".join(linhas), _ficheiro(nome))      # ficheiros so dela
+    texto = re.sub(r'"imagem": "[^"]*"', '"imagem": "' + corpo + '.png"', texto)
+    texto = re.sub(r'"som": "[^"]*"', '"som": "' + corpo + '.wav"', texto)
     if not texto.rstrip().endswith(","):
         texto = texto.rstrip() + ","
     if not linhas[ultima - 1].rstrip().endswith(","):

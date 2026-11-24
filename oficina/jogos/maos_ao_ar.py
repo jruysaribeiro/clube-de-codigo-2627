@@ -562,8 +562,9 @@ def _novo_inimigo(fonte):
     copia[0] = copia[0][:onde] + '"' + letra + '"' + copia[0][ate:]
     texto = "\n".join(copia)
     texto = re.sub(r'"nome":\s*"[^"]*"', '"nome": "' + nome + '"', texto, count=1)
-    texto = re.sub(r'"imagem":\s*"[^"]*"', '"imagem": "' + _ficheiro(nome) + '.png"', texto)
-    texto = re.sub(r'"som":\s*"[^"]*"', '"som": "' + _ficheiro(nome) + '.wav"', texto)
+    corpo = blocos.corpo_livre("\n".join(linhas), _ficheiro(nome))      # ficheiros so dele
+    texto = re.sub(r'"imagem":\s*"[^"]*"', '"imagem": "' + corpo + '.png"', texto)
+    texto = re.sub(r'"som":\s*"[^"]*"', '"som": "' + corpo + '.wav"', texto)
     nova = _acrescentar(linhas, texto.split("\n"), fichas[-1][3])
 
     nova, nivel = _por_no_mapa(nova, letra)

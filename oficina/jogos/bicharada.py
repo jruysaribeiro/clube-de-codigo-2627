@@ -337,8 +337,10 @@ def _copiar_ficha(linhas, inicio, fim, antigo, nome, ultima):
     # "ultima" e a linha onde acaba a ultima ficha: a copia vai a seguir.
     texto = "\n".join(linhas[inicio - 1:fim])
     texto = texto.replace('"' + antigo + '"', '"' + nome + '"', 1)
-    texto = re.sub(r'"imagem": "[^"]*"', '"imagem": "' + _ficheiro(nome) + '.png"', texto)
-    texto = re.sub(r'"som": "[^"]*"', '"som": "' + _ficheiro(nome) + '.wav"', texto)
+    # (Ficheiros so dela: ve o corpo_livre, no blocos.py.)
+    corpo = blocos.corpo_livre("\n".join(linhas), _ficheiro(nome), (".png", "-costas.png", ".wav"))
+    texto = re.sub(r'"imagem": "[^"]*"', '"imagem": "' + corpo + '.png"', texto)
+    texto = re.sub(r'"som": "[^"]*"', '"som": "' + corpo + '.wav"', texto)
     if not texto.rstrip().endswith(","):
         texto = texto.rstrip() + ","
     if not linhas[ultima - 1].rstrip().endswith(","):
@@ -412,7 +414,8 @@ def novo(fonte, grupo):
     nome = _nome_livre("Ataque novo", existentes)
     copia = _copiar_ficha(linhas, inicio, fim, antigo, nome, ultima)
     if '"som"' not in "\n".join(copia) and copia[-1].rstrip().endswith("},"):
-        copia[-1] = copia[-1].rstrip()[:-2] + ', "som": "' + _ficheiro(nome) + '.wav"},'
+        copia[-1] = (copia[-1].rstrip()[:-2] + ', "som": "'
+                     + blocos.corpo_livre("\n".join(linhas), _ficheiro(nome), (".wav",)) + '.wav"},')
     aviso = ('Criei o "' + nome + '", igual a ' + antigo + ". Muda-lhe o nome e os números."
              " Ainda nenhum bicho o tem: abre um bicho e carrega em «Escolher os ataques».")
     return "\n".join(linhas[:ultima] + copia + linhas[ultima:]), "ataque:" + str(len(partes)), aviso

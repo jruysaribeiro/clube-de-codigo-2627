@@ -808,19 +808,25 @@ class Sessao:
 
     # --- Criar uma coisa nova ---
 
-    def criar(self, jogo, grupo):
+    def criar(self, jogo, grupo, qual=None):
         # Um inimigo novo, uma torre nova: quem sabe faze-los e o ficheiro
         # do jogo em oficina/jogos/, que devolve o ficheiro ja com a coisa
         # nova la dentro (uma copia de uma que ja existia, com outro nome).
         with self.tranca:
             config = configuracao(jogo)
-            if grupo not in getattr(config, "CRIAVEIS", {}):
+            criaveis = getattr(config, "CRIAVEIS", {})
+            if grupo not in criaveis:
+                raise Falha("Aqui não dá para criar isso.")
+            # (Um grupo com varios botoes "+": o CRIAVEIS dele e uma lista, e
+            # "qual" diz em qual se carregou.)
+            varios = isinstance(criaveis[grupo], list)
+            if varios and qual not in criaveis[grupo]:
                 raise Falha("Aqui não dá para criar isso.")
             guardar_original(config)
             caminho = caminho_do_jogo(config)
             fonte, fim_de_linha = ler(caminho)
             try:
-                nova, escolha, aviso = config.novo(fonte, grupo)
+                nova, escolha, aviso = config.novo(fonte, grupo, qual) if varios else config.novo(fonte, grupo)
                 compile(nova, config.FICHEIRO, "exec")
                 if escolha not in [e["id"] for e in config.escolhas(nova)]:
                     raise ValueError("a coisa nova não apareceu")
@@ -1351,7 +1357,7 @@ class Pedido(BaseHTTPRequestHandler):
         elif caminho == "/api/qual-imagem":
             self.tratar(lambda: sessao.escolher_imagem(dados.get("qual")))
         elif caminho == "/api/criar":
-            self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo"))))
+            self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo")), dados.get("qual")))
         elif caminho == "/api/desenho":
             try:
                 self.responder(200, sessao.desenhar(dados))

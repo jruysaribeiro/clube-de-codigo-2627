@@ -7,6 +7,7 @@
 # ultima linha.
 
 import ast
+import os
 
 
 def instrucao(arvore, nome):
@@ -184,3 +185,23 @@ def nos_da_regiao(arvore, inicio, fim):
     # As instrucoes inteiras que tocam na regiao. Se a regiao e so a ficha
     # do Soldado, a instrucao inteira e "INIMIGOS = {...}".
     return [no for no in arvore.body if no.lineno <= fim and no.end_lineno >= inicio]
+
+
+def corpo_livre(escrito, corpo, fins=(".png", ".wav")):
+    # Uma coisa nova fica com ficheiros so dela. Recebe o codigo todo do jogo
+    # e o nome que os ficheiros teriam ("bicho-novo") e devolve esse nome ou,
+    # se ja houver "bicho-novo.png" (escrito no codigo, ou nas pastas das
+    # imagens e dos sons), o primeiro que estiver livre: "bicho-novo-2".
+    # Senao, a quem mudasse o nome ao primeiro bicho novo e criasse outro, os
+    # dois ficavam a partilhar a imagem: desenhar um mudava o outro.
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    pastas = [os.path.join(raiz, "comum", "assets", "imagens"), os.path.join(raiz, "comum", "assets", "sons")]
+
+    def ocupado(nome):
+        return '"' + nome + '"' in escrito or any(os.path.exists(os.path.join(pasta, nome)) for pasta in pastas)
+    tentativa = corpo
+    numero = 2
+    while any(ocupado(tentativa + fim) for fim in fins):
+        tentativa = corpo + "-" + str(numero)
+        numero = numero + 1
+    return tentativa
