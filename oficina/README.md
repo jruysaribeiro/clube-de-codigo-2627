@@ -4,8 +4,9 @@ Escolhe-se um jogo e **uma coisa** dele (um inimigo, uma torre, o mapa).
 De um lado fica só o código dessa coisa; do outro, o jogo a correr, a
 mudar enquanto se escreve.
 
-Abre quatro jogos: **FADO//NEON** (s10), **Bicharada** (s12), **O Cerco** (s13)
-e **Mãos ao Ar!** (s14, aqui jogado só com o teclado, sem câmara).
+Abre cinco jogos: **FADO//NEON** (s10), **Bicharada** (s12), **Bicharada à
+Solta** (s15, a Bicharada com um mapa por onde se anda), **O Cerco** (s13) e
+**Mãos ao Ar!** (s14, aqui jogado só com o teclado, sem câmara).
 
 ## Correr
 
@@ -37,11 +38,12 @@ perceber o que se lhe pode pedir (`SUGESTOES`, no `jogos/o_cerco.py`).
 
 ## Regras do jogo
 
-Além dos dados, os quatro jogos abrem **regras**. N'O Cerco são quatro: quem
+Além dos dados, os cinco jogos abrem **regras**. N'O Cerco são quatro: quem
 a torre ataca, o que a torre faz ao disparar, o que acontece a um inimigo
 atingido e como anda um inimigo. Nos outros: como saem os tiros e o que faz
 cada carta (FADO//NEON), quanto magoa um ataque e quem ataca primeiro
-(Bicharada), como salta o Faísca e como se mexe um inimigo (Mãos ao Ar!).
+(Bicharada; a Bicharada à Solta junta onde se pode andar e que bicho salta da
+erva), como salta o Faísca e como se mexe um inimigo (Mãos ao Ar!).
 Cada uma é uma função pequena do jogo; mudá-la muda a maneira como o jogo se
 comporta. É aqui que se escreve um `if` a sério.
 
@@ -60,7 +62,7 @@ no `jogos/o_cerco.py`).
 
 ## Acontecimentos, desenhos e coisas novas
 
-Nos quatro jogos:
+Nos cinco jogos:
 
 - **Acontecimentos**: funções que vêm vazias e que o jogo chama em certos
   momentos (n'O Cerco: quando começa uma onda, cai um inimigo, um inimigo

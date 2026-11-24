@@ -443,9 +443,9 @@ página no browser: escolhe-se um jogo e **uma coisa** dele (um inimigo, uma
 torre, um nível), e fica o código dessa coisa de um lado e o jogo a correr do
 outro, a mudar enquanto se escreve. Para fechar: `Ctrl + C` no terminal.
 
-Abre quatro jogos: **FADO//NEON** (s10), **Bicharada** (s12), **O Cerco**
-(s13) e **Mãos ao Ar!** (s14, aqui só com o teclado: não liga a câmara nem
-instala nada).
+Abre cinco jogos: **FADO//NEON** (s10), **Bicharada** (s12), **Bicharada à
+Solta** (s15, a Bicharada com um mapa), **O Cerco** (s13) e **Mãos ao Ar!**
+(s14, aqui só com o teclado: não liga a câmara nem instala nada).
 
 - A Oficina mexe no **ficheiro verdadeiro** do jogo, e só guarda código que
   correu sem rebentar. **Repor o original** desfaz um bocado; **Guardar o meu
@@ -460,7 +460,7 @@ já foi mudado, para experimentar a sério; **Voltar** regressa ao código.
 
 ### Regras, acontecimentos e desenhos
 
-Além dos dados, os quatro jogos abrem **regras** (n'O Cerco: quem a torre
+Além dos dados, os cinco jogos abrem **regras** (n'O Cerco: quem a torre
 ataca, o que faz ao disparar...), **acontecimentos** (funções vazias que o
 jogo chama quando cai um inimigo, começa uma onda, se carrega numa tecla...)
 e **desenhos**. São funções pequenas: é aqui que se escreve, ou se pede ao
