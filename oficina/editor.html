@@ -105,8 +105,8 @@
   #ajuda { margin: 0; padding: 0 14px 12px; max-height: 30vh; overflow: auto; white-space: pre; color: #cfcfe0; font: 12.5px/1.5 var(--letra-codigo); }
 
   /* ---------- a imagem do bocado ---------- */
-  #barra-imagem, #barra-som { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); font-size: 14px; }
-  #barra-imagem button, #barra-som button { font-size: 14px; }
+  #barra-imagem, #barra-som, #barra-lista { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); font-size: 14px; }
+  #barra-imagem button, #barra-som button, #barra-lista button { font-size: 14px; }
   #gravar-som.a-gravar { border-color: var(--vermelho); color: var(--vermelho); }
   #miniatura {
     width: 40px; height: 40px; flex: none; border: 1px solid var(--linha); border-radius: 6px;
@@ -116,6 +116,20 @@
   #texto-imagem, #texto-som { flex: 1; min-width: 150px; color: var(--fraco); }
   #texto-imagem b, #texto-som b { color: var(--texto); font-weight: 600; font-family: var(--letra-codigo); }
   #texto-imagem.mal, #texto-som.mal { color: var(--laranja); }
+
+  /* ---------- escolher de uma lista ---------- */
+  #lista { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(10, 10, 18, .8); padding: 12px; overflow: auto; }
+  #lista .folha { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; width: min(560px, 100%); }
+  #lista h2 { margin: 0; font-size: 19px; }
+  #lista p { margin: 0; color: var(--fraco); font-size: 14px; }
+  #opcoes-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+  #opcoes-lista button { font-size: 15px; }
+  #opcoes-lista button.escolhida { border-color: var(--amarelo); box-shadow: 0 0 0 2px var(--amarelo); }
+  #opcoes-lista button b { color: var(--amarelo); margin-right: 6px; }
+  #lista .fim { display: flex; gap: 8px; }
+  #guardar-lista { border-color: var(--verde); color: var(--verde); font-weight: 600; }
+  #apagar { margin-left: auto; color: var(--vermelho); }
+  #apagar:hover { border-color: var(--vermelho); }
 
   /* ---------- desenhar uma imagem ---------- */
   #desenho { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(10, 10, 18, .8); padding: 12px; overflow: auto; }
@@ -248,6 +262,10 @@
     <button type="button" id="por-som">Escolher um som</button>
     <button type="button" id="tirar-som" hidden>Tirar o som</button>
   </div>
+  <div id="barra-lista" hidden>
+    <span>Em vez de escreveres os nomes:</span>
+    <button type="button" id="abrir-lista"></button>
+  </div>
   <div class="caixa">
     <pre id="numeros" aria-hidden="true"></pre>
     <div class="folhas">
@@ -275,14 +293,27 @@
     <button id="guardar">Guardar o meu jogo</button>
     <button id="reabrir" hidden>Pôr o jogo a correr outra vez</button>
     <button id="pedir-ajuda" hidden><span class="luz" id="luz-do-botao"></span><span id="texto-do-botao">Pedir ao ajudante</span></button>
+    <button id="apagar" hidden></button>
   </div>
   </section>
   </div>
 </main>
 
-<input type="file" id="escolher-ficheiro" accept=".py,text/x-python,text/plain" hidden>
+<input type="file" id="escolher-ficheiro" accept=".zip,.py,application/zip,text/x-python,text/plain" hidden>
 <input type="file" id="escolher-imagem" accept="image/*" hidden>
 <input type="file" id="escolher-som" accept="audio/*" hidden>
+
+<div id="lista" hidden>
+  <div class="folha" role="dialog" aria-labelledby="titulo-lista">
+    <h2 id="titulo-lista"></h2>
+    <p id="nota-lista"></p>
+    <div id="opcoes-lista"></div>
+    <div class="fim">
+      <button type="button" id="guardar-lista">Pôr no jogo</button>
+      <button type="button" id="fechar-lista">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <div id="desenho" hidden>
   <div class="folha" role="dialog" aria-label="Desenhar uma imagem">
@@ -465,7 +496,80 @@ async function criarNovo(jogo, grupo) {
     alert(erro.message);
     return;
   }
-  abrir(jogo, dados.escolha, dados.aviso);
+  // (Se a coisa nova tem uma lista de onde escolher, abre-se logo: um
+  // treinador novo comeca por escolher os bichos que leva.)
+  await abrir(jogo, dados.escolha, dados.aviso);
+  if (!$("barra-lista").hidden) abrirLista();
+}
+
+/* ---------------- escolher de uma lista, e apagar ---------------- */
+
+// Os bichos de um treinador escolhem-se de uma lista dos que existem, pela
+// ordem em que se carrega neles. O que se escolhe vai para o codigo do
+// editor, e dai segue o caminho de sempre.
+let escolhidosDaLista = [];
+
+function pintarLista(opcoes) {
+  const caixa = $("opcoes-lista");
+  caixa.replaceChildren();
+  for (const opcao of opcoes) {
+    const botao = elemento("button");
+    botao.type = "button";
+    const lugar = escolhidosDaLista.indexOf(opcao);
+    if (lugar >= 0) {
+      botao.className = "escolhida";
+      botao.append(elemento("b", String(lugar + 1)));
+    }
+    botao.append(opcao);
+    botao.setAttribute("aria-pressed", lugar >= 0 ? "true" : "false");
+    botao.onclick = () => {
+      if (lugar >= 0) escolhidosDaLista.splice(lugar, 1);
+      else escolhidosDaLista.push(opcao);
+      pintarLista(opcoes);
+    };
+    caixa.append(botao);
+  }
+}
+
+async function abrirLista() {
+  let dados;
+  try {
+    dados = await pedir("/api/lista", {codigo: codigo.value});
+  } catch (erro) {
+    alert(erro.message);
+    return;
+  }
+  $("titulo-lista").textContent = dados.titulo;
+  $("nota-lista").textContent = dados.nota || "";
+  escolhidosDaLista = dados.escolhidos.slice();
+  pintarLista(dados.opcoes);
+  $("lista").hidden = false;
+}
+
+async function guardarLista() {
+  try {
+    const dados = await pedir("/api/lista", {codigo: codigo.value, escolhidos: escolhidosDaLista});
+    $("lista").hidden = true;
+    codigo.value = dados.codigo;
+    marcarLinha(null);
+    enviar();
+  } catch (erro) {
+    alert(erro.message);
+  }
+}
+
+async function apagarCoisa() {
+  const nome = $("titulo").textContent;
+  if (!confirm('Apagar "' + nome + '" do jogo?\n\nSai do jogo e de todos os sítios onde era usado.')) return;
+  let dados;
+  try {
+    dados = await pedir("/api/apagar", {});
+  } catch (erro) {
+    alert(erro.message);
+    return;
+  }
+  alert(dados.aviso);
+  $("voltar").click();
 }
 
 function guardarJogo(jogo) {
@@ -485,7 +589,14 @@ function trazerJogo(jogo, nome) {
     if (!ficheiro) return;
     if (!confirm('Abrir "' + ficheiro.name + '" como o teu ' + nome + "?\n\nO jogo que está agora na Oficina é trocado por este.")) return;
     try {
-      await pedir("/api/carregar", {jogo, fonte: await ficheiro.text()});
+      // O ficheiro vai inteiro, em base64: e o zip que o "Guardar o meu jogo"
+      // da (o jogo, as imagens e os sons), ou um .py sozinho, dos antigos.
+      const bytes = new Uint8Array(await ficheiro.arrayBuffer());
+      let texto = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        texto += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      }
+      await pedir("/api/carregar", {jogo, pacote: btoa(texto)});
       await mostrarJogos();
     } catch (erro) {
       alert(erro.message);
@@ -528,6 +639,11 @@ async function abrir(jogo, escolha, recado) {
   mostrarImagem(dados.imagem);
   somAVista = undefined;
   mostrarSom(dados.som);
+  $("barra-lista").hidden = !dados.lista;
+  $("abrir-lista").textContent = dados.lista || "";
+  $("apagar").hidden = !dados.apagar;
+  $("apagar").textContent = dados.apagar || "";
+  $("lista").hidden = true;
   codigo.value = dados.codigo;
   codigo.setSelectionRange(0, 0);     // senao o Safari abre o codigo ja puxado para a direita
   linhaMal = null;
@@ -1413,6 +1529,10 @@ $("repor").onclick = async () => {
   }
 };
 $("guardar").onclick = () => guardarJogo(jogoAberto);
+$("apagar").onclick = apagarCoisa;
+$("abrir-lista").onclick = abrirLista;
+$("guardar-lista").onclick = guardarLista;
+$("fechar-lista").onclick = () => { $("lista").hidden = true; };
 $("reabrir").onclick = async () => {
   $("reabrir").hidden = true;
   try {

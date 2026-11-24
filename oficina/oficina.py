@@ -23,9 +23,11 @@
 # so aparece se houver um computador ajudante na rede (ver ajudante.py).
 
 import argparse
+import ast
 import atexit
 import base64
 import importlib
+import io
 import json
 import os
 import re
@@ -37,6 +39,7 @@ import sys
 import threading
 import time
 import webbrowser
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -60,6 +63,15 @@ FICHEIROS = {
             re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,59}\.wav", re.IGNORECASE), b"RIFF", "explosao.wav"),
 }
 FICHEIRO_MAXIMO = 1500000         # bytes (a pagina ja os encolhe antes de os mandar)
+# Um jogo guardado e um zip: o ficheiro do jogo e, nestas pastas, as imagens
+# e os sons que ele usa.
+PASTAS_DO_ZIP = {"imagem": "imagens", "som": "sons"}
+ZIP_MAXIMO = 60000000             # bytes, tudo somado e fora do zip
+ZIP_FICHEIROS = 500
+LEIA_ME = ("Este é um jogo guardado na Oficina.\n\n"
+           "Para continuares a mexer nele: abre a Oficina, entra no jogo, carrega em\n"
+           "\"Abrir um jogo guardado\" e escolhe este ficheiro zip, tal como está.\n"
+           "O jogo, as imagens e os sons vão cada um para o seu sítio.\n")
 PACIENCIA = 6                 # segundos a espera de um jogo que nao responde
 
 
@@ -329,6 +341,9 @@ class Sessao:
                 "jogo": config.NOME, "desde": self.contador, "imagem": self.estado_da_imagem(),
                 "som": self.estado_do_ficheiro("som"),
                 "sugestoes": regiao.get("sugestoes") or [],
+                # O que dizem os botoes de apagar esta coisa e de escolher de
+                # uma lista (None se aqui nao os ha).
+                "apagar": regiao.get("apagar"), "lista": regiao.get("lista"),
             }
 
     def jogar(self, jogo):
@@ -546,6 +561,44 @@ class Sessao:
             escrever(caminho, nova, fim_de_linha)
             return {"escolha": escolha, "aviso": aviso}
 
+    # --- Apagar uma coisa, e escolher de uma lista ---
+
+    def apagar(self):
+        # Quem sabe apagar e o ficheiro do jogo em oficina/jogos/, que devolve
+        # o ficheiro ja sem a coisa. O que la estava fica ao lado, em
+        # ".anterior", por se ter apagado sem querer.
+        with self.tranca:
+            config = self.config
+            if config is None or self.escolha == JOGAR or not hasattr(config, "apagar"):
+                raise Falha("Aqui não dá para apagar isso.")
+            caminho = caminho_do_jogo(config)
+            fonte, fim_de_linha = ler(caminho)
+            try:
+                nova, aviso = config.apagar(fonte, self.escolha)
+                compile(nova, config.FICHEIRO, "exec")
+            except (SyntaxError, ValueError) as erro:
+                raise Falha("Não deu para apagar: " + str(erro))
+            self.parar()
+            self.config = None
+            shutil.copyfile(caminho, caminho + ".anterior")
+            escrever(caminho, nova, fim_de_linha)
+            return {"aviso": aviso}
+
+    def lista(self, dados):
+        # Sem "escolhidos": a lista de onde se escolhe, e o que esta escolhido
+        # no codigo do editor. Com "escolhidos": esse codigo ja mudado, que a
+        # pagina poe no editor e manda como se tivesse sido escrito.
+        with self.tranca:
+            config = self.config
+            if config is None or self.escolha == JOGAR or not hasattr(config, "lista"):
+                raise Falha("Aqui não há nada para escolher de uma lista.")
+            fonte, _ = ler(caminho_do_jogo(config))
+            try:
+                return config.lista(fonte, self.escolha, str(dados.get("codigo", "")), dados.get("escolhidos"))
+            except (SyntaxError, ValueError) as erro:
+                texto = str(erro)
+                raise Falha(texto[:1].upper() + texto[1:])
+
     # --- O ajudante ---
 
     def perguntar(self, dados):
@@ -565,14 +618,83 @@ class Sessao:
     # --- Levar o jogo para casa e traze-lo de volta ---
 
     def descarregar(self, jogo):
+        # Um zip com o ficheiro do jogo e as imagens e os sons de que ele
+        # fala (os nomes escritos no codigo que existam nas pastas): e tudo o
+        # que e preciso para continuar noutro computador.
         config = configuracao(jogo)
+        nome = os.path.basename(config.FICHEIRO)
         with open(caminho_do_jogo(config), "rb") as f:
-            return os.path.basename(config.FICHEIRO), f.read()
+            jogo_em_bytes = f.read()
+        nomes = set()
+        try:
+            for no in ast.walk(ast.parse(jogo_em_bytes.decode("utf-8"))):
+                if isinstance(no, ast.Constant) and isinstance(no.value, str):
+                    nomes.add(no.value)
+        except (SyntaxError, ValueError):
+            pass                 # um jogo com um erro vai na mesma, so sem imagens
+        memoria = io.BytesIO()
+        with zipfile.ZipFile(memoria, "w", zipfile.ZIP_DEFLATED) as pacote:
+            pacote.writestr(nome, jogo_em_bytes)
+            pacote.writestr("LEIA-ME.txt", LEIA_ME)
+            for tipo, pasta_no_zip in PASTAS_DO_ZIP.items():
+                pasta, regra, _, _ = FICHEIROS[tipo]
+                for ficheiro in sorted(nomes):
+                    caminho = os.path.join(pasta, ficheiro)
+                    if regra.fullmatch(ficheiro) and os.path.isfile(caminho):
+                        pacote.write(caminho, pasta_no_zip + "/" + ficheiro)
+        return os.path.splitext(nome)[0] + ".zip", memoria.getvalue()
 
-    def carregar(self, jogo, fonte):
+    def abrir_pacote(self, config, dados):
+        # O que vem num jogo guardado: (o codigo do jogo, [(tipo, nome,
+        # conteudo), ...] com as imagens e os sons). Um ficheiro .py sozinho,
+        # como os que a Oficina guardava antes, tambem serve.
+        if not zipfile.is_zipfile(io.BytesIO(dados)):
+            try:
+                return dados.decode("utf-8"), []
+            except UnicodeDecodeError:
+                raise Falha("Esse ficheiro não é um jogo guardado pela Oficina.")
+        try:
+            pacote = zipfile.ZipFile(io.BytesIO(dados))
+            entradas = [e for e in pacote.infolist() if not e.is_dir() and not e.filename.startswith("__MACOSX/")]
+            if len(entradas) > ZIP_FICHEIROS or sum(e.file_size for e in entradas) > ZIP_MAXIMO:
+                raise Falha("Esse ficheiro é grande demais para ser um jogo guardado.")
+            # (Quem abriu o zip e o voltou a fechar pode ter metido tudo
+            # dentro de uma pasta: tira-se essa pasta do caminho.)
+            pastas = {e.filename.partition("/")[0] for e in entradas if "/" in e.filename}
+            fora = len(pastas) == 1 and all("/" in e.filename for e in entradas)
+            caminhos = {e: (e.filename.partition("/")[2] if fora else e.filename) for e in entradas}
+            jogos = [e for e in entradas if "/" not in caminhos[e] and caminhos[e].endswith(".py")]
+            certos = [e for e in jogos if caminhos[e] == os.path.basename(config.FICHEIRO)]
+            if not jogos:
+                raise Falha("Não encontrei nenhum jogo dentro desse ficheiro.")
+            fonte = pacote.read((certos or jogos)[0]).decode("utf-8")
+            ficheiros = []
+            for entrada in entradas:
+                pasta, _, nome = caminhos[entrada].partition("/")
+                for tipo, pasta_no_zip in PASTAS_DO_ZIP.items():
+                    _, regra, inicio, _ = FICHEIROS[tipo]
+                    if pasta != pasta_no_zip or not regra.fullmatch(nome) or entrada.file_size > FICHEIRO_MAXIMO:
+                        continue
+                    conteudo = pacote.read(entrada)
+                    if conteudo.startswith(inicio) and (tipo != "som" or conteudo[8:12] == b"WAVE"):
+                        ficheiros.append((tipo, nome, conteudo))
+            return fonte, ficheiros
+        except (zipfile.BadZipFile, UnicodeDecodeError, RuntimeError, OSError):
+            raise Falha("Não consegui ler esse ficheiro: está estragado, ou não é um jogo guardado pela Oficina.")
+
+    def carregar(self, jogo, fonte, pacote=None):
+        # "pacote" e o ficheiro que a crianca escolheu, em base64: o zip que o
+        # "Guardar o meu jogo" da, ou um .py sozinho. ("fonte" e so o codigo.)
         with self.tranca:
             config = configuracao(jogo)
-            fonte = fonte.replace("\r\n", "\n")
+            ficheiros = []
+            if pacote is not None:
+                try:
+                    dados = base64.b64decode(str(pacote), validate=True)
+                except ValueError:
+                    raise Falha("O ficheiro chegou estragado. Tenta outra vez.")
+                fonte, ficheiros = self.abrir_pacote(config, dados)
+            fonte = str(fonte or "").replace("\r\n", "\n")
             try:
                 escolhas = config.escolhas(fonte)
             except (SyntaxError, ValueError) as erro:
@@ -586,7 +708,16 @@ class Sessao:
             _, fim_de_linha = ler(caminho)
             shutil.copyfile(caminho, caminho + ".anterior")   # por se enganarem no ficheiro
             escrever(caminho, fonte, fim_de_linha)
-            return {"ok": True}
+            # So depois de o jogo ter sido aceite: as imagens e os sons que
+            # vinham com ele, cada um na sua pasta.
+            for tipo, nome, conteudo in ficheiros:
+                pasta = FICHEIROS[tipo][0]
+                os.makedirs(pasta, exist_ok=True)
+                with open(os.path.join(pasta, nome) + ".novo", "wb") as f:
+                    f.write(conteudo)
+                os.replace(os.path.join(pasta, nome) + ".novo", os.path.join(pasta, nome))
+            return {"ok": True, "imagens": len([f for f in ficheiros if f[0] == "imagem"]),
+                    "sons": len([f for f in ficheiros if f[0] == "som"])}
 
 
 sessao = Sessao()
@@ -619,7 +750,8 @@ class Pedido(BaseHTTPRequestHandler):
         try:
             resposta = accao()
             if isinstance(resposta, tuple):
-                self.responder(200, resposta[1], "text/x-python; charset=utf-8",
+                tipo = "application/zip" if resposta[0].endswith(".zip") else "text/x-python; charset=utf-8"
+                self.responder(200, resposta[1], tipo,
                                {"Content-Disposition": 'attachment; filename="' + resposta[0] + '"'})
             else:
                 self.responder(200, resposta)
@@ -745,12 +877,16 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(lambda: sessao.por_ficheiro(caminho[5:], dados.get("dados")))
         elif caminho in ("/api/tirar-imagem", "/api/tirar-som"):
             self.tratar(lambda: sessao.tirar_ficheiro(caminho[11:]))
+        elif caminho == "/api/apagar":
+            self.tratar(sessao.apagar)
+        elif caminho == "/api/lista":
+            self.tratar(lambda: sessao.lista(dados))
         elif caminho == "/api/criar":
             self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo"))))
         elif caminho == "/api/pergunta":
             self.pergunta(dados)
         elif caminho == "/api/carregar":
-            self.tratar(lambda: sessao.carregar(dados.get("jogo"), str(dados.get("fonte", ""))))
+            self.tratar(lambda: sessao.carregar(dados.get("jogo"), dados.get("fonte"), dados.get("pacote")))
         elif caminho == "/api/foto":      # para testes: tira uma fotografia a janela
             self.tratar(lambda: sessao.dizer({"tipo": "foto", "ficheiro": str(dados.get("ficheiro"))}) or {"ok": True})
         else:

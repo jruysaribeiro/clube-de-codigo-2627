@@ -1,13 +1,15 @@
 # S15 — BICHARADA A SOLTA
-# A Bicharada (s12) com um mapa por onde se anda. Na erva alta saltam
-# bichos a solta, os treinadores estao espalhados pelo mapa, e a casa da avo
-# cura a equipa.
+# A Bicharada (s12) com um mundo por onde se anda. O mundo e feito de zonas,
+# cada uma do tamanho do ecra: quando sais por um lado de uma, entras na do
+# lado. Ha edificios onde se entra pela porta. Na erva alta saltam bichos a
+# solta, os treinadores estao espalhados pelas zonas, e a casa da avo cura a
+# equipa.
 #
 # ESTE FICHEIRO E UMA BASE, NAO UM JOGO ACABADO.
-# O mapa, os tipos, os ataques, os bichos e os treinadores sao todos DADOS,
-# aqui em cima. Para mudares o mapa mudas letras no MAPA; para inventares um
-# bicho novo escreves mais um dicionario em BICHOS. O resto do ficheiro sabe
-# ler o que la puseres.
+# As zonas, os tipos, os ataques, os bichos e os treinadores sao todos DADOS,
+# aqui em cima. Para mudares uma zona mudas letras em ZONAS; para inventares
+# um bicho novo escreves mais um dicionario em BICHOS. O resto do ficheiro
+# sabe ler o que la puseres.
 #
 #   Setas            andar pelo mapa, e mexer nos menus
 #   Enter / Espaco   escolher, e passar o texto a frente
@@ -36,6 +38,8 @@ TAMANHO_EQUIPA = 3       # quantos bichos levas contigo
 NIVEL_INICIAL = 5        # o nivel com que os teus bichos comecam
 SOPAS_NA_MOCHILA = 3     # a sopa da avo cura metade da vida. So ha mais em casa dela
 QUADRADO = 40            # o tamanho de um quadrado do mapa, em pixeis
+ZONA_COLUNAS = 20        # quantos quadrados cabem no ecra, de lado a lado
+ZONA_LINHAS = 14         # e de cima a baixo
 SORTE_NA_ERVA = 15       # em cada 100 passos na erva alta, em quantos salta um bicho
 
 RELVA = (120, 190, 100)
@@ -45,6 +49,7 @@ TRONCO = (110, 75, 45)
 COPA = (40, 110, 60)
 PAREDE = (235, 220, 190)
 TELHADO = (200, 80, 60)
+SOALHO = (200, 165, 115)
 
 PRETO = (18, 18, 28)
 BRANCO = (240, 240, 240)
@@ -61,33 +66,212 @@ PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 #                              OS DADOS
 # =====================================================================
 
-# --- O mapa ---
-# Cada letra e um quadrado. Cabem 20 letras em cada linha, e 14 linhas.
+# --- As zonas ---
+# O mundo e feito de zonas. Cada zona enche o ecra: 20 letras em cada linha,
+# e 14 linhas. Cada letra e um quadrado:
 #   .   relva: anda-se a vontade
 #   e   erva alta: anda-se, e de vez em quando salta de la um bicho a solta
 #   A   arvore: nao se passa
 #   ~   agua: nao se passa
-#   H   a casa da avo: anda contra ela para curar a equipa e encher as sopas
-#   P   a partida: onde comecas (so um)
+#   #   parede: nao se passa. Serve para os edificios, por fora e por dentro
+#   _   soalho: o chao dentro de um edificio. Anda-se a vontade
+#       (um espaco) nada: fica preto, e nao se passa
+#   H   uma casa da avo: anda contra ela para curar a equipa e encher as sopas
+#   P   a partida: onde comecas (so um, no mundo todo)
 #   1 a 9   um treinador: o 1 e o primeiro da lista TREINADORES, o 2 e o
 #           segundo, e por ai fora. Anda contra ele para o desafiares.
-# Uma letra que o jogo nao conheca fica relva. Fora do mapa e tudo arvores.
-MAPA = [
-    "AAAAAAAAAAAAAAAAAAAA",
-    "A....eeee....A...4.A",
-    "A.H..eeee....A.....A",
-    "A.P...ee...........A",
-    "A..........AAA..eeeA",
-    "A...1......A~A..eeeA",
-    "AAAA..AAA..~~~..eeeA",
-    "A.....A.....~~.....A",
-    "A.eee.A..2.........A",
-    "A.eee.....AAAA..AA.A",
-    "A.eee.........eee..A",
-    "A......~~~....eee3.A",
-    "A.....~~~~~...eee..A",
-    "AAAAAAAAAAAAAAAAAAAA",
+#   M, ou outra letra que esteja em PORTAS: uma porta (ve mais abaixo)
+# Uma letra que o jogo nao conheca fica relva.
+# AS SAIDAS: para se passar de uma zona para a do lado, tem de haver relva
+# (ou erva) na borda das duas, no mesmo sitio. Aqui as saidas para os lados
+# estao nas linhas 7 e 8 (a contar de cima), e as de cima e de baixo nas duas
+# colunas do meio.
+ZONAS = {
+    "serra": [
+        "AAAAAAAAAAAAAAAAAAAA",
+        "A...AA.......eeee..A",
+        "A...AA.......eeee..A",
+        "A............eeee..A",
+        "A..eee....AA.......A",
+        "A..eee....AA.......A",
+        "A..eee..............",
+        "A...................",
+        "A......AAA.........A",
+        "A......AAA....~~...A",
+        "A.............~~...A",
+        "A..AA..............A",
+        "A..AA..............A",
+        "AAAAAAAAA..AAAAAAAAA",
+    ],
+    "montado": [
+        "AAAAAAAAAAAAAAAAAAAA",
+        "A..A....A.....A....A",
+        "A.......eee........A",
+        "A..A....eee...A.H..A",
+        "A.......eee........A",
+        "A....A.......A.....A",
+        ".................3..",
+        "....................",
+        "A....A.......A.....A",
+        "A..eee.............A",
+        "A..eee....A....A...A",
+        "A..eee.............A",
+        "A.......A.....A....A",
+        "AAAAAAAAA..AAAAAAAAA",
+    ],
+    "feira": [
+        "AAAAAAAAAAAAAAAAAAAA",
+        "A..................A",
+        "A...AA......AA.....A",
+        "A...AA......AA.....A",
+        "A..................A",
+        "A..................A",
+        "..............4....A",
+        "...................A",
+        "A..................A",
+        "A...AA......AA.....A",
+        "A...AA......AA.....A",
+        "A..................A",
+        "A..................A",
+        "AAAAAAAAAAAAAAAAAAAA",
+    ],
+    "aldeia": [
+        "AAAAAAAAA..AAAAAAAAA",
+        "A..................A",
+        "A..H....###........A",
+        "A..P....#M#..eee...A",
+        "A............eee...A",
+        "A............eee...A",
+        "A...................",
+        "A...................",
+        "A..AAA.............A",
+        "A..A~A.......AA....A",
+        "A..AAA.......AA....A",
+        "A..................A",
+        "A..................A",
+        "AAAAAAAAA..AAAAAAAAA",
+    ],
+    "ribeira": [
+        "AAAAAAAAA..AAAAAAAAA",
+        "A............~~....A",
+        "A..eee.......~~....A",
+        "A..eee.......~~....A",
+        "A..eee........~~...A",
+        "A.............~~...A",
+        "....................",
+        "....................",
+        "A.............~~...A",
+        "A....AA.......~~...A",
+        "A....AA......~~....A",
+        "A............~~.eeeA",
+        "A............~~.eeeA",
+        "AAAAAAAAA..AAAAAAAAA",
+    ],
+    "pinhal": [
+        "AAAAAAAAAAAAAAAAAAAA",
+        "A.A...A....A...A...A",
+        "A....eeee......eee.A",
+        "A.A..eeee..A...eee.A",
+        "A....eeee......eee.A",
+        "A.......A....A.....A",
+        "....................",
+        "....................",
+        "A..A.......A.......A",
+        "A.....eeee.....A...A",
+        "A..A..eeee.........A",
+        "A.....eeee...A.....A",
+        "A..A...............A",
+        "AAAAAAAAA..AAAAAAAAA",
+    ],
+    "horta": [
+        "AAAAAAAAA..AAAAAAAAA",
+        "A..................A",
+        "A..eeee....eeee....A",
+        "A..eeee....eeee....A",
+        "A..................A",
+        "A..................A",
+        "A...................",
+        "A...................",
+        "A..................A",
+        "A..eeee....AAA.....A",
+        "A..eeee....A~A.....A",
+        "A..........AAA.....A",
+        "A..................A",
+        "AAAAAAAAAAAAAAAAAAAA",
+    ],
+    "praia": [
+        "AAAAAAAAA..AAAAAAAAA",
+        "A..................A",
+        "A..H...............A",
+        "A............eee...A",
+        "A............eee...A",
+        "A..................A",
+        "....................",
+        ".........2..........",
+        "A..................A",
+        "A....~~~......~~~..A",
+        "A..~~~~~~~..~~~~~~~A",
+        "A~~~~~~~~~~~~~~~~~~A",
+        "~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~",
+    ],
+    "farol": [
+        "AAAAAAAAA..AAAAAAAAA",
+        "A..................A",
+        "A......eeee........A",
+        "A......eeee....AA..A",
+        "A......eeee....AA..A",
+        "A..................A",
+        "..................~~",
+        ".................~~~",
+        "A...............~~~~",
+        "A..~~.........~~~~~~",
+        "A~~~~~~.....~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~",
+    ],
+    "mercearia": [
+        "                    ",
+        "                    ",
+        "                    ",
+        "     ##########     ",
+        "     #________#     ",
+        "     #___1____#     ",
+        "     #_####___#     ",
+        "     #________#     ",
+        "     #________#     ",
+        "     #________#     ",
+        "     ####M#####     ",
+        "                    ",
+        "                    ",
+        "                    ",
+    ],
+}
+
+# --- O mundo ---
+# Como as zonas se juntam: cada linha daqui e uma fila de zonas, da esquerda
+# para a direita, e as filas vao de cima para baixo. Quem sai pela direita
+# da "aldeia" entra na "ribeira"; quem sai por baixo entra na "horta".
+# Onde nao houver zona (ou com "" no lugar dela) nao se passa.
+# Uma zona que nao esteja aqui e o interior de um edificio: so se la chega
+# por uma porta.
+MUNDO = [
+    ["serra", "montado", "feira"],
+    ["aldeia", "ribeira", "pinhal"],
+    ["horta", "praia", "farol"],
 ]
+
+# --- As portas ---
+# Cada porta e uma letra, e leva ao interior de um edificio, que e uma zona
+# como as outras. Le-se: "a letra M e a porta da mercearia".
+# A mesma letra escreve-se em dois sitios: ca fora, na parede do edificio, e
+# la dentro, na parede do interior. Quem pisa uma, aparece ao lado da outra.
+# Para fazeres um edificio novo: uma zona nova em ZONAS (o interior), uma
+# linha aqui com uma letra que ainda nao uses, e essa letra nos dois sitios.
+PORTAS = {
+    "M": "mercearia",
+}
 
 # --- Os tipos ---
 # Cada tipo tem uma cor, que aparece nos menus e nos bichos.
@@ -337,10 +521,14 @@ def escurecer(cor, quanto):
 #   dizer("ola")                        poe um texto no painel de baixo (na
 #                                       batalha) ou numa caixa (no mapa)
 # E do mapa:
-#   jogador["coluna"], jogador["linha"]    onde estas (0, 0 e o canto de cima,
-#                                       a esquerda)
+#   jogador["zona"]                     o nome da zona onde estas ("aldeia",
+#                                       "mercearia"...)
+#   jogador["coluna"], jogador["linha"]    onde estas nessa zona (0, 0 e o
+#                                       canto de cima, a esquerda, do ecra)
 #   jogador["passos"]                   quantos passos ja deste
-#   letra_do_mapa(coluna, linha)        a letra que esta nesse quadrado do MAPA
+#   letra_do_mapa(coluna, linha)        a letra que esta nesse quadrado da
+#                                       zona onde estas
+#   ir_para(zona, coluna, linha)        poe-te noutro sitio, de repente
 #   minha_equipa                        a lista dos teus bichos
 #   batalha_selvagem                    True se a batalha e contra um bicho a
 #                                       solta, False se e contra um treinador
@@ -482,10 +670,14 @@ sopas = SOPAS_NA_MOCHILA
 troca_obrigatoria = False
 
 # No mapa: onde estas, para onde olhas e quantos passos ja deste.
-jogador = {"coluna": 1, "linha": 1, "olha": "baixo", "passos": 0}
+jogador = {"zona": "", "coluna": 1, "linha": 1, "olha": "baixo", "passos": 0}
 # Onde acordas se a equipa toda desmaiar: o ultimo sitio onde descansaste.
-descanso = {"coluna": 1, "linha": 1}
+descanso = {"zona": "", "coluna": 1, "linha": 1}
+# Por que porta entraste em cada edificio, para saires pela mesma:
+# entradas["M"] = ("aldeia", 9, 3)
+entradas = {}
 treinadores_vencidos = []    # 0 e o primeiro treinador, 1 o segundo...
+por_vencer = 0               # quantos treinadores do mundo ainda faltam
 batalha_selvagem = False     # a batalha e contra um bicho a solta?
 bicho_a_solta = None         # o bicho que saltou da erva
 a_fugir = False
@@ -580,7 +772,7 @@ def voltar_ao_mundo():
 
 
 def ganhar_batalha():
-    global estado
+    global estado, por_vencer
     era_selvagem = batalha_selvagem
     nome = treinador()["nome"]
     voltar_ao_mundo()
@@ -588,7 +780,10 @@ def ganhar_batalha():
         return
     if indice_treinador not in treinadores_vencidos:
         treinadores_vencidos.append(indice_treinador)
-    faltam = treinadores_por_vencer()
+    # (Conta-se so aqui e ao comecar, e nao a cada frame: e preciso
+    # percorrer o mundo todo.)
+    por_vencer = treinadores_por_vencer()
+    faltam = por_vencer
     if faltam == 0:
         estado = "vitoria"
     elif faltam == 1:
@@ -604,8 +799,7 @@ def acordar_em_casa():
     voltar_ao_mundo()
     curar_tudo(minha_equipa)
     sopas = SOPAS_NA_MOCHILA
-    jogador["coluna"] = descanso["coluna"]
-    jogador["linha"] = descanso["linha"]
+    ir_para(descanso["zona"], descanso["coluna"], descanso["linha"])
     jogador["olha"] = "baixo"
     dizer("A avó foi buscar-te. A equipa está curada: tenta outra vez!")
 
@@ -614,13 +808,60 @@ def acordar_em_casa():
 #                              O MAPA
 # =====================================================================
 
+def letra_da_zona(nome, coluna, linha):
+    # A letra de um quadrado de uma zona. Fora da zona (ou se a zona nao
+    # existir) e tudo arvores.
+    if nome not in ZONAS:
+        return "A"
+    zona = ZONAS[nome]
+    if linha < 0 or linha >= ZONA_LINHAS or linha >= len(zona):
+        return "A"
+    if coluna < 0 or coluna >= ZONA_COLUNAS or coluna >= len(zona[linha]):
+        return "A"
+    return zona[linha][coluna]
+
+
 def letra_do_mapa(coluna, linha):
-    # A letra de um quadrado do MAPA. Fora do mapa e tudo arvores.
-    if linha < 0 or linha >= len(MAPA):
-        return "A"
-    if coluna < 0 or coluna >= len(MAPA[linha]):
-        return "A"
-    return MAPA[linha][coluna]
+    # A letra de um quadrado da zona onde estas.
+    return letra_da_zona(jogador["zona"], coluna, linha)
+
+
+def zona_ao_lado(nome, passo_coluna, passo_linha):
+    # O nome da zona que fica desse lado no MUNDO, ou "" se nao ha nenhuma.
+    # zona_ao_lado("aldeia", 1, 0) e a que fica a direita da aldeia.
+    for fila in range(len(MUNDO)):
+        for lugar in range(len(MUNDO[fila])):
+            if MUNDO[fila][lugar] == nome:
+                fila = fila + passo_linha
+                lugar = lugar + passo_coluna
+                if fila < 0 or fila >= len(MUNDO) or lugar < 0 or lugar >= len(MUNDO[fila]):
+                    return ""
+                if MUNDO[fila][lugar] not in ZONAS:
+                    return ""
+                return MUNDO[fila][lugar]
+    return ""
+
+
+def quadrado_ao_lado(nome, coluna, linha, passo_coluna, passo_linha):
+    # Para onde se vai com um passo: (zona, coluna, linha). Quem sai por um
+    # lado do ecra entra na zona ao lado, pelo lado contrario. Se la nao
+    # houver zona, a zona vem "".
+    coluna = coluna + passo_coluna
+    linha = linha + passo_linha
+    if 0 <= coluna < ZONA_COLUNAS and 0 <= linha < ZONA_LINHAS:
+        return nome, coluna, linha
+    return zona_ao_lado(nome, passo_coluna, passo_linha), coluna % ZONA_COLUNAS, linha % ZONA_LINHAS
+
+
+def encontrar_letra(letra, nomes):
+    # Onde esta uma letra, procurando nas zonas com esses nomes: devolve
+    # (zona, coluna, linha) do primeiro quadrado, ou ("", 0, 0) se nao ha.
+    for nome in nomes:
+        for linha in range(ZONA_LINHAS):
+            for coluna in range(ZONA_COLUNAS):
+                if letra_da_zona(nome, coluna, linha) == letra:
+                    return nome, coluna, linha
+    return "", 0, 0
 
 
 def treinador_do_quadrado(letra):
@@ -632,51 +873,96 @@ def treinador_do_quadrado(letra):
 
 
 def encontrar_partida():
-    # Onde esta o P no MAPA: (coluna, linha). Sem P, o primeiro bocado de relva.
+    # Onde esta o P: (zona, coluna, linha). Sem P, o primeiro bocado de relva.
     for procurada in ["P", "."]:
-        for linha in range(len(MAPA)):
-            for coluna in range(len(MAPA[linha])):
-                if MAPA[linha][coluna] == procurada:
-                    return coluna, linha
-    return 0, 0
+        zona, coluna, linha = encontrar_letra(procurada, list(ZONAS))
+        if zona != "":
+            return zona, coluna, linha
+    return list(ZONAS)[0], 0, 0
 
 
 def treinadores_por_vencer():
-    # Quantos treinadores do mapa ainda nao venceste.
+    # Quantos treinadores ainda nao venceste, em todas as zonas.
     faltam = []
-    for texto in MAPA:
-        for letra in texto:
-            numero = treinador_do_quadrado(letra)
-            if numero != -1 and numero not in treinadores_vencidos and numero not in faltam:
-                faltam.append(numero)
+    for nome in ZONAS:
+        for linha in range(ZONA_LINHAS):
+            for coluna in range(ZONA_COLUNAS):
+                numero = treinador_do_quadrado(letra_da_zona(nome, coluna, linha))
+                if numero != -1 and numero not in treinadores_vencidos and numero not in faltam:
+                    faltam.append(numero)
     return len(faltam)
+
+
+def ir_para(zona, coluna, linha):
+    # Poe-te noutro sitio, de repente.
+    jogador["zona"] = zona
+    jogador["coluna"] = coluna
+    jogador["linha"] = linha
 
 
 def comecar_mundo():
     # Poe-te na partida, com as sopas todas e nenhum treinador vencido.
-    global sopas
+    global sopas, por_vencer
     voltar_ao_mundo()
-    coluna, linha = encontrar_partida()
-    jogador["coluna"] = coluna
-    jogador["linha"] = linha
+    zona, coluna, linha = encontrar_partida()
+    ir_para(zona, coluna, linha)
     jogador["olha"] = "baixo"
     jogador["passos"] = 0
+    descanso["zona"] = zona
     descanso["coluna"] = coluna
     descanso["linha"] = linha
+    entradas.clear()
     treinadores_vencidos.clear()
+    por_vencer = treinadores_por_vencer()
     sopas = SOPAS_NA_MOCHILA
     dizer("Anda com as setas. Vai contra um treinador para o desafiares.")
 
 
+def chao_livre(letra):
+    # Um quadrado onde se pode ficar parado: da para andar la, e nao e uma
+    # porta, nem a casa da avo, nem um treinador.
+    if letra in PORTAS or letra == "H" or treinador_do_quadrado(letra) != -1:
+        return False
+    return pode_andar(letra)
+
+
+def passar_a_porta(letra):
+    # Pisaste uma porta: apareces ao lado da porta igual, do outro lado.
+    # De fora vai-se para dentro; de dentro volta-se a porta por onde se
+    # entrou (ou, se nao se entrou por nenhuma, a primeira que houver ca fora).
+    dentro = PORTAS[letra]
+    if jogador["zona"] != dentro:
+        entradas[letra] = (jogador["zona"], jogador["coluna"], jogador["linha"])
+        zona, coluna, linha = encontrar_letra(letra, [dentro])
+    elif letra in entradas:
+        zona, coluna, linha = entradas[letra]
+    else:
+        fora = []
+        for nome in ZONAS:
+            if nome != dentro:
+                fora.append(nome)
+        zona, coluna, linha = encontrar_letra(letra, fora)
+    if zona == "":
+        return       # a porta nao tem outro lado: fica-se onde se esta
+    # Um passo para o lado, para nao ficares em cima da porta: primeiro
+    # tenta-se para baixo, depois para cima, e depois para os lados.
+    for passo in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+        if chao_livre(letra_da_zona(zona, coluna + passo[0], linha + passo[1])):
+            coluna = coluna + passo[0]
+            linha = linha + passo[1]
+            break
+    ir_para(zona, coluna, linha)
+
+
 # ONDE SE PODE ANDAR
-# Recebe a letra de um quadrado do MAPA e devolve True se da para andar para
-# la, ou False se nao da. Como esta: so nao se passa nas arvores (A) nem na
-# agua (~). (A casa da avo e os treinadores nao passam por aqui: contra eles
-# vai-se sempre de encontro.)
+# Recebe a letra de um quadrado do mapa e devolve True se da para andar para
+# la, ou False se nao da. Como esta: nao se passa nas arvores (A), na agua
+# (~), nas paredes (#) nem no nada (um espaco). (A casa da avo e os
+# treinadores nao passam por aqui: contra eles vai-se sempre de encontro.)
 # Ideias: nadar, isto e, passar na agua se levares na equipa um bicho do tipo
-# "agua"; uma letra nova para um muro; uma ponte "=" por cima da agua.
+# "agua"; uma letra nova para uma cerca; uma ponte "=" por cima da agua.
 def pode_andar(letra):
-    if letra == "A" or letra == "~":
+    if letra == "A" or letra == "~" or letra == "#" or letra == " ":
         return False
     return True
 
@@ -694,9 +980,8 @@ def ha_batalha_na_erva():
 # QUE BICHO SALTA DA ERVA
 # Devolve o bicho a solta, feito com criar_bicho(nome, nivel). Como esta: um
 # bicho qualquer de BICHOS, um a tres niveis abaixo do teu bicho mais forte.
-# Ideias: so bichos de planta; bichos mais fortes do lado direito do mapa
-# (quando jogador["coluna"] e maior que 10); um bicho raro, que so salta 1 vez
-# em cada 20.
+# Ideias: so bichos de agua na praia (if jogador["zona"] == "praia"); bichos
+# mais fortes na serra; um bicho raro, que so salta 1 vez em cada 20.
 def escolher_bicho_selvagem():
     nome = random.choice(list(BICHOS.keys()))
     nivel = nivel_mais_alto(minha_equipa) - random.randint(1, 3)
@@ -711,6 +996,7 @@ def descansar():
     global sopas
     curar_tudo(minha_equipa)
     sopas = SOPAS_NA_MOCHILA
+    descanso["zona"] = jogador["zona"]
     descanso["coluna"] = jogador["coluna"]
     descanso["linha"] = jogador["linha"]
     dizer("A avó deu sopa a todos. A equipa está curada!")
@@ -748,9 +1034,9 @@ def andar(passo_coluna, passo_linha):
         jogador["olha"] = "baixo"
     else:
         jogador["olha"] = "cima"
-    coluna = jogador["coluna"] + passo_coluna
-    linha = jogador["linha"] + passo_linha
-    letra = letra_do_mapa(coluna, linha)
+    zona, coluna, linha = quadrado_ao_lado(jogador["zona"], jogador["coluna"], jogador["linha"],
+                                           passo_coluna, passo_linha)
+    letra = letra_da_zona(zona, coluna, linha)
 
     if treinador_do_quadrado(letra) != -1:
         desafiar(treinador_do_quadrado(letra))
@@ -761,10 +1047,16 @@ def andar(passo_coluna, passo_linha):
     if not pode_andar(letra):
         return
 
-    jogador["coluna"] = coluna
-    jogador["linha"] = linha
+    antes = jogador["zona"]
+    ir_para(zona, coluna, linha)
     jogador["passos"] = jogador["passos"] + 1
     aviso = ""
+    if letra in PORTAS and PORTAS[letra] in ZONAS:
+        passar_a_porta(letra)
+    # Mudaste de zona, por um lado do ecra ou por uma porta? E a zona nova
+    # que o desenhar_mundo passa a mostrar.
+    if jogador["zona"] != antes:
+        dizer("Entraste em: " + jogador["zona"])
     ao_dar_passo(letra)
     if estado == "mundo" and letra == "e" and ha_batalha_na_erva():
         encontrar_bicho()
@@ -901,8 +1193,8 @@ def ao_carregar_tecla(tecla):
 
 # QUANDO DAS UM PASSO
 # Corre a cada passo no mapa, ja no quadrado novo. letra: a letra desse
-# quadrado no MAPA ("." e relva, "e" e erva alta...). jogador["passos"] diz
-# quantos ja deste.
+# quadrado ("." e relva, "e" e erva alta...). jogador["passos"] diz quantos
+# ja deste, e jogador["zona"] em que zona estas.
 # Ideias: uma letra nova no mapa, por exemplo "s" para uma sopa perdida no
 # chao (if letra == "s"); os bichos cansarem-se, e perderem 1 de vida a cada
 # 20 passos; dizer "Cheira a maresia..." quando chegas perto da agua.
@@ -1358,9 +1650,10 @@ def desenhar_barra_vida(bicho, x, y, largura):
 
 
 # UM QUADRADO DO MAPA
-# letra: a letra desse quadrado no MAPA. Primeiro pinta-se relva em todos, e
-# depois, por cima, o que a letra disser: erva alta, uma arvore, agua ou a
-# casa da avo. (Tu e os treinadores sao desenhados depois, por outras funcoes.)
+# letra: a letra desse quadrado, na zona. Primeiro pinta-se relva em todos, e
+# depois, por cima, o que a letra disser: erva alta, uma arvore, agua, a casa
+# da avo, uma parede, soalho, uma porta ou nada. (Tu e os treinadores sao
+# desenhados depois, por outras funcoes.)
 # Ideias: outras cores (um mapa de neve, ou de deserto); flores na relva; o
 # desenho de uma letra nova que tenhas inventado (if letra == "s").
 def desenhar_quadrado(letra, x, y):
@@ -1386,6 +1679,19 @@ def desenhar_quadrado(letra, x, y):
         pygame.draw.rect(ecra, PAREDE, (x + 5, y + 18, 30, 20))
         pygame.draw.polygon(ecra, TELHADO, [(x + 1, y + 20), (meio, y + 2), (x + 39, y + 20)])
         pygame.draw.rect(ecra, TRONCO, (meio - 4, y + 26, 8, 12))
+    elif letra == "#":
+        pygame.draw.rect(ecra, PAREDE, (x, y, QUADRADO, QUADRADO))
+        pygame.draw.rect(ecra, escurecer(PAREDE, 0.7), (x, y, QUADRADO, QUADRADO), 2)
+        pygame.draw.line(ecra, escurecer(PAREDE, 0.7), (x, y + 20), (x + QUADRADO, y + 20), 2)
+    elif letra == "_":
+        pygame.draw.rect(ecra, SOALHO, (x, y, QUADRADO, QUADRADO))
+        pygame.draw.line(ecra, escurecer(SOALHO, 0.85), (x, y + 20), (x + QUADRADO, y + 20), 1)
+    elif letra == " ":
+        pygame.draw.rect(ecra, PRETO, (x, y, QUADRADO, QUADRADO))
+    elif letra in PORTAS:
+        pygame.draw.rect(ecra, PAREDE, (x, y, QUADRADO, QUADRADO))
+        pygame.draw.rect(ecra, TRONCO, (x + 8, y + 4, 24, 36))
+        pygame.draw.circle(ecra, AMARELO, (x + 26, y + 24), 3)
 
 
 # TU, NO MAPA
@@ -1431,33 +1737,25 @@ def desenhar_treinador(treinador, x, y, vencido):
         pygame.draw.rect(ecra, VERMELHO, (meio + 9, y + 11, 4, 4))
 
 
-def canto_do_mapa():
-    # Onde se desenha o primeiro quadrado, para o mapa ficar ao meio do ecra
-    # (por cima da faixa de baixo, que tem 40 pixeis).
-    largura = 0
-    for texto in MAPA:
-        largura = max(largura, len(texto))
-    x = max(0, (LARGURA - largura * QUADRADO) // 2)
-    y = max(0, (ALTURA - 40 - len(MAPA) * QUADRADO) // 2)
-    return x, y
-
-
 def desenhar_mundo():
+    # So se desenha a zona onde estas: e o ecra inteiro.
     ecra.fill(PRETO)
-    x0, y0 = canto_do_mapa()
-    linha = 0
-    for texto in MAPA:
-        coluna = 0
-        for letra in texto:
-            x = x0 + coluna * QUADRADO
-            y = y0 + linha * QUADRADO
-            desenhar_quadrado(letra, x, y)
+    for linha in range(ZONA_LINHAS):
+        for coluna in range(ZONA_COLUNAS):
+            letra = letra_do_mapa(coluna, linha)
+            x = coluna * QUADRADO
+            y = linha * QUADRADO
             numero = treinador_do_quadrado(letra)
             if numero != -1:
+                # Por baixo de um treinador vai o chao que ele tiver ao lado:
+                # soalho dentro de um edificio, relva ca fora.
+                letra = "."
+                if letra_do_mapa(coluna - 1, linha) == "_":
+                    letra = "_"
+            desenhar_quadrado(letra, x, y)
+            if numero != -1:
                 desenhar_treinador(TREINADORES[numero], x, y, numero in treinadores_vencidos)
-            coluna = coluna + 1
-        linha = linha + 1
-    desenhar_jogador(x0 + jogador["coluna"] * QUADRADO, y0 + jogador["linha"] * QUADRADO, jogador["olha"])
+    desenhar_jogador(jogador["coluna"] * QUADRADO, jogador["linha"] * QUADRADO, jogador["olha"])
 
     # A caixa com o que foi dito, por cima do mapa.
     if aviso != "":
@@ -1467,14 +1765,14 @@ def desenhar_mundo():
 
     # A faixa de baixo: os treinadores que faltam, a equipa e as sopas.
     pygame.draw.rect(ecra, PAINEL, (0, ALTURA - 40, LARGURA, 40))
-    faltam = treinadores_por_vencer()
-    mostrar_texto("Treinadores por vencer: " + str(faltam), 14, ALTURA - 28, BRANCO, fonte_pequena)
-    x = 280
-    for bicho in minha_equipa[:4]:
+    mostrar_texto(jogador["zona"], 14, ALTURA - 28, AMARELO, fonte_pequena)
+    mostrar_texto("Treinadores por vencer: " + str(por_vencer), 120, ALTURA - 28, BRANCO, fonte_pequena)
+    x = 345
+    for bicho in minha_equipa[:3]:
         mostrar_texto("Nv " + str(bicho["nivel"]), x, ALTURA - 28, AMARELO, fonte_pequena)
         desenhar_barra_vida(bicho, x + 48, ALTURA - 26, 60)
-        x = x + 125
-    mostrar_texto("Sopas: " + str(sopas), LARGURA - 90, ALTURA - 28, BRANCO, fonte_pequena)
+        x = x + 120
+    mostrar_texto("Sopas: " + str(sopas), LARGURA - 88, ALTURA - 28, BRANCO, fonte_pequena)
 
 
 def desenhar_caixa_bicho(bicho, x, y, com_numeros):

@@ -75,9 +75,20 @@ Nos cinco jogos:
   herói.
 - **Os botões com +**: criam uma cópia do primeiro, com outro nome, no fim
   da lista: um inimigo, uma torre, uma carta, um bicho, um ataque, um
-  treinador, um nível. A cópia é posta onde apareça no jogo (o inimigo novo
+  treinador, um nível. Na Bicharada à Solta há também **+ Nova zona** e
+  **+ Novo edifício**. A cópia é posta onde apareça no jogo (o inimigo novo
   d'O Cerco entra na primeira onda), e o aviso diz onde. (No ficheiro do
   jogo em `oficina/jogos/`: `CRIAVEIS` e `novo()`.)
+
+Nas duas Bicharadas:
+
+- **Apagar este bicho** (com um bicho aberto) tira-o do jogo e das equipas
+  dos treinadores que o levavam. Tem de sobrar o bastante para uma equipa.
+- **Escolher os bichos** (com um treinador aberto) mostra os bichos que
+  existem, para se carregar nos que ele leva, pela ordem em que entram. Abre
+  sozinho quando se cria um treinador novo, e pode-se voltar lá depois.
+  (No ficheiro do jogo em `oficina/jogos/`: `apagar()` e `lista()`, e as
+  chaves `"apagar"` e `"lista"` que a `regiao` devolve.)
 
 Uma função que só corre mais tarde (a de uma tecla, por exemplo) pode
 rebentar já depois de guardada: o jogo pára com o erro à vista, e corrige-se
@@ -99,9 +110,9 @@ sons ficam em `comum/assets/sons/`, e o jogo guarda os que já leu em
 - A imagem é encolhida para um quadrado pequeno e guardada em
   `comum/assets/imagens/`, com o nome que está no código. Mudar o nome no
   código é escolher outro ficheiro.
-- As imagens ficam só nesse computador: não vão para o git, nem dentro do
-  ficheiro que o **Guardar o meu jogo** descarrega. Sem a imagem, o jogo
-  corre na mesma, com a forma.
+- As imagens não vão para o git. Vão dentro do zip que o **Guardar o meu
+  jogo** descarrega, e é assim que passam para outro computador. Sem a
+  imagem, o jogo corre na mesma, com a forma.
 
 ## O ajudante ("Pedir ajuda")
 
@@ -151,9 +162,12 @@ início de `oficina/ajudante.py`.
   fica no `o-cerco.py` dela, e o jogo corre-se depois como sempre.
 - Só é guardado código que **funcionou**: correu no jogo uns instantes sem
   rebentar. Código com erros fica só no editor, com o erro explicado.
-- **Guardar o meu jogo** descarrega o ficheiro inteiro. **Abrir um jogo
-  guardado** troca o jogo da Oficina por esse ficheiro (o que lá estava
-  fica ao lado, em `o-cerco.py.anterior`).
+- **Guardar o meu jogo** descarrega um zip (`o-cerco.zip`) com o ficheiro do
+  jogo e as imagens e os sons que ele usa. **Abrir um jogo guardado** recebe
+  esse zip tal como está: troca o jogo da Oficina pelo que lá vem (o que lá
+  estava fica ao lado, em `o-cerco.py.anterior`) e põe as imagens e os sons
+  nas pastas deles. Também abre um `.py` sozinho, como os que a Oficina
+  guardava antes.
 - **Repor o original** devolve o bocado aberto ao que era da primeira vez
   que a Oficina abriu o jogo nesse computador (cópia em `oficina/.originais/`).
 

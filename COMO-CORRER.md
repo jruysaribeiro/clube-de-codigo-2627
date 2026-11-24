@@ -449,7 +449,8 @@ Solta** (s15, a Bicharada com um mapa), **O Cerco** (s13) e **Mãos ao Ar!**
 
 - A Oficina mexe no **ficheiro verdadeiro** do jogo, e só guarda código que
   correu sem rebentar. **Repor o original** desfaz um bocado; **Guardar o meu
-  jogo** dá o ficheiro para levar.
+  jogo** dá um zip para levar (o jogo, as imagens e os sons), e **Abrir um
+  jogo guardado** recebe esse zip e põe tudo no sítio.
 - Se o browser não abrir sozinho, abre o endereço que o terminal mostra
   (costuma ser `http://127.0.0.1:8765`). Com `--sem-navegador` não tenta
   abrir; com `--porta 9000` usa outra porta.
@@ -475,8 +476,8 @@ Nas coisas que no código dizem `"imagem": "soldado.png"` aparecem os botões
 **Desenhar** (pinta-se ali mesmo, em quadradinhos) e **Escolher uma imagem**.
 Com `"som": "soldado.wav"` há **Escolher um som** e **Gravar**, com o
 microfone. Ficam em `comum/assets/imagens/` e `comum/assets/sons/` com esses
-nomes, e o jogo usa-os logo. Ficam só nesse computador: não vão para o git
-nem dentro do ficheiro que o **Guardar o meu jogo** dá.
+nomes, e o jogo usa-os logo. Não vão para o git, mas vão dentro do zip que o
+**Guardar o meu jogo** dá.
 
 ### O ajudante (o botão «Pedir ajuda»)
 
