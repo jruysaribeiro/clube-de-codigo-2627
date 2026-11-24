@@ -891,6 +891,189 @@ def ponte(t):
     t.caixa(escurecer(tabua, 55), 28, 0, 3, 32)
 
 
+# =====================================================================
+# Os blocos que ja vinham com a Bicharada a Solta: a relva, as arvores, a
+# agua, e a mobilia de dentro dos edificios.
+# =====================================================================
+
+RELVA = (120, 190, 100)
+MADEIRA = (110, 75, 45)
+SOALHO = (200, 165, 115)
+PAREDE = (235, 220, 190)
+AZUL = (70, 140, 230)
+TELHA = (200, 80, 60)
+
+
+@modelo("relva.png")
+def relva(t):
+    t.caixa(RELVA, 0, 0, 32, 32)
+    for x, y in ((4, 6), (14, 3), (25, 8), (9, 15), (20, 18), (28, 25), (5, 26), (16, 28), (12, 22)):
+        t.caixa(escurecer(RELVA, 28), x, y, 1, 2)
+        t.ponto(escurecer(RELVA, 28), x + 1, y)
+    for x, y in ((8, 9), (22, 4), (27, 16), (3, 18), (18, 24)):
+        t.ponto(clarear(RELVA, 30), x, y)
+
+
+@modelo("erva.png")
+def erva(t):
+    fundo = (60, 140, 70)
+    t.caixa(fundo, 0, 0, 32, 32)
+    for x in (5, 15, 25):
+        for y in (14, 29):
+            t.linha(clarear(fundo, 55), (x, y), (x - 3, y - 11), 2)
+            t.linha(RELVA, (x, y), (x + 3, y - 13), 2)
+            t.linha(escurecer(fundo, 30), (x, y), (x, y - 8))
+
+
+@modelo("arvore.png")
+def arvore(t):
+    copa = (40, 110, 60)
+    t.caixa(MADEIRA, 13, 19, 6, 12)
+    t.caixa(escurecer(MADEIRA, 30), 17, 19, 2, 12)
+    t.oval(escurecer(copa, 25), 2, 2, 28, 22)
+    t.oval(copa, 3, 2, 26, 19)
+    t.oval(clarear(copa, 35), 8, 5, 10, 6)
+    for x, y in ((9, 14), (21, 9), (17, 16), (24, 15)):
+        t.ponto(clarear(copa, 60), x, y)
+    t.contornar()
+
+
+@modelo("agua.png")
+def agua(t):
+    t.caixa(AZUL, 0, 0, 32, 32)
+    for x, y, largura in ((3, 6, 9), (19, 10, 9), (8, 19, 10), (22, 24, 8), (2, 28, 7)):
+        t.caixa(clarear(AZUL, 70), x, y, largura, 1)
+        t.caixa(escurecer(AZUL, 30), x + 2, y + 2, largura, 1)
+
+
+@modelo("casa.png")
+def casa(t):
+    t.caixa(PAREDE, 5, 15, 22, 15)
+    t.caixa(escurecer(PAREDE, 30), 5, 28, 22, 2)
+    t.forma(TELHA, [(1, 16), (16, 2), (31, 16)])
+    t.forma(clarear(TELHA, 35), [(6, 14), (16, 5), (18, 7), (10, 14)])
+    t.caixa(MADEIRA, 13, 20, 6, 10)
+    t.ponto((246, 196, 60), 17, 25)
+    t.caixa(AZUL, 21, 19, 4, 4)
+    t.caixa(AZUL, 7, 19, 4, 4)
+    t.contornar()
+
+
+@modelo("parede.png")
+def parede(t):
+    t.caixa(PAREDE, 0, 0, 32, 32)
+    junta = escurecer(PAREDE, 60)
+    for y in (0, 8, 16, 24):
+        t.caixa(junta, 0, y, 32, 1)
+        for x in ((0, 16) if y % 16 == 0 else (8, 24)):
+            t.caixa(junta, x, y, 1, 8)
+    t.caixa(junta, 0, 31, 32, 1)
+
+
+@modelo("soalho.png")
+def soalho(t):
+    t.caixa(SOALHO, 0, 0, 32, 32)
+    for y in (7, 15, 23, 31):
+        t.caixa(escurecer(SOALHO, 35), 0, y, 32, 1)
+    for x, y in ((10, 0), (24, 8), (6, 16), (20, 24)):
+        t.caixa(escurecer(SOALHO, 35), x, y, 1, 7)
+    for x, y in ((4, 3), (17, 11), (27, 19), (12, 27)):
+        t.caixa(clarear(SOALHO, 20), x, y, 4, 1)
+
+
+@modelo("nada.png")
+def nada(t):
+    t.caixa((18, 18, 28), 0, 0, 32, 32)
+
+
+@modelo("tapete.png")
+def tapete(t):
+    t.caixa(TELHA, 2, 2, 28, 28, 3)
+    t.caixa((246, 196, 60), 5, 5, 22, 22)
+    t.caixa(TELHA, 7, 7, 18, 18)
+    t.forma((246, 196, 60), [(16, 10), (22, 16), (16, 22), (10, 16)])
+    t.forma(escurecer(TELHA, 40), [(16, 13), (19, 16), (16, 19), (13, 16)])
+    t.contornar()
+
+
+@modelo("janela.png")
+def janela(t):
+    t.caixa(PAREDE, 0, 0, 32, 32)
+    t.caixa(escurecer(PAREDE, 60), 0, 0, 32, 1)
+    t.caixa(escurecer(PAREDE, 60), 0, 31, 32, 1)
+    t.caixa(MADEIRA, 5, 5, 22, 20)
+    t.caixa(clarear(AZUL, 60), 7, 7, 18, 16)
+    t.caixa(BRANCO, 9, 9, 4, 2)
+    t.caixa(BRANCO, 19, 17, 4, 2)
+    t.caixa(MADEIRA, 15, 7, 2, 16)
+    t.caixa(MADEIRA, 7, 14, 18, 2)
+    t.caixa(escurecer(MADEIRA, 30), 4, 25, 24, 2)
+
+
+@modelo("mesa.png")
+def mesa(t):
+    t.caixa(escurecer(MADEIRA, 35), 5, 22, 3, 8)
+    t.caixa(escurecer(MADEIRA, 35), 24, 22, 3, 8)
+    t.caixa(MADEIRA, 2, 6, 28, 18, 3)
+    t.caixa(clarear(MADEIRA, 30), 4, 8, 24, 3)
+    t.caixa(escurecer(MADEIRA, 25), 2, 21, 28, 3)
+    t.contornar()
+
+
+@modelo("banco.png")
+def banco(t):
+    t.caixa(escurecer(MADEIRA, 35), 10, 17, 3, 11)
+    t.caixa(escurecer(MADEIRA, 35), 19, 17, 3, 11)
+    t.oval(MADEIRA, 7, 9, 18, 11)
+    t.oval(clarear(MADEIRA, 35), 10, 10, 10, 4)
+    t.contornar()
+
+
+@modelo("estante.png")
+def estante(t):
+    t.caixa(escurecer(MADEIRA, 25), 2, 1, 28, 30)
+    cores = ((220, 70, 70), AZUL, (246, 196, 60), (70, 180, 90), PAREDE, (160, 110, 200))
+    for prateleira in (3, 17):
+        t.caixa(escurecer(MADEIRA, 70), 4, prateleira, 24, 11)
+        for numero in range(6):
+            alto = 10 - (numero * 3 + prateleira) % 3
+            t.caixa(cores[(numero + prateleira) % 6], 4 + numero * 4, prateleira + 11 - alto, 3, alto)
+    t.contornar()
+
+
+@modelo("cama.png")
+def cama(t):
+    t.caixa(MADEIRA, 4, 1, 24, 30, 3)
+    t.caixa(AZUL, 6, 11, 20, 18, 2)
+    t.caixa(clarear(AZUL, 45), 6, 11, 20, 3)
+    t.caixa(BRANCO, 9, 3, 14, 7, 2)
+    t.caixa((225, 225, 232), 9, 8, 14, 2)
+    t.contornar()
+
+
+@modelo("vaso.png")
+def vaso(t):
+    folha = (52, 150, 88)
+    t.oval(folha, 8, 2, 16, 15)
+    t.oval(clarear(folha, 40), 10, 4, 7, 6)
+    t.oval(escurecer(folha, 30), 16, 9, 7, 7)
+    t.forma(TELHA, [(8, 18), (24, 18), (21, 30), (11, 30)])
+    t.caixa(clarear(TELHA, 30), 7, 17, 18, 3)
+    t.contornar()
+
+
+@modelo("balcao.png")
+def balcao(t):
+    t.caixa(MADEIRA, 0, 5, 32, 22)
+    t.caixa(clarear(MADEIRA, 35), 0, 5, 32, 4)
+    t.caixa(escurecer(MADEIRA, 30), 0, 24, 32, 3)
+    t.oval(escurecer((246, 196, 60), 70), 9, 9, 14, 14)
+    t.oval((246, 196, 60), 10, 10, 12, 12)
+    t.caixa(escurecer((246, 196, 60), 70), 15, 12, 2, 8)                     # o cifrao da moeda
+    t.caixa(escurecer((246, 196, 60), 70), 13, 13, 6, 1)
+    t.caixa(escurecer((246, 196, 60), 70), 13, 18, 6, 1)
+
+
 def fazer():
     pygame.init()
     pygame.display.set_mode((16, 16))

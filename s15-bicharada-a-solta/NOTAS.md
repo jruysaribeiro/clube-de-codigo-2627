@@ -45,9 +45,8 @@ horta    praia     farol
 |---|---|
 | Cada zona, desenhada com letras (20 por linha, 14 linhas) | `ZONAS` |
 | Como as zonas se juntam | `MUNDO` |
-| Os blocos inventados: areia, neve, rochas, o que quiserem | `BLOCOS` |
+| Os blocos: todos os quadrados das zonas (relva, árvores, água, mobília, areia, neve...) e o que cada um faz | `BLOCOS` |
 | Os edifícios: que letra é a porta de que interior | `PORTAS` |
-| O que há dentro de um edifício: tapete, mesa, banco, estante, cama, vaso, janela | as letras `t m b l c v j`, em `ZONAS` |
 | O que se vende, e por quanto | `LOJA` |
 | O teu boneco: a cor e as três imagens | `JOGADOR` |
 | As falas, as perguntas e quem dá a rede | `TREINADORES` (`falas`, `falas_depois`, `falas_rede`, `da_rede`) |
@@ -58,7 +57,7 @@ horta    praia     farol
 | Quantas moedas dá uma batalha | `premio_da_batalha()` |
 | O que se recebe ao comprar | `receber_compra()` |
 | O que acontece a cada passo, em casa da avó, a cada frame, ao apanhar, ao responder | `ao_dar_passo()`, `ao_descansar()`, `a_cada_frame()`, `ao_apanhar()`, `ao_responder()` |
-| Os desenhos | `desenhar_quadrado()`, `desenhar_jogador()`, `desenhar_treinador()`, `desenhar_bicho_de_costas()` |
+| Os desenhos | `desenhar_bloco()`, `desenho_feito()`, `desenhar_quadrado()`, `desenhar_jogador()`, `desenhar_treinador()`, `desenhar_bicho_de_costas()` |
 
 Não há limite para as zonas nem para os edifícios: são mais entradas em
 `ZONAS`. Os limites são outros: nove treinadores no mapa (um algarismo cada),
@@ -94,18 +93,25 @@ moedas), é o acontecimento `ao_responder()`.
 ## Na Oficina
 
 - cada **zona** abre sozinha, com o boneco lá dentro, e anda só a criança;
-- as letras de **dentro** de um edifício não são as de **fora**: lá dentro há
-  soalho, tapete, mesa, banco, estante, cama, vaso e janela; cá fora há relva,
-  erva alta, árvores, água e a casa da avó. A Oficina mostra só as que
-  servem para a zona aberta, e avisa quando uma está no sítio errado;
+- **todos os quadrados das zonas são blocos**, também os que já vinham com o
+  jogo: a relva, a erva alta, as árvores, a água, a casa da avó, as paredes,
+  o soalho e a mobília. Cada um abre em **Blocos**, e pode mudar de nome, de
+  cor, de desenho (há um modelo de pixel art para cada um) e de regras: uma
+  árvore por onde se passa, outro bloco que cura a equipa (`"faz": "cura"`)
+  ou abre a loja (`"faz": "loja"`). Enquanto não tiverem imagem, o jogo
+  desenha-os como sempre desenhou. Só a relva e o soalho não se apagam;
+- os blocos de **dentro** de um edifício não são os de **fora** (a parede
+  serve nos dois sítios). A ajuda de cada zona mostra só os que servem para
+  essa zona, e a Oficina avisa quando um está no sítio errado;
 - **O mundo** e **As portas** mostram o mundo todo visto de cima;
 - **+ Novo bloco** cria um quadrado novo para as zonas: fica com uma letra
   livre, dá-se-lhe um nome, desenha-se (ou começa-se por um modelo) e diz-se
   nas caixas se se anda por cima dele, se saltam de lá bichos e se é para
   dentro dos edifícios. Depois escreve-se a letra dele nas zonas. A ajuda de
   cada zona diz os blocos que há nesse momento. É assim que se fazem outros
-  sítios: uma praia de areia, uma serra de neve, um deserto de catos. Já vêm
-  oito: areia, palmeira, canas, rocha, neve, cato, flores e ponte;
+  sítios: uma praia de areia, uma serra de neve, um deserto de catos. Além
+  dos que já vinham com o jogo há mais oito: areia, palmeira, canas, rocha,
+  neve, cato, flores e ponte;
 - **+ Nova zona**, **+ Novo edifício**, **+ Novo treinador**, **+ Novo
   bicho**, **+ Novo ataque**, **+ Novo tipo** criam, e o botão vermelho
   **Apagar** tira (e acerta o resto: o `MUNDO`, as `PORTAS`, os números no
@@ -169,7 +175,7 @@ preços da `LOJA`, os níveis em `TREINADORES`, e as contas de
 | Não se consegue entrar na erva alta | «Já falaste com quem dá a rede? Há algum treinador com a caixa marcada?» |
 | O treinador novo não aparece no mapa | «Que número é ele na lista `TREINADORES`? Esse número está escrito nalguma zona?» |
 | O boneco começa num sítio estranho | «Onde está o `P`? Há só um, no mundo todo?» |
-| Não se passa de uma zona para a do lado | «Há relva na borda das duas, na mesma linha? E no `MUNDO`, estão mesmo lado a lado?» |
+| Não se passa de uma zona para a do lado | «Há um bloco por onde se anda na borda das duas, na mesma linha? E no `MUNDO`, estão mesmo lado a lado?» |
 | Uma zona aparece toda desalinhada | «Falta uma vírgula no fim de uma linha?» (Sem ela, o Python cola duas linhas numa.) |
 | A porta de um edifício deixou de funcionar depois de lhe mudarem o nome | «Mudaste o nome no código, ou com o botão **Mudar o nome**?» (Só o botão acerta o `MUNDO` e as `PORTAS`.) |
 | Entra-se na porta e não acontece nada | «A letra está em `PORTAS`? E está escrita lá dentro, na parede do interior?» |
