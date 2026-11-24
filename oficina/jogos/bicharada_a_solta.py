@@ -29,6 +29,7 @@ DESCRICAO = "A Bicharada com um mundo: andas de zona em zona, e os bichos saltam
 SOBRE_OS_GRUPOS = {
     "Mapa": "O mundo é feito de zonas, cada uma do tamanho do ecrã e desenhada com letras. "
             "Sais por um lado de uma, entras na do lado.",
+    "Blocos": "Os quadrados que inventas para as zonas: areia, neve, rochas... Cada um é uma letra, um nome e um desenho teu.",
     "Edifícios": "Os sítios onde se entra por uma porta (cada um é uma zona por dentro), e o que se vende na loja.",
     "Bichos": "Tipo, vida, ataque, forma, cor. Podes pôr uma imagem tua.",
     "Ataques": "O poder, a precisão e o efeito de cada ataque.",
@@ -46,6 +47,7 @@ lista = base.lista
 CRIAVEIS = dict(base.CRIAVEIS)
 CRIAVEIS["Mapa"] = "Nova zona"
 CRIAVEIS["Edifícios"] = "Novo edifício"
+CRIAVEIS["Blocos"] = "Novo bloco"
 
 QUE_FAZER = "O que posso fazer aqui?"
 LINHA_A_LINHA = "Explica-me esta função linha a linha"
@@ -60,6 +62,10 @@ SUGESTOES = {
               "Como é que isto funciona?"],
     "portas": ["Como é que faço um edifício novo?", "Para que serve a letra de cada porta?",
                "Como é que ponho duas portas no mesmo edifício?"],
+    "bloco": ["Faz com que não se possa andar por cima deste bloco", "Faz saltar só bichos de fogo deste bloco",
+              "O que quer dizer cada coisa?"],
+    "desenhar_bloco": ["Põe uma sombra por baixo dos blocos que tapam o caminho", "Faz os blocos sem imagem redondos",
+                       "Explica-me este desenho linha a linha"],
     "loja": ["Põe à venda uma Pomada que cura a equipa toda, por 40 moedas", "Faz as redes mais baratas",
              "Como é que ponho uma coisa nova à venda?"],
     "consegue_apanhar": ["Faz com que se apanhe sempre", "Só se apanha um bicho com menos de metade da vida",
@@ -115,6 +121,7 @@ DESENHOS = {
     "desenhar_jogador": ("Tu, no mapa", ["x", "y", "olha_para"]),
     "desenhar_treinador": ("Um treinador, no mapa", ["treinador", "x", "y", "vencido"]),
     "desenhar_bicho_de_costas": ("O teu bicho, visto de costas", ["bicho", "cx", "cy", "tamanho"]),
+    "desenhar_bloco": ("Um bloco teu", ["letra", "x", "y"]),
 }
 # tipo da escolha -> as funcoes do mapa desse tipo. (O grupo onde aparecem e
 # as explicacoes gerais sao os mesmos das funcoes da batalha.)
@@ -151,6 +158,9 @@ DICAS = {
     "desenho_da_batalha": "Isto é o desenho: muda-o e vês logo, na batalha e em todos os bichos lá em cima."
                           " Um bicho que tenha imagem de costas mostra a imagem, e não este desenho."
                           " A batalha joga-se sozinha.",
+    "bloco": "Um bloco é um quadrado inventado por ti. Desenha-o com «Desenhar» (ou usa um modelo), diz nas caixas"
+             " se se anda por cima dele, e depois escreve a letra dele nas zonas. Estás numa zona onde ele"
+             " aparece (ou na da partida, se ainda não está em nenhuma): clica no jogo e anda com as setas.",
     "loja": "Estás ao balcão, com moedas para experimentar: setas e Enter para comprar. Muda um preço, ou"
             " acrescenta uma coisa, e vê a loja mudar. O que cada coisa faz está na regra «O que se recebe ao comprar».",
     "treinador": "O treinador fala contigo e depois luta: é o que está nas falas dele. Enter passa as falas"
@@ -183,6 +193,8 @@ SALA_NOVA = ([" " * 20] * 3 + ["     ##j####j##     ", "     #l______v#     ", "
                                "     #___mb___#     ", "     #________#     ", "     #________#     ",
                                "     #___tt___#     ", "     ####?#####     "] + [" " * 20] * 3)
 LETRAS_DE_PORTA = "BCDFGIJKLMNOQRSTUVWXYZ"
+LETRAS_DE_BLOCO = "adfghikqwxyznorsup"        # minusculas que o jogo ainda nao usa para outra coisa
+CORES_PARA_BLOCOS = [(200, 170, 120), (120, 200, 210), (220, 120, 90), (160, 130, 200), (110, 170, 120), (235, 200, 90)]
 
 
 # =====================================================================
@@ -195,13 +207,20 @@ class Mundo:
     # com os dados, para se poder perguntar "chega-se a pe ate ali?" sem
     # mexer no jogo. Um sitio e (zona, coluna, linha).
 
-    def __init__(self, zonas, mundo, portas, treinadores, pode=None):
+    def __init__(self, zonas, mundo, portas, treinadores, pode=None, os_blocos=None):
         self.zonas = zonas
         self.mundo = mundo
         self.portas = portas
         self.treinadores = treinadores      # quantos ha
+        self.blocos = os_blocos if isinstance(os_blocos, dict) else {}
         # A regra de andar: a original, ou a que o jogo tiver agora.
-        self.pode = pode or (lambda letra: letra not in "A~# jmblcv")
+        self.pode = pode or self.pode_original
+
+    def pode_original(self, letra):
+        if letra in "A~# jmblcv":
+            return False
+        ficha = self.blocos.get(letra)
+        return not (isinstance(ficha, dict) and ficha.get("passa") is False)
 
     def letra(self, nome, coluna, linha):
         zona = self.zonas.get(nome)
@@ -360,6 +379,11 @@ def escolhas(fonte):
     if blocos.instrucao(arvore, "LOJA") is not None:
         lista.append({"id": "loja", "grupo": "Edifícios", "titulo": "A loja: o que se vende"})
     numero = 0
+    for letra, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "BLOCOS")):
+        nome = blocos.valor_da_chave(ficha, "nome") or "bloco"
+        lista.append({"id": "bloco:" + str(numero), "grupo": "Blocos", "titulo": nome + " (a letra " + str(letra) + ")"})
+        numero = numero + 1
+    numero = 0
     for nome, _, _ in _zonas_escritas(arvore):
         titulo = nome or "Zona " + str(numero + 1)
         if nome in interiores:
@@ -392,14 +416,36 @@ def _juntar_imagens(resposta, ficha, chaves):
         resposta["imagens"] = imagens
 
 
-def _quem_e_quem(arvore, aqui):
-    # A lista dos treinadores que ha agora, com o numero de cada um e a zona
-    # onde esta, e a das portas. "aqui" e a zona que esta aberta.
+def _blocos_escritos(arvore, dentro):
+    # Os blocos que ha, para dentro dos edificios ou para ca fora:
+    # [(letra, nome, o que se faz com ele), ...]
+    lista = []
+    os_blocos = _valor(arvore, "BLOCOS")
+    for letra, ficha in os_blocos.items() if isinstance(os_blocos, dict) else []:
+        if not isinstance(ficha, dict) or bool(ficha.get("dentro")) != bool(dentro):
+            continue
+        faz = "anda-se por cima" if ficha.get("passa") is not False else "nao se passa"
+        if ficha.get("erva") is True:
+            faz = faz + ", e saltam de la bichos"
+        lista.append((str(letra), str(ficha.get("nome", "bloco")), faz))
+    return lista
+
+
+def _quem_e_quem(arvore, aqui, dentro=False):
+    # A lista dos blocos e dos treinadores que ha agora (com o numero de cada
+    # um e a zona onde esta), e a das portas. "aqui" e a zona que esta aberta.
     zonas = _valor(arvore, "ZONAS")
     zonas = zonas if _sao_zonas(zonas) else {}
+    os_blocos = _blocos_escritos(arvore, dentro)
+    texto_dos_blocos = []
+    if os_blocos:
+        texto_dos_blocos = ["OS BLOCOS QUE HA AGORA para " + ("dentro dos edificios" if dentro else "as zonas ca de fora")
+                            + " (fazem-se e mudam-se em Blocos):"]
+        texto_dos_blocos += ["  " + letra + "   " + nome + " (" + faz + ")" for letra, nome, faz in os_blocos]
+        texto_dos_blocos.append("")
     treinadores = [blocos.valor_da_chave(ficha, "nome") or "sem nome"
                    for _, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "TREINADORES"))]
-    texto = ["OS TREINADORES QUE HA AGORA, e o numero de cada um no mapa:"]
+    texto = texto_dos_blocos + ["OS TREINADORES QUE HA AGORA, e o numero de cada um no mapa:"]
     for numero, nome in enumerate(treinadores, 1):
         if numero > 9:
             texto.append("  -   " + nome + ": nao cabe no mapa (so ha numeros ate ao 9)")
@@ -445,6 +491,21 @@ def regiao(fonte, escolha):
                                                  ("imagem_lado", "De lado")])
         return resposta
 
+    if tipo == "bloco":
+        no = blocos.instrucao(arvore, "BLOCOS")
+        partes = base._fichas(no)
+        if not numero.isdigit() or int(numero) >= len(partes):
+            return None
+        letra, ficha, inicio, fim = partes[int(numero)]
+        zonas = _valor(arvore, "ZONAS")
+        onde = [zona for zona in zonas if str(letra) in "".join(zonas[zona])] if _sao_zonas(zonas) else []
+        ajuda = blocos.ajuda_acima(linhas, no.lineno) + "\n\nA LETRA DESTE BLOCO E: " + str(letra) + "\n"
+        ajuda = ajuda + ("Esta nas zonas: " + ", ".join(onde) if onde else
+                         "Ainda nao esta em nenhuma zona: abre uma zona e escreve a letra " + str(letra) + ".")
+        return {"inicio": inicio, "fim": fim, "titulo": blocos.valor_da_chave(ficha, "nome") or escolha,
+                "imagem": blocos.valor_da_chave(ficha, "imagem"), "som": None, "ajuda": ajuda, "dica": DICAS["bloco"],
+                "sugestoes": SUGESTOES["bloco"], "caixas": True, "apagar": "Apagar este bloco"}
+
     if tipo == "zona":
         no = blocos.instrucao(arvore, "ZONAS")
         partes = _zonas_escritas(arvore)
@@ -456,7 +517,7 @@ def regiao(fonte, escolha):
         # E, por baixo, quem e cada numero e cada porta neste momento: isso
         # muda quando se cria, apaga ou muda o nome a um treinador.
         ajuda = blocos.comentarios_a_partir_de(linhas, INICIO_DOS_INTERIORES if dentro else INICIO_DAS_ZONAS)
-        ajuda = (ajuda or blocos.ajuda_acima(linhas, no.lineno)) + "\n\n" + _quem_e_quem(arvore, nome)
+        ajuda = (ajuda or blocos.ajuda_acima(linhas, no.lineno)) + "\n\n" + _quem_e_quem(arvore, nome, dentro)
         return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": None, "som": None,
                 "ajuda": ajuda, "dica": DICAS["interior" if dentro else "zona"],
                 "sugestoes": SUGESTOES["interior" if dentro else "zona"],
@@ -542,7 +603,7 @@ def _ler_mundo(fonte, treinadores=None):
         treinadores = len(no.value.elts) if no is not None and isinstance(no.value, ast.List) else 0
     if not _sao_zonas(zonas) or not _e_mundo(mundo) or not _sao_portas(portas):
         return arvore, None
-    return arvore, Mundo(zonas, mundo, portas, treinadores)
+    return arvore, Mundo(zonas, mundo, portas, treinadores, os_blocos=_valor(arvore, "BLOCOS"))
 
 
 def _escrever_na_zona(arvore, linhas, nome, coluna, linha, texto):
@@ -623,7 +684,7 @@ def _nova_zona(fonte):
     # uma saida para a direita, que e onde a zona nova tem a entrada.
     fila = None
     for numero, nomes in enumerate(mundo.mundo):
-        if nomes and any(mundo.letra(nomes[-1], ZONA[0] - 1, linha) in ".e" for linha in (6, 7)):
+        if nomes and any(mundo.livre(mundo.letra(nomes[-1], ZONA[0] - 1, linha)) for linha in (6, 7)):
             fila = fila if fila is not None else numero
     ligada = fila is not None
     if fila is None:
@@ -729,7 +790,67 @@ def _novo_treinador(fonte):
     return "\n".join(linhas), "treinador:" + str(len(partes)), aviso
 
 
+def _novo_bloco(fonte):
+    arvore = ast.parse(fonte)
+    partes = base._fichas(blocos.instrucao(arvore, "BLOCOS"))
+    zonas = _valor(arvore, "ZONAS")
+    portas = _valor(arvore, "PORTAS")
+    usadas = "".join("".join(filas) for filas in zonas.values()) if _sao_zonas(zonas) else ""
+    usadas = usadas + "".join(str(parte[0]) for parte in partes) + "".join(portas if isinstance(portas, dict) else [])
+    livres = [letra for letra in LETRAS_DE_BLOCO if letra not in usadas and letra not in CONHECIDAS]
+    if not livres:
+        raise ValueError("já não há letras livres para mais um bloco.")
+    letra = livres[0]
+    nome = base._nome_livre("bloco novo", [blocos.valor_da_chave(parte[1], "nome") for parte in partes])
+    cor = CORES_PARA_BLOCOS[len(partes) % len(CORES_PARA_BLOCOS)]
+    linhas = fonte.split("\n")
+    _juntar_ao_dicionario(arvore, linhas, "BLOCOS", [
+        '    "' + letra + '": {',
+        '        "nome": "' + nome + '",',
+        '        "passa": True,',
+        '        "erva": False,',
+        '        "dentro": False,',
+        '        "por_baixo": ".",',
+        '        "cor": ' + str(cor) + ",",
+        '        "imagem": "' + base._ficheiro(nome) + '.png",',
+        "    },",
+    ])
+    aviso = ('Criei o bloco "' + nome + '": é a letra ' + letra + ". Dá-lhe um nome, desenha-o (ou começa por um modelo) "
+             "e diz nas caixas se se anda por cima dele. Depois abre uma zona e escreve a letra " + letra + " onde o quiseres.")
+    return "\n".join(linhas), "bloco:" + str(len(partes)), aviso
+
+
+def _apagar_bloco(fonte, escolha):
+    # O bloco sai dos BLOCOS, e nas zonas fica relva (ou soalho, dentro dos
+    # edificios) no lugar dele.
+    arvore = ast.parse(fonte)
+    partes = base._fichas(blocos.instrucao(arvore, "BLOCOS"))
+    numero = escolha.partition(":")[2]
+    if not numero.isdigit() or int(numero) >= len(partes):
+        raise ValueError("isso não se pode apagar.")
+    letra, ficha, inicio, fim = partes[int(numero)]
+    interiores = _interiores(arvore)
+    linhas = fonte.split("\n")
+    quantos = []
+
+    def mudar(zona, texto):
+        quantos.extend(letra for esta in texto if esta == letra)
+        return texto.replace(letra, "_" if zona in interiores else ".")
+    trocas = _trocas_nas_zonas(arvore, linhas, mudar)
+    # (Um bloco que o tinha por baixo passa a ter relva.)
+    for _, outra, _, _ in partes:
+        no = base._no_da_chave(outra, "por_baixo") if isinstance(outra, ast.Dict) and outra is not ficha else None
+        if no is not None and blocos.texto_constante(no) == letra and no.lineno == no.end_lineno:
+            base._trocar_no(linhas, no, '"."', trocas)
+    aviso = 'Apaguei o bloco "' + (blocos.valor_da_chave(ficha, "nome") or str(letra)) + '" (a letra ' + str(letra) + ")."
+    if quantos:
+        aviso = aviso + " Havia " + str(len(quantos)) + " nas zonas: ficou relva (ou soalho) no lugar deles."
+    return base._aplicar(linhas, [(inicio, fim)], trocas), aviso
+
+
 def novo(fonte, grupo):
+    if grupo == "Blocos":
+        return _novo_bloco(fonte)
     if grupo == "Mapa":
         return _nova_zona(fonte)
     if grupo == "Edifícios":
@@ -769,22 +890,42 @@ def novo(fonte, grupo):
 #   sem "chave": devolve as caixas e como estao
 #   com "chave": devolve {"codigo": ...} ja com esse valor
 
-CAIXAS = {"da_rede": "Dá a rede no início (sem bichos, em vez de lutar dá uma rede; depois faz uma luta de treino)"}
+CAIXAS_DE = {
+    "treinador": {"da_rede": "Dá a rede no início (sem bichos, em vez de lutar dá uma rede; depois faz uma luta de treino)"},
+    "bloco": {"passa": "Anda-se por cima dele (desmarcado, tapa o caminho)",
+              "erva": "Saltam de lá bichos à solta, como da erva alta",
+              "dentro": "É para dentro dos edifícios (desmarcado, é para as zonas cá de fora)"},
+}
 
 
 def caixas(fonte, escolha, codigo, chave=None, valor=None):
-    if escolha.partition(":")[0] != "treinador":
+    CAIXAS = CAIXAS_DE.get(escolha.partition(":")[0])
+    if CAIXAS is None:
         raise ValueError("aqui não há caixas para marcar.")
     texto = codigo.rstrip()
     virgula = texto.endswith(",")
     if virgula:
         texto = texto[:-1]
+    # A ficha de um treinador e um {...}. A de um bloco e "letra": {...}:
+    # para o Python a ler mete-se entre chavetas, numa linha a parte (assim
+    # as linhas e as colunas do que la esta nao mudam de sitio... a nao ser a
+    # linha, que passa a ser a seguinte).
+    desvio = 0
     try:
         ficha = ast.parse(texto, mode="eval").body
     except SyntaxError:
-        raise ValueError("o código tem um erro: corrige-o primeiro, ou carrega em Repor o original.")
-    if not isinstance(ficha, ast.Dict):
-        raise ValueError("não percebi a ficha deste treinador.")
+        try:
+            ficha = ast.parse("{\n" + texto + "\n}", mode="eval").body
+            ficha = ficha.values[0] if isinstance(ficha, ast.Dict) and len(ficha.values) == 1 else None
+            desvio = 1
+        except SyntaxError:
+            raise ValueError("o código tem um erro: corrige-o primeiro, ou carrega em Repor o original.")
+    if not isinstance(ficha, ast.Dict) or len(ficha.keys) == 0:
+        raise ValueError("não percebi esta ficha.")
+    if desvio:
+        for no in ast.walk(ficha):
+            if hasattr(no, "lineno"):
+                no.lineno, no.end_lineno = no.lineno - 1, no.end_lineno - 1
     valores = {}
     for k, v in zip(ficha.keys, ficha.values):
         if blocos.texto_constante(k) in CAIXAS:
@@ -988,6 +1129,8 @@ def apagar(fonte, escolha):
     tipo = escolha.partition(":")[0]
     if tipo == "zona":
         return _apagar_zona(fonte, escolha)
+    if tipo == "bloco":
+        return _apagar_bloco(fonte, escolha)
     if tipo == "ataque":
         return _apagar_ataque(fonte, escolha)
     if tipo == "treinador":
@@ -1047,14 +1190,15 @@ def _ver_mundo(ns, treinadores, aberto, problemas, avisos, zona_aberta=False):
         if not isinstance(letra, str) or len(letra) != 1 or not isinstance(nome, str):
             problemas.append('Em PORTAS, cada porta é uma letra só e o nome de uma zona: "M": "mercearia".')
             return
-        if letra in CONHECIDAS:
+        if letra in CONHECIDAS or (isinstance(ns.get("BLOCOS"), dict) and letra in ns["BLOCOS"]):
             problemas.append('Em PORTAS, a letra "' + letra + '" já quer dizer outra coisa no mapa. Escolhe outra.')
             return
     if not aberto:
         return
 
     quantos = len(treinadores) if isinstance(treinadores, list) else 0
-    este = Mundo(zonas, mundo, portas, quantos)
+    os_blocos = ns.get("BLOCOS") if isinstance(ns.get("BLOCOS"), dict) else {}
+    este = Mundo(zonas, mundo, portas, quantos, os_blocos=os_blocos)
     no_mundo = este.no_mundo()
     interiores = [nome for nome in portas.values() if nome in zonas]
     tudo = "".join("".join(zonas[nome]) for nome in zonas)
@@ -1134,21 +1278,31 @@ def _ver_mundo(ns, treinadores, aberto, problemas, avisos, zona_aberta=False):
     # As letras de fora la dentro, e as de dentro ca fora.
     for nome in zonas:
         letras = set("".join(zonas[nome]))
+        de_fora = [letra for letra in os_blocos if isinstance(os_blocos[letra], dict) and not os_blocos[letra].get("dentro")]
+        de_dentro = [letra for letra in os_blocos if isinstance(os_blocos[letra], dict) and os_blocos[letra].get("dentro")]
         if nome in interiores:
+            blocos_errados = sorted(str(os_blocos[letra].get("nome", letra)) for letra in letras & set(de_fora))
+            if blocos_errados:
+                avisos.append('Dentro de "' + nome + '" há blocos que são para cá de fora (' + ", ".join(blocos_errados)
+                              + "). Se os queres lá dentro, marca neles a caixa «É para dentro dos edifícios».")
             erradas = sorted(letras & set(SO_DE_FORA))
             if erradas:
                 avisos.append('Dentro de "' + nome + '" há letras de lá de fora (' + " ".join(erradas) + "): relva, "
                               "erva, árvores, água e a casa da avó são para as zonas ao ar livre. Cá dentro usa "
                               "soalho (_), tapete, mesa, estante...")
         else:
+            blocos_errados = sorted(str(os_blocos[letra].get("nome", letra)) for letra in letras & set(de_dentro))
+            if blocos_errados:
+                avisos.append('Na zona "' + nome + '" há blocos que são para dentro dos edifícios ('
+                              + ", ".join(blocos_errados) + ").")
             erradas = sorted(letras & set(SO_DE_DENTRO))
             if erradas:
                 avisos.append('Na zona "' + nome + '" há letras de dentro dos edifícios (' + " ".join(erradas)
                               + "): soalho, tapete, mesas e estantes são para os interiores.")
-    novas = sorted(set(tudo) - set(CONHECIDAS) - set(portas))
+    novas = sorted(set(tudo) - set(CONHECIDAS) - set(portas) - set(os_blocos))
     if novas:
-        avisos.append("Letras novas: " + " ".join(novas) + ". O jogo trata-as como relva, até lhes dares "
-                      "um desenho (em Desenhos) ou uma regra.")
+        avisos.append("Letras que o jogo não conhece: " + " ".join(novas) + ". Ficam relva. Para serem outra coisa, "
+                      "faz um bloco com essa letra, em Blocos.")
 
 
 def _ver_falas(falas, quem, chave, problemas):
@@ -1217,6 +1371,47 @@ def _ver_aprende(ns, bichos, aberto, problemas, avisos):
                                   "Muda o nome também na ficha desse bicho, senão o jogo pára.")
         # (Tambem os que se aprendem tem de ser do tipo do bicho, ou normais.)
         base._ver_tipo_dos_ataques(str(nome), ficha, list(aprende), ' em "aprende"', ns, aberto, problemas, avisos)
+
+
+def _ver_blocos(ns, problemas, avisos):
+    os_blocos = ns.get("BLOCOS")
+    if not isinstance(os_blocos, dict):
+        problemas.append("BLOCOS tem de estar entre { }.")
+        return
+    portas = ns.get("PORTAS") if isinstance(ns.get("PORTAS"), dict) else {}
+    tipos = ns.get("CORES_TIPO") if isinstance(ns.get("CORES_TIPO"), dict) else {}
+    for letra, ficha in os_blocos.items():
+        if not isinstance(letra, str) or len(letra) != 1:
+            problemas.append("Em BLOCOS, cada bloco é uma letra só, entre aspas.")
+            continue
+        if not isinstance(ficha, dict):
+            problemas.append('O bloco "' + letra + '" tem de ter a ficha entre { }.')
+            continue
+        quem = "O bloco " + str(ficha.get("nome", letra)) if isinstance(ficha.get("nome"), str) else 'O bloco "' + letra + '"'
+        if letra in CONHECIDAS or letra in portas:
+            problemas.append(quem + ': a letra "' + letra + '" já quer dizer outra coisa no mapa. Escolhe outra.')
+        base._ver_texto(ficha, quem, "nome", problemas)
+        base._ver_cor(ficha, quem, "cor", problemas)
+        if not isinstance(ficha.get("passa"), bool):
+            problemas.append(quem + ': o "passa" é True (anda-se por cima) ou False (tapa o caminho), sem aspas.')
+        for chave in ("erva", "dentro"):
+            if chave in ficha and not isinstance(ficha[chave], bool):
+                problemas.append(quem + ': o "' + chave + '" é True ou False, sem aspas.')
+        if ficha.get("erva") is True and ficha.get("passa") is False:
+            avisos.append(quem + " tem erva mas não se passa por ele: nunca vai saltar de lá nenhum bicho.")
+        por_baixo = ficha.get("por_baixo", ".")
+        if not isinstance(por_baixo, str) or len(por_baixo) != 1:
+            problemas.append(quem + ': o "por_baixo" é uma letra só: "." para relva, "_" para soalho, ou a de outro bloco.')
+        if "imagem" in ficha:
+            _ver_imagem(ficha, quem, "imagem", ns, problemas)
+        if "bichos" in ficha:
+            if not isinstance(ficha["bichos"], list) or not all(isinstance(tipo, str) for tipo in ficha["bichos"]):
+                problemas.append(quem + ': os "bichos" são uma lista de tipos, entre [ ]: ["agua", "normal"].')
+            else:
+                for tipo in ficha["bichos"]:
+                    if tipos and tipo not in tipos:
+                        problemas.append(quem + ': o tipo "' + tipo + '", em "bichos", não existe.'
+                                         + base._parecido(tipo, list(tipos)))
 
 
 def _ver_loja_e_jogador(ns, problemas, avisos):
@@ -1316,7 +1511,7 @@ class Palco(base.Palco):
     def __init__(self, escolha):
         super().__init__(escolha)
         # no_mapa: o palco e o mapa, e nao uma batalha.
-        self.dados = self.tipo in ("zona", "mundo", "portas", "loja", "jogador")     # anda so a crianca
+        self.dados = self.tipo in ("zona", "mundo", "portas", "loja", "jogador", "bloco")     # anda so a crianca
         self.de_cima = self.tipo in ("mundo", "portas")           # ve-se o mundo todo, pequeno
         self.no_mapa = self.dados or self.regra in DO_MAPA
         # Um treinador abre num palco so dele: fala e depois luta (ve as cenas).
@@ -1337,6 +1532,7 @@ class Palco(base.Palco):
         _ver_conversas(ns, self.ler(ns, "TREINADORES"), self.falador, problemas, avisos)
         _ver_aprende(ns, self.ler(ns, "BICHOS"), self.tipo == "bicho", problemas, avisos)
         _ver_loja_e_jogador(ns, problemas, avisos)
+        _ver_blocos(ns, problemas, avisos)
         if self.regra in REGRAS and self.preparado and not problemas:
             _experimentar(ns, self.regra, problemas)
         base._resumir_avisos_de_tipo(avisos)
@@ -1417,7 +1613,7 @@ class Palco(base.Palco):
     def mundo(self, ns):
         # O mundo como esta agora no jogo, com a regra de andar que la estiver.
         return Mundo(ns["ZONAS"], ns["MUNDO"], ns["PORTAS"], len(ns["TREINADORES"]),
-                     lambda letra: ns["pode_andar"](letra))
+                     lambda letra: ns["pode_andar"](letra), ns.get("BLOCOS"))
 
     def passeio(self, ns, noticia):
         # Poe o jogo no mapa, com as funcoes do proprio jogo: na partida ou,
@@ -1434,14 +1630,24 @@ class Palco(base.Palco):
         ns["moedas"] = 100
         if self.tipo == "loja":
             ns["abrir_loja"]()
+        nome = None
         if self.tipo == "zona":
             nomes = list(ns["ZONAS"])
             nome = nomes[min(self.numero, len(nomes) - 1)]
+        elif self.tipo == "bloco" and len(ns["BLOCOS"]) > 0:
+            # Um bloco abre numa zona onde ele esteja (se estiver nalguma).
+            letra = list(ns["BLOCOS"])[min(self.numero, len(ns["BLOCOS"]) - 1)]
+            com_ele = [zona for zona in ns["ZONAS"] if letra in "".join(ns["ZONAS"][zona])]
+            nome = com_ele[0] if com_ele else None
+        if nome is not None:
             if ns["jogador"]["zona"] != nome:
                 este = self.mundo(ns)
                 sitio = None
                 for letra in "._e":
                     sitio = sitio or este.encontrar(letra, [nome])
+                for letra, ficha in ns["BLOCOS"].items():        # ou um bloco por onde se anda (a areia)
+                    if sitio is None and isinstance(ficha, dict) and ficha.get("passa") is True:
+                        sitio = este.encontrar(letra, [nome])
                 sitio = sitio or (nome, 1, 1)
                 ns["ir_para"](*sitio)
                 for chave in ("zona", "coluna", "linha"):
@@ -1782,6 +1988,8 @@ class Palco(base.Palco):
                  "#": ns["PAREDE"], "_": ns["SOALHO"], " ": ns["PRETO"]}
         if letra in ns["PORTAS"]:
             return ns["TRONCO"]
+        if letra in ns["BLOCOS"] and isinstance(ns["BLOCOS"][letra], dict):
+            return ns["BLOCOS"][letra].get("cor", ns["RELVA"])
         if letra in "123456789" and int(letra) <= len(ns["TREINADORES"]):
             return ns["VERMELHO"]
         return cores.get(letra, ns["RELVA"])
@@ -1854,6 +2062,18 @@ class Palco(base.Palco):
             texto = LEGENDA_DE_DENTRO if dentro else LEGENDA
             if len(ns["PORTAS"]) > 0:
                 texto = texto + "  " + " ".join(ns["PORTAS"]) + " porta"
+            # ... e os blocos que ha para este genero de zona.
+            for letra, ficha in ns["BLOCOS"].items():
+                if isinstance(ficha, dict) and bool(ficha.get("dentro")) == dentro:
+                    texto = texto + "  " + letra + " " + str(ficha.get("nome", "bloco"))
+        elif self.tipo == "bloco":
+            letras = list(ns["BLOCOS"])
+            letra = letras[min(self.numero, len(letras) - 1)] if letras else "?"
+            ficha = ns["BLOCOS"].get(letra, {})
+            texto = ("O bloco «" + str(ficha.get("nome", "?")) + "» é a letra " + letra + ". "
+                     + ("Anda-se por cima dele." if ficha.get("passa") is not False else "Tapa o caminho."))
+            if letra not in "".join("".join(filas) for filas in ns["ZONAS"].values()):
+                texto = texto + " Ainda não está em nenhuma zona: abre uma zona e escreve a letra " + letra + "."
         elif self.tipo == "mundo":
             texto = "O mundo visto de cima. O ponto amarelo és tu: clica aqui e anda com as setas."
         elif self.tipo == "portas":

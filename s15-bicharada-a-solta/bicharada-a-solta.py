@@ -89,6 +89,8 @@ PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 #   1 a 9   um treinador: o 1 e o primeiro da lista TREINADORES, o 2 e o
 #           segundo, e por ai fora. Anda contra ele para o desafiares.
 #   M, ou outra letra que esteja em PORTAS: uma porta (ve mais abaixo)
+#   s, r, ou outra letra que esteja em BLOCOS: um bloco inventado (areia,
+#          rocha...). Ve os BLOCOS, mais abaixo
 # Uma letra que o jogo nao conheca fica relva.
 # AS SAIDAS: para se passar de uma zona para a do lado, tem de haver relva
 # (ou erva) na borda das duas, no mesmo sitio. Aqui as saidas para os lados
@@ -111,25 +113,24 @@ PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 #       (um espaco) nada: fica preto, e nao se passa. E o que ha a volta da sala
 #   1 a 9   um treinador: anda contra ele para falares com ele
 #   M, ou outra letra que esteja em PORTAS: a porta por onde se sai
-# Para uma coisa nova (um piano, uma lareira) escolhe uma letra que ainda nao
-# uses: desenha-a em desenhar_quadrado e, se nao for para passar por cima,
-# junta-a ao pode_andar.
+# Para uma coisa nova (um piano, uma lareira) faz um bloco, em BLOCOS, com
+# "dentro": True.
 ZONAS = {
     "serra": [
-        "AAAAAAAAAAAAAAAAAAAA",
-        "A...AA.......eeee..A",
-        "A...AA.......eeee..A",
-        "A............eeee..A",
-        "A..eee....AA.......A",
-        "A..eee....AA.......A",
-        "A..eee..............",
-        "A...................",
-        "A......AAA.........A",
-        "A......AAA....~~...A",
-        "A.............~~...A",
-        "A..AA..............A",
-        "A..AA..............A",
-        "AAAAAAAAA..AAAAAAAAA",
+        "rrrrrrrrrrrrrrrrrrrr",
+        "r...rr.......eeee..r",
+        "r...rr.......eeee..r",
+        "r............eeee..r",
+        "r..eee....rr.......r",
+        "r..eee....rr.......r",
+        "r..eee..............",
+        "r...................",
+        "r......rrr.........r",
+        "r......rrr....~~...r",
+        "r.............~~...r",
+        "r..rr..............r",
+        "r..rr..............r",
+        "rrrrrrrrr..rrrrrrrrr",
     ],
     "montado": [
         "AAAAAAAAAAAAAAAAAAAA",
@@ -228,33 +229,33 @@ ZONAS = {
         "AAAAAAAAAAAAAAAAAAAA",
     ],
     "praia": [
-        "AAAAAAAAA..AAAAAAAAA",
-        "A..................A",
-        "A..H...............A",
-        "A............eee...A",
-        "A............eee...A",
-        "A..................A",
-        "....................",
-        ".........3..........",
-        "A..................A",
-        "A....~~~......~~~..A",
-        "A..~~~~~~~..~~~~~~~A",
-        "A~~~~~~~~~~~~~~~~~~A",
+        "pppppppppssppppppppp",
+        "pssssssssssssssssssp",
+        "pssHsssssssssssssssp",
+        "pssssssssssssuuusssp",
+        "pssssssssssssuuusssp",
+        "pssssssssssssssssssp",
+        "ssssssssssssssssssss",
+        "sssssssss3ssssssssss",
+        "pssssssssssssssssssp",
+        "pssss~~~ssssss~~~ssp",
+        "pss~~~~~~~ss~~~~~~~p",
+        "p~~~~~~~~~~~~~~~~~~p",
         "~~~~~~~~~~~~~~~~~~~~",
         "~~~~~~~~~~~~~~~~~~~~",
     ],
     "farol": [
-        "AAAAAAAAA..AAAAAAAAA",
-        "A..................A",
-        "A......eeee........A",
-        "A......eeee....AA..A",
-        "A......eeee....AA..A",
-        "A..................A",
-        "..................~~",
-        ".................~~~",
-        "A...............~~~~",
-        "A..~~.........~~~~~~",
-        "A~~~~~~.....~~~~~~~~",
+        "pppppppppssppppppppp",
+        "pssssssssssssssssssp",
+        "pssssssuuuussssssssp",
+        "pssssssuuuussssppssp",
+        "pssssssuuuussssppssp",
+        "pssssssssssssssssssp",
+        "ssssssssssssssssss~~",
+        "sssssssssssssssss~~~",
+        "psssssssssssssss~~~~",
+        "pss~~sssssssss~~~~~~",
+        "p~~~~~~sssss~~~~~~~~",
         "~~~~~~~~~~~~~~~~~~~~",
         "~~~~~~~~~~~~~~~~~~~~",
         "~~~~~~~~~~~~~~~~~~~~",
@@ -299,6 +300,96 @@ MUNDO = [
 # linha aqui com uma letra que ainda nao uses, e essa letra nos dois sitios.
 PORTAS = {
     "M": "mercearia",
+}
+
+# --- Os blocos ---
+# Os quadrados que se inventam para as zonas: areia, neve, rochas, o que
+# quiseres. Cada bloco e uma letra, que se escreve nas zonas.
+#   nome       o que ele e
+#   passa      True se se anda por cima, False se tapa o caminho
+#   erva       True se de la saltam bichos a solta, como da erva alta
+#   bichos     (so se quiseres) os tipos dos bichos que de la saltam:
+#              ["agua"]. Sem isto, saltam de todos os tipos
+#   dentro     True se e para dentro dos edificios, False se e para ca fora
+#   por_baixo  a letra do chao que se desenha primeiro, por baixo dele: "."
+#              (relva) para um cacto no prado, "s" para um cacto na areia
+#   cor        a cor do bloco, enquanto nao tiver imagem
+#   imagem     o nome de um PNG. Se existir em comum/assets/imagens/, e ele
+#              que se ve (o que for transparente deixa ver o chao por baixo)
+BLOCOS = {
+    "s": {
+        "nome": "areia",
+        "passa": True,
+        "erva": False,
+        "dentro": False,
+        "por_baixo": ".",
+        "cor": (235, 215, 160),
+        "imagem": "areia.png",
+    },
+    "p": {
+        "nome": "palmeira",
+        "passa": False,
+        "erva": False,
+        "dentro": False,
+        "por_baixo": "s",
+        "cor": (60, 150, 90),
+        "imagem": "palmeira.png",
+    },
+    "u": {
+        "nome": "canas",
+        "passa": True,
+        "erva": True,
+        "bichos": ["agua", "normal"],
+        "dentro": False,
+        "por_baixo": "s",
+        "cor": (175, 185, 95),
+        "imagem": "canas.png",
+    },
+    "r": {
+        "nome": "rocha",
+        "passa": False,
+        "erva": False,
+        "dentro": False,
+        "por_baixo": ".",
+        "cor": (135, 135, 145),
+        "imagem": "rocha.png",
+    },
+    "n": {
+        "nome": "neve",
+        "passa": True,
+        "erva": False,
+        "dentro": False,
+        "por_baixo": ".",
+        "cor": (238, 242, 248),
+        "imagem": "neve.png",
+    },
+    "k": {
+        "nome": "cacto",
+        "passa": False,
+        "erva": False,
+        "dentro": False,
+        "por_baixo": "s",
+        "cor": (70, 160, 100),
+        "imagem": "cacto.png",
+    },
+    "f": {
+        "nome": "flores",
+        "passa": True,
+        "erva": False,
+        "dentro": False,
+        "por_baixo": ".",
+        "cor": (240, 150, 190),
+        "imagem": "flores.png",
+    },
+    "o": {
+        "nome": "ponte",
+        "passa": True,
+        "erva": False,
+        "dentro": False,
+        "por_baixo": "~",
+        "cor": (150, 105, 65),
+        "imagem": "ponte.png",
+    },
 }
 
 # --- A loja ---
@@ -1134,8 +1225,9 @@ def passar_a_porta(letra):
 # ONDE SE PODE ANDAR
 # Recebe a letra de um quadrado do mapa e devolve True se da para andar para
 # la, ou False se nao da. Como esta: nao se passa nas arvores (A), na agua
-# (~), nas paredes (#), no nada (um espaco) nem, dentro dos edificios, nas
-# janelas (j), mesas (m), bancos (b), estantes (l), camas (c) e vasos (v). (A casa da avo, o balcao da
+# (~), nas paredes (#), no nada (um espaco), dentro dos edificios nas janelas
+# (j), mesas (m), bancos (b), estantes (l), camas (c) e vasos (v), nem nos
+# BLOCOS que tem "passa": False. (A casa da avo, o balcao da
 # loja e os treinadores nao passam por aqui: contra eles vai-se sempre de
 # encontro. E na erva alta so se entra com um bicho ou uma rede.)
 # Ideias: nadar, isto e, passar na agua se levares na equipa um bicho do tipo
@@ -1145,11 +1237,14 @@ def pode_andar(letra):
         return False
     if letra in "jmblcv":
         return False
+    if letra in BLOCOS and not BLOCOS[letra]["passa"]:
+        return False
     return True
 
 
 # QUANDO SALTA UM BICHO DA ERVA
-# Corre a cada passo que das na erva alta (a letra e). Devolve True se desse
+# Corre a cada passo que das na erva alta (a letra e, e os BLOCOS que tem
+# "erva": True). Devolve True se desse
 # passo salta um bicho a solta, ou False se nao salta nada. Como esta: e
 # sorte, SORTE_NA_ERVA vezes em cada 100.
 # Ideias: saltar sempre; nunca saltar dois bichos seguidos (guarda na memoria
@@ -1160,12 +1255,24 @@ def ha_batalha_na_erva():
 
 # QUE BICHO SALTA DA ERVA
 # Devolve o bicho a solta, feito com criar_bicho(nome, nivel). Como esta: um
-# bicho qualquer de BICHOS, um a tres niveis abaixo do teu bicho mais forte.
+# bicho qualquer de BICHOS (ou, se estas em cima de um bloco que diz os
+# "bichos" que de la saltam, so dos tipos que ele diz), um a tres niveis
+# abaixo do teu bicho mais forte.
 # Enquanto nao tens nenhum, vem ao NIVEL_INICIAL: e o teu primeiro bicho.
 # Ideias: so bichos de agua na praia (if jogador["zona"] == "praia"); bichos
 # mais fortes na serra; um bicho raro, que so salta 1 vez em cada 20.
 def escolher_bicho_selvagem():
-    nome = random.choice(list(BICHOS.keys()))
+    nomes = list(BICHOS.keys())
+    # O bloco onde estas diz de que tipos sao os bichos que de la saltam?
+    letra = letra_do_mapa(jogador["coluna"], jogador["linha"])
+    if letra in BLOCOS and "bichos" in BLOCOS[letra]:
+        deste_sitio = []
+        for nome in nomes:
+            if BICHOS[nome]["tipo"] in BLOCOS[letra]["bichos"]:
+                deste_sitio.append(nome)
+        if len(deste_sitio) > 0:
+            nomes = deste_sitio
+    nome = random.choice(nomes)
     if len(minha_equipa) == 0:
         return criar_bicho(nome, NIVEL_INICIAL)
     nivel = nivel_mais_alto(minha_equipa) - random.randint(1, 3)
@@ -1258,6 +1365,14 @@ def tecla_na_loja(tecla):
         cursor_loja = (cursor_loja + 1) % len(nomes)
     if tecla == pygame.K_RETURN or tecla == pygame.K_SPACE:
         aviso = comprar(nomes[cursor_loja % len(nomes)])
+
+
+def e_erva(letra):
+    # De um quadrado com esta letra saltam bichos a solta? A erva alta (e), e
+    # os BLOCOS que tem "erva": True.
+    if letra == "e":
+        return True
+    return letra in BLOCOS and "erva" in BLOCOS[letra] and BLOCOS[letra]["erva"]
 
 
 def descansar():
@@ -1441,7 +1556,7 @@ def andar(passo_coluna, passo_linha):
         return
     if not pode_andar(letra):
         return
-    if letra == "e" and len(minha_equipa) == 0 and redes == 0:
+    if e_erva(letra) and len(minha_equipa) == 0 and redes == 0:
         dizer("Sem bichos nem redes, a erva alta é perigosa. Fala primeiro com quem te dê uma rede.")
         return
 
@@ -1456,7 +1571,7 @@ def andar(passo_coluna, passo_linha):
     if jogador["zona"] != antes:
         dizer("Entraste em: " + jogador["zona"])
     ao_dar_passo(letra)
-    if estado == "mundo" and letra == "e" and ha_batalha_na_erva():
+    if estado == "mundo" and e_erva(letra) and ha_batalha_na_erva():
         encontrar_bicho()
 
 
@@ -2157,7 +2272,10 @@ def desenhar_barra_vida(bicho, x, y, largura):
 # desenho de uma letra nova que tenhas inventado (if letra == "s").
 def desenhar_quadrado(letra, x, y):
     meio = x + QUADRADO // 2
-    pygame.draw.rect(ecra, RELVA, (x, y, QUADRADO, QUADRADO))
+    if letra != "H":
+        # (A casa da avo desenha-se por cima do chao que tiver a volta: quem
+        # o pinta e o desenhar_mundo.)
+        pygame.draw.rect(ecra, RELVA, (x, y, QUADRADO, QUADRADO))
     if letra in "_tmblcv$":
         # O que esta dentro de um edificio tem soalho por baixo.
         pygame.draw.rect(ecra, SOALHO, (x, y, QUADRADO, QUADRADO))
@@ -2226,10 +2344,40 @@ def desenhar_quadrado(letra, x, y):
         pygame.draw.rect(ecra, TRONCO, (x, y + 6, QUADRADO, 28))
         pygame.draw.circle(ecra, AMARELO, (meio, y + 20), 9)
         pygame.draw.circle(ecra, escurecer(AMARELO, 0.6), (meio, y + 20), 9, 2)
+    elif letra in BLOCOS:
+        desenhar_bloco(letra, x, y)
     elif letra in PORTAS:
         pygame.draw.rect(ecra, PAREDE, (x, y, QUADRADO, QUADRADO))
         pygame.draw.rect(ecra, TRONCO, (x + 8, y + 4, 24, 36))
         pygame.draw.circle(ecra, AMARELO, (x + 26, y + 24), 3)
+
+
+# UM BLOCO TEU
+# letra: a letra do bloco, em BLOCOS. Primeiro desenha-se o chao que ele tem
+# por baixo ("por_baixo"), e depois a imagem dele. Sem imagem: um quadrado da
+# "cor" dele se se anda por cima, ou uma forma redonda se tapa o caminho.
+# Ideias: outra forma para os blocos sem imagem; uma sombra por baixo dos
+# que tapam o caminho; blocos que piscam.
+def desenhar_bloco(letra, x, y):
+    bloco = BLOCOS[letra]
+    por_baixo = "."
+    if "por_baixo" in bloco:
+        por_baixo = bloco["por_baixo"]
+    if por_baixo != letra and not (por_baixo in BLOCOS and "por_baixo" in BLOCOS[por_baixo]
+                                   and BLOCOS[por_baixo]["por_baixo"] == letra):
+        desenhar_quadrado(por_baixo, x, y)
+    imagem = None
+    if "imagem" in bloco:
+        imagem = obter_imagem(bloco["imagem"], QUADRADO)
+    if imagem is not None:
+        ecra.blit(imagem, (x, y))
+    elif bloco["passa"]:
+        pygame.draw.rect(ecra, bloco["cor"], (x, y, QUADRADO, QUADRADO))
+        pygame.draw.rect(ecra, escurecer(bloco["cor"], 0.9), (x + 6, y + 26, 10, 4))
+        pygame.draw.rect(ecra, escurecer(bloco["cor"], 0.9), (x + 24, y + 10, 8, 4))
+    else:
+        pygame.draw.rect(ecra, bloco["cor"], (x + 4, y + 4, 32, 32), border_radius=12)
+        pygame.draw.rect(ecra, escurecer(bloco["cor"], 0.65), (x + 4, y + 4, 32, 32), 3, border_radius=12)
 
 
 # TU, NO MAPA
@@ -2380,6 +2528,18 @@ def desenhar_encontro():
         indice = indice + 1
 
 
+def chao_ao_lado(coluna, linha):
+    # A letra do chao que esta encostado a um quadrado: relva, soalho, ou um
+    # bloco por onde se anda (areia, neve). Se nao houver nenhum, relva.
+    for passo in [(-1, 0), (1, 0), (0, 1), (0, -1)]:
+        letra = letra_do_mapa(coluna + passo[0], linha + passo[1])
+        if letra == "." or letra == "_":
+            return letra
+        if letra in BLOCOS and BLOCOS[letra]["passa"] and not e_erva(letra):
+            return letra
+    return "."
+
+
 def desenhar_mundo():
     # So se desenha a zona onde estas: e o ecra inteiro.
     ecra.fill(PRETO)
@@ -2389,13 +2549,12 @@ def desenhar_mundo():
             x = coluna * QUADRADO
             y = linha * QUADRADO
             numero = treinador_do_quadrado(letra)
-            if numero != -1:
-                # Por baixo de um treinador vai o chao que ele tiver ao lado:
-                # soalho dentro de um edificio, relva ca fora.
-                letra = "."
-                if letra_do_mapa(coluna - 1, linha) == "_":
-                    letra = "_"
-            desenhar_quadrado(letra, x, y)
+            if numero != -1 or letra == "H":
+                # Por baixo de um treinador ou da casa da avo vai o chao que
+                # tiverem ao lado: soalho num edificio, areia na praia...
+                desenhar_quadrado(chao_ao_lado(coluna, linha), x, y)
+            if numero == -1:
+                desenhar_quadrado(letra, x, y)
             if numero != -1:
                 desenhar_treinador(TREINADORES[numero], x, y, numero in treinadores_vencidos)
     desenhar_jogador(jogador["coluna"] * QUADRADO, jogador["linha"] * QUADRADO, jogador["olha"])

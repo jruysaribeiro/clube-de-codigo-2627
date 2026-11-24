@@ -313,7 +313,7 @@
   <div class="baixo">
     <button id="guardar-alteracoes" hidden>Guardar alterações</button>
     <button id="repor">Repor o original</button>
-    <button id="guardar">Guardar o meu jogo</button>
+    <button id="guardar">Descarregar o meu jogo</button>
     <button id="reabrir" hidden>Pôr o jogo a correr outra vez</button>
     <button id="pedir-ajuda" hidden><span class="luz" id="luz-do-botao"></span><span id="texto-do-botao">Pedir ao ajudante</span></button>
     <button id="renomear" hidden></button>
@@ -524,7 +524,7 @@ async function mostrarJogos() {
       cartao.append(linha);
     }
     const ficheiro = elemento("div", "", "ficheiro");
-    const guardar = elemento("button", "Guardar o meu jogo");
+    const guardar = elemento("button", "Descarregar o meu jogo");
     guardar.onclick = () => guardarJogo(jogo.id);
     const trazer = elemento("button", "Abrir um jogo guardado");
     trazer.onclick = () => trazerJogo(jogo.id, jogo.nome);
@@ -656,7 +656,7 @@ function trazerJogo(jogo, nome) {
     if (!ficheiro) return;
     if (!confirm('Abrir "' + ficheiro.name + '" como o teu ' + nome + "?\n\nO jogo que está agora na Oficina é trocado por este.")) return;
     try {
-      // O ficheiro vai inteiro, em base64: e o zip que o "Guardar o meu jogo"
+      // O ficheiro vai inteiro, em base64: e o zip que o "Descarregar o meu jogo"
       // da (o jogo, as imagens e os sons), ou um .py sozinho, dos antigos.
       const bytes = new Uint8Array(await ficheiro.arrayBuffer());
       let texto = "";

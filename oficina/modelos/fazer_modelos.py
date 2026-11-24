@@ -789,6 +789,108 @@ def investida(t):
     t.caixa(clarear(roxo, 60), 0, 15, 5, 2)
 
 
+# =====================================================================
+#                 OS BLOCOS (Bicharada a Solta)
+# Quadrados para as zonas. Os que tapam o caminho tem o fundo transparente:
+# o jogo desenha primeiro o chao que o bloco tem por baixo.
+# =====================================================================
+
+AREIA = (235, 215, 160)
+
+
+@modelo("areia.png")
+def areia(t):
+    t.caixa(AREIA, 0, 0, 32, 32)
+    for x, y in ((4, 5), (13, 9), (24, 4), (8, 18), (20, 15), (28, 22), (3, 27), (15, 26), (25, 29), (10, 12)):
+        t.caixa(escurecer(AREIA, 22), x, y, 2, 1)
+    for x, y in ((7, 3), (18, 21), (27, 12), (12, 30), (22, 8)):
+        t.ponto(clarear(AREIA, 18), x, y)
+
+
+@modelo("neve.png")
+def neve(t):
+    branco = (238, 242, 248)
+    t.caixa(branco, 0, 0, 32, 32)
+    for x, y, largura in ((3, 6, 7), (17, 4, 9), (8, 16, 10), (22, 19, 6), (4, 26, 8), (18, 28, 9)):
+        t.caixa((212, 224, 240), x, y, largura, 1)
+    for x, y in ((12, 9), (26, 12), (6, 21), (15, 23)):
+        t.ponto(BRANCO, x, y)
+
+
+@modelo("rocha.png")
+def rocha(t):
+    cor = (135, 135, 145)
+    t.forma(escurecer(cor), [(3, 28), (5, 14), (12, 5), (22, 4), (28, 13), (29, 28)])
+    t.forma(cor, [(4, 26), (6, 14), (12, 6), (21, 5), (26, 13), (26, 26)])
+    t.forma(clarear(cor, 30), [(8, 14), (12, 8), (19, 7), (15, 14)])
+    t.linha(escurecer(cor, 70), (16, 15), (19, 24))
+    t.linha(escurecer(cor, 70), (10, 20), (13, 25))
+    t.contornar()
+
+
+@modelo("palmeira.png")
+def palmeira(t):
+    tronco = (150, 110, 70)
+    for y in range(13, 30, 3):                                               # o tronco, aos aneis
+        t.caixa(tronco if y % 2 else escurecer(tronco, 25), 14 + (30 - y) // 9, y, 4, 3)
+    folha = (52, 150, 88)
+    for pontos in ([(16, 13), (2, 9), (0, 15), (9, 12)], [(16, 13), (30, 9), (31, 15), (23, 12)],
+                   [(16, 13), (6, 2), (2, 6), (11, 9)], [(16, 13), (26, 2), (30, 6), (21, 9)], [(16, 13), (13, 1), (19, 1)]):
+        t.forma(folha, pontos)
+    t.forma(clarear(folha, 30), [(16, 12), (8, 5), (12, 9)])
+    t.forma(clarear(folha, 30), [(16, 12), (24, 5), (20, 9)])
+    t.oval((120, 80, 50), 13, 12, 3, 3)                                      # os cocos
+    t.oval((120, 80, 50), 17, 13, 3, 3)
+    t.contornar()
+
+
+@modelo("canas.png")
+def canas(t):
+    cana = (150, 170, 80)
+    for x, topo in ((4, 8), (9, 3), (14, 9), (19, 4), (24, 7), (28, 11)):
+        t.caixa(cana, x, topo, 2, 30 - topo)
+        t.caixa(escurecer(cana, 40), x, topo + (30 - topo) // 2, 2, 1)
+        t.oval((130, 90, 50), x - 1, topo - 3, 4, 6)                         # a espiga
+    t.contornar()
+
+
+@modelo("cacto.png")
+def cacto(t):
+    verde = (70, 160, 100)
+    t.caixa(verde, 12, 4, 8, 26, 4)
+    t.caixa(verde, 4, 12, 4, 10, 2)                                          # os bracos
+    t.caixa(verde, 4, 18, 9, 4, 2)
+    t.caixa(verde, 24, 8, 4, 10, 2)
+    t.caixa(verde, 19, 14, 9, 4, 2)
+    t.caixa(clarear(verde, 35), 14, 6, 2, 22)
+    t.oval((240, 120, 170), 13, 1, 6, 5)                                     # a flor
+    for x, y in ((18, 10), (13, 16), (18, 22), (5, 14), (26, 10)):
+        t.ponto(BRANCO, x, y)
+    t.contornar()
+
+
+@modelo("flores.png")
+def flores(t):
+    for x, y, cor in ((7, 9, (240, 150, 190)), (22, 6, (246, 196, 60)), (15, 19, (240, 240, 245)), (26, 22, (240, 150, 190)),
+                      (6, 25, (246, 196, 60))):
+        t.caixa((60, 140, 70), x + 1, y + 3, 1, 5)                           # o pe
+        for dx, dy in ((0, 1), (2, 1), (1, 0), (1, 2)):
+            t.ponto(cor, x + dx, y + dy)
+        t.ponto((250, 220, 90) if cor != (246, 196, 60) else (230, 110, 60), x + 1, y + 1)
+
+
+@modelo("ponte.png")
+def ponte(t):
+    tabua = (150, 105, 65)
+    for y in range(0, 32, 8):
+        t.caixa(tabua, 3, y, 26, 7)
+        t.caixa(escurecer(tabua, 35), 3, y + 6, 26, 1)
+        t.ponto(escurecer(tabua, 70), 6, y + 3)
+        t.ponto(escurecer(tabua, 70), 25, y + 3)
+    t.caixa(escurecer(tabua, 55), 1, 0, 3, 32)                               # os corrimaos
+    t.caixa(escurecer(tabua, 55), 28, 0, 3, 32)
+
+
 def fazer():
     pygame.init()
     pygame.display.set_mode((16, 16))

@@ -87,7 +87,7 @@ jogos, cada um à sua medida. O que cada jogo oferece está no ficheiro dele em
 | Jogo | Cria-se e apaga-se | Listas e caixas |
 |---|---|---|
 | FADO//NEON | inimigos, cartas, ondas especiais, frases | os ataques e os invocados do chefe, os inimigos de uma onda; caixas no arranque do jogo, nos inimigos e nas cartas |
-| Bicharada à Solta | bichos, ataques, treinadores, tipos, zonas, edifícios | os bichos de um treinador, os ataques de um bicho; a caixa «dá a rede no início» |
+| Bicharada à Solta | bichos, ataques, treinadores, tipos, zonas, edifícios, blocos | os bichos de um treinador, os ataques de um bicho; a caixa «dá a rede no início» |
 | O Cerco | inimigos, torres, ondas | os inimigos de uma onda |
 | Mãos ao Ar! | inimigos, mundos, níveis | o jeito de um inimigo; caixas nos inimigos, nos mundos e nos níveis |
 
@@ -165,8 +165,8 @@ sons ficam em `comum/assets/sons/`, e o jogo guarda os que já leu em
 - A imagem é encolhida para um quadrado pequeno e guardada em
   `comum/assets/imagens/`, com o nome que está no código. Mudar o nome no
   código é escolher outro ficheiro.
-- As imagens não vão para o git. Vão dentro do zip que o **Guardar o meu
-  jogo** descarrega, e é assim que passam para outro computador. Sem a
+- As imagens não vão para o git. Vão dentro do zip que o **Descarregar o
+  meu jogo** descarrega, e é assim que passam para outro computador. Sem a
   imagem, o jogo corre na mesma, com a forma.
 
 ## O ajudante ("Pedir ajuda")
@@ -231,7 +231,7 @@ início de `oficina/ajudante.py`.
   guarda. Quem sai de um bocado com alterações por guardar é avisado.
 - Se o jogo parar por causa de um erro que está noutra coisa (e não no
   bocado aberto), o aviso diz em qual, com um botão para ir lá.
-- **Guardar o meu jogo** descarrega um zip (`o-cerco.zip`) com o ficheiro do
+- **Descarregar o meu jogo** descarrega um zip (`o-cerco.zip`) com o ficheiro do
   jogo e as imagens e os sons que ele usa. **Abrir um jogo guardado** recebe
   esse zip tal como está: troca o jogo da Oficina pelo que lá vem (o que lá
   estava fica ao lado, em `o-cerco.py.anterior`) e põe as imagens e os sons

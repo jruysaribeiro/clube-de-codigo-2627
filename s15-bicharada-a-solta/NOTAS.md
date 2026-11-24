@@ -45,6 +45,7 @@ horta    praia     farol
 |---|---|
 | Cada zona, desenhada com letras (20 por linha, 14 linhas) | `ZONAS` |
 | Como as zonas se juntam | `MUNDO` |
+| Os blocos inventados: areia, neve, rochas, o que quiserem | `BLOCOS` |
 | Os edifícios: que letra é a porta de que interior | `PORTAS` |
 | O que há dentro de um edifício: tapete, mesa, banco, estante, cama, vaso, janela | as letras `t m b l c v j`, em `ZONAS` |
 | O que se vende, e por quanto | `LOJA` |
@@ -98,6 +99,13 @@ moedas), é o acontecimento `ao_responder()`.
   erva alta, árvores, água e a casa da avó. A Oficina mostra só as que
   servem para a zona aberta, e avisa quando uma está no sítio errado;
 - **O mundo** e **As portas** mostram o mundo todo visto de cima;
+- **+ Novo bloco** cria um quadrado novo para as zonas: fica com uma letra
+  livre, dá-se-lhe um nome, desenha-se (ou começa-se por um modelo) e diz-se
+  nas caixas se se anda por cima dele, se saltam de lá bichos e se é para
+  dentro dos edifícios. Depois escreve-se a letra dele nas zonas. A ajuda de
+  cada zona diz os blocos que há nesse momento. É assim que se fazem outros
+  sítios: uma praia de areia, uma serra de neve, um deserto de catos. Já vêm
+  oito: areia, palmeira, canas, rocha, neve, cato, flores e ponte;
 - **+ Nova zona**, **+ Novo edifício**, **+ Novo treinador**, **+ Novo
   bicho**, **+ Novo ataque**, **+ Novo tipo** criam, e o botão vermelho
   **Apagar** tira (e acerta o resto: o `MUNDO`, as `PORTAS`, os números no
@@ -125,7 +133,8 @@ arranca).
 
 ## Ideias, por ordem de dificuldade
 
-**1. Só dados.** Redesenhar uma zona. Uma zona nova, à direita do pinhal
+**1. Só dados.** Redesenhar uma zona. Um bloco novo: lava, gelo, um muro,
+uma estrada, um piano para dentro de casa. Uma zona nova, à direita do pinhal
 (que já tem lá uma saída à espera). Um ginásio: um edifício com um treinador
 dentro. Falas novas, e uma pergunta com três respostas. Uma coisa nova na
 loja. Desenhar o teu boneco e os bichos, de frente e de costas.
@@ -135,8 +144,8 @@ equipa); só bichos de água na praia (`jogador["zona"] == "praia"`); só se
 apanha um bicho com menos de metade da vida; os treinadores pagarem o dobro.
 
 **3. Coisas que o jogo não tem.**
-- Uma letra nova: `s` é uma sopa perdida no chão. Precisa de um `if` em
-  `ao_dar_passo()` e de um desenho em `desenhar_quadrado()`.
+- Um bloco que faz alguma coisa: uma sopa perdida no chão. É um bloco novo
+  (em Blocos) e um `if` em `ao_dar_passo()` com a letra dele.
 - Uma **Pomada** na loja que cura a equipa toda: uma linha na `LOJA` e um
   `elif` em `receber_compra()`.
 - Uma resposta com consequências: quem diz à Tia da Mercearia que não quer

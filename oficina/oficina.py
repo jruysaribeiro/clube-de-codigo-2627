@@ -907,7 +907,7 @@ class Sessao:
 
     def carregar(self, jogo, fonte, pacote=None):
         # "pacote" e o ficheiro que a crianca escolheu, em base64: o zip que o
-        # "Guardar o meu jogo" da, ou um .py sozinho. ("fonte" e so o codigo.)
+        # "Descarregar o meu jogo" da, ou um .py sozinho. ("fonte" e so o codigo.)
         with self.tranca:
             config = configuracao(jogo)
             ficheiros = []
