@@ -259,11 +259,12 @@ def regiao(fonte, escolha):
         som = blocos.valor_da_chave(ficha, "som")
     if tipo == "treinador":
         nome = blocos.valor_da_chave(ficha, "nome")
-    # Um bicho pode ser apagado, e os bichos de um treinador escolhem-se de
-    # uma lista: o que vai aqui e o que dizem esses botoes na Oficina.
+    # Estas coisas podem ser apagadas, e os bichos de um treinador
+    # escolhem-se de uma lista: o que vai aqui e o que dizem esses botoes na
+    # Oficina.
     return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": imagem, "som": som,
             "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo], "sugestoes": SUGESTOES[tipo],
-            "apagar": "Apagar este bicho" if tipo == "bicho" else None,
+            "apagar": "Apagar este " + tipo,
             "lista": "Escolher os bichos" if tipo == "treinador" else None}
 
 
@@ -392,12 +393,13 @@ def novo(fonte, grupo):
 
 
 # =====================================================================
-#                          APAGAR UM BICHO
+#                          APAGAR UMA COISA
 # =====================================================================
-# O bicho sai de BICHOS e das equipas dos treinadores que o levavam (um
-# treinador que so tinha esse fica com outro bicho, para nao ficar sem
-# equipa). Devolve o ficheiro inteiro ja sem ele, e uma frase a contar o que
-# se fez.
+# Um bicho, um ataque ou um treinador saem do jogo e dos sitios onde eram
+# usados: o bicho sai das equipas dos treinadores, o ataque sai dos ataques
+# dos bichos. Quem ficaria sem nada (um treinador sem bichos, um bicho sem
+# ataques) fica com outro, para o jogo nao parar. Devolve o ficheiro inteiro
+# ja sem a coisa, e uma frase a contar o que se fez.
 
 def _lista_da_chave(ficha, chave):
     # Dentro de um {...} escrito no codigo, a lista [...] guardada em "chave".
@@ -415,71 +417,125 @@ def _no_da_chave(ficha, chave):
     return None
 
 
-def apagar(fonte, escolha):
-    tipo, _, numero = escolha.partition(":")
-    arvore = ast.parse(fonte)
-    linhas = fonte.split("\n")
-    partes = _fichas(blocos.instrucao(arvore, "BICHOS"))
-    if tipo != "bicho" or not numero.isdigit() or int(numero) >= len(partes):
-        raise ValueError("isso não se pode apagar.")
-    nome, _, inicio, fim = partes[int(numero)]
-    minimo = 3
-    no = blocos.instrucao(arvore, "TAMANHO_EQUIPA")
-    if no is not None and isinstance(no.value, ast.Constant) and isinstance(no.value.value, int):
-        minimo = no.value.value
-    if len(partes) - 1 < minimo:
-        raise ValueError("tem de haver pelo menos " + str(minimo) + " bichos, para dar para fazer uma equipa. "
-                         "Cria outro primeiro.")
-    outro = [parte[0] for parte in partes if parte[0] != nome][0]
+# As mudancas ao ficheiro juntam-se em duas listas e fazem-se todas no fim,
+# de baixo para cima, para os numeros das linhas nao mudarem a meio:
+#   cortes   linhas inteiras que saem: (primeira, ultima)
+#   trocas   bocados de uma linha: (linha, de, ate, texto novo)
 
-    cortes = [(inicio, fim)]     # linhas inteiras que saem: (primeira, ultima)
-    trocas = []                  # bocados de uma linha: (linha, de, ate, texto novo)
-    donos = []
-    for _, ficha, _, _ in _fichas(blocos.instrucao(arvore, "TREINADORES")):
-        equipa = _lista_da_chave(ficha, "equipa")
-        if equipa is None:
-            continue
-        membros = [membro for membro in equipa.elts if blocos.valor_da_chave(membro, "bicho") == nome]
-        if len(membros) == 0:
-            continue
-        donos.append(blocos.valor_da_chave(ficha, "nome") or "um treinador")
-        ficam = len(equipa.elts) - len(membros)
-        for membro in membros:
-            primeira = linhas[membro.lineno - 1]
-            de = _coluna(primeira, membro.col_offset)
-            ate = _coluna(linhas[membro.end_lineno - 1], membro.end_col_offset)
-            antes = primeira[:de].strip()
-            depois = linhas[membro.end_lineno - 1][ate:].strip()
-            if ficam == 0 and membro is membros[0] or (membro.lineno != membro.end_lineno and (antes or depois not in ("", ","))):
-                # O unico que ele tinha (ou escrito de uma maneira que nao se
-                # percebe): em vez de sair, passa a ser outro bicho.
-                valor = _no_da_chave(membro, "bicho")
-                linha = linhas[valor.lineno - 1]
-                trocas.append((valor.lineno, _coluna(linha, valor.col_offset), _coluna(linha, valor.end_col_offset),
-                               '"' + outro + '"'))
-            elif antes == "" and depois in ("", ","):
-                cortes.append((membro.lineno, membro.end_lineno))
-            else:
-                # Esta na mesma linha que outros: sai ele e a virgula dele.
-                virgula = re.match(r"\s*,\s*", primeira[ate:])
-                if virgula:
-                    ate = ate + virgula.end()
-                else:
-                    virgula = re.search(r",\s*$", primeira[:de])
-                    if virgula:
-                        de = virgula.start()
-                trocas.append((membro.lineno, de, ate, ""))
+def _trocar_no(linhas, no, texto, trocas):
+    # O que esta escrito num no (de uma linha so) passa a ser "texto".
+    linha = linhas[no.lineno - 1]
+    trocas.append((no.lineno, _coluna(linha, no.col_offset), _coluna(linha, no.end_col_offset), texto))
 
+
+def _tirar_da_lista(linhas, elemento, cortes, trocas):
+    # Tira um elemento de uma lista [...] escrita no codigo, com a virgula
+    # dele. Diz se conseguiu (nao consegue se estiver escrito em varias
+    # linhas misturado com outros).
+    primeira = linhas[elemento.lineno - 1]
+    de = _coluna(primeira, elemento.col_offset)
+    ate = _coluna(linhas[elemento.end_lineno - 1], elemento.end_col_offset)
+    antes = primeira[:de].strip()
+    depois = linhas[elemento.end_lineno - 1][ate:].strip()
+    if antes == "" and depois in ("", ","):
+        cortes.append((elemento.lineno, elemento.end_lineno))      # esta sozinho nas linhas dele
+        return True
+    if elemento.lineno != elemento.end_lineno:
+        return False
+    virgula = re.match(r"\s*,\s*", primeira[ate:])
+    if virgula:
+        ate = ate + virgula.end()
+    else:
+        virgula = re.search(r",\s*$", primeira[:de])
+        if virgula:
+            de = virgula.start()
+    trocas.append((elemento.lineno, de, ate, ""))
+    return True
+
+
+def _aplicar(linhas, cortes, trocas):
     for linha, de, ate, texto in sorted(trocas, reverse=True):
         linhas[linha - 1] = linhas[linha - 1][:de] + texto + linhas[linha - 1][ate:]
     for primeira, ultima in sorted(cortes, reverse=True):
         del linhas[primeira - 1:ultima]
+    return "\n".join(linhas)
 
+
+def _e_de(nomes):
+    # ["A", "B", "C"] -> "A, de B e de C"
+    if len(nomes) == 1:
+        return nomes[0]
+    return ", de ".join(nomes[:-1]) + " e de " + nomes[-1]
+
+
+def apagar(fonte, escolha):
+    tipo, _, numero = escolha.partition(":")
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    nomes = {"bicho": "BICHOS", "ataque": "ATAQUES", "treinador": "TREINADORES"}
+    partes = _fichas(blocos.instrucao(arvore, nomes[tipo])) if tipo in nomes else []
+    if not numero.isdigit() or int(numero) >= len(partes):
+        raise ValueError("isso não se pode apagar.")
+    nome, ficha, inicio, fim = partes[int(numero)]
+    cortes = [(inicio, fim)]
+    trocas = []
+
+    if tipo == "treinador":
+        if len(partes) < 2:
+            raise ValueError("tem de haver pelo menos um treinador.")
+        nome = blocos.valor_da_chave(ficha, "nome") or "o treinador"
+        return _aplicar(linhas, cortes, trocas), 'Apaguei "' + nome + '".'
+
+    outro = [parte[0] for parte in partes if parte[0] != nome]
+    if tipo == "ataque":
+        if len(outro) == 0:
+            raise ValueError("tem de haver pelo menos um ataque.")
+        # Sai tambem dos ataques dos bichos. Um bicho que so tinha este fica
+        # com outro, para nao ficar sem ataques.
+        donos = []
+        for bicho, dados, _, _ in _fichas(blocos.instrucao(arvore, "BICHOS")):
+            ataques = _lista_da_chave(dados, "ataques")
+            dele = [no for no in ataques.elts if blocos.texto_constante(no) == nome] if ataques is not None else []
+            if len(dele) == 0:
+                continue
+            donos.append(str(bicho))
+            ficam = len(ataques.elts) - len(dele)
+            for no in dele:
+                if (ficam == 0 and no is dele[0]) or not _tirar_da_lista(linhas, no, cortes, trocas):
+                    _trocar_no(linhas, no, '"' + outro[0] + '"', trocas)
+        aviso = 'Apaguei o ataque "' + str(nome) + '".'
+        if donos:
+            aviso = aviso + " Saiu também dos ataques de " + _e_de(donos) + "."
+        return _aplicar(linhas, cortes, trocas), aviso
+
+    # (Na Bicharada escolhe-se uma equipa a entrada: tem de haver bichos que
+    # cheguem. Num jogo sem TAMANHO_EQUIPA basta ficar um.)
+    minimo = 1
+    no = blocos.instrucao(arvore, "TAMANHO_EQUIPA")
+    if no is not None and isinstance(no.value, ast.Constant) and isinstance(no.value.value, int):
+        minimo = no.value.value
+    if len(partes) - 1 < minimo:
+        if minimo == 1:
+            raise ValueError("tem de haver pelo menos um bicho.")
+        raise ValueError("tem de haver pelo menos " + str(minimo) + " bichos, para dar para fazer uma equipa. "
+                         "Cria outro primeiro.")
+    # Sai tambem das equipas dos treinadores. Um treinador que so tinha este
+    # fica com outro bicho, para nao ficar sem equipa.
+    donos = []
+    for _, dados, _, _ in _fichas(blocos.instrucao(arvore, "TREINADORES")):
+        equipa = _lista_da_chave(dados, "equipa")
+        dele = [m for m in equipa.elts if blocos.valor_da_chave(m, "bicho") == nome] if equipa is not None else []
+        if len(dele) == 0:
+            continue
+        donos.append(blocos.valor_da_chave(dados, "nome") or "um treinador")
+        ficam = len(equipa.elts) - len(dele)
+        for membro in dele:
+            if (ficam == 0 and membro is dele[0]) or not _tirar_da_lista(linhas, membro, cortes, trocas):
+                _trocar_no(linhas, _no_da_chave(membro, "bicho"), '"' + outro[0] + '"', trocas)
     aviso = 'Apaguei o "' + str(nome) + '".'
     if donos:
-        aviso = aviso + " Saiu também da equipa de " + " e de ".join(donos) + "."
-    aviso = aviso + " Os ataques dele continuam em Ataques."
-    return "\n".join(linhas), aviso
+        aviso = aviso + " Saiu também da equipa de " + _e_de(donos) + "."
+    return _aplicar(linhas, cortes, trocas), aviso + " Os ataques dele continuam em Ataques."
 
 
 # =====================================================================

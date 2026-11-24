@@ -13,10 +13,17 @@
 #
 #   Setas            andar pelo mapa, e mexer nos menus
 #   Enter / Espaco   escolher, e passar o texto a frente
-#   Esc / Backspace  voltar atras (e, no ecra de escolha, tirar o ultimo)
+#   Esc / Backspace  voltar atras, e sair da loja
+#
+# Comecas sem bichos e sem redes. Fala com o Mestre Zacarias (anda contra
+# ele): da-te uma rede. Com ela vais a erva alta apanhar o teu primeiro bicho.
+# Quando voltares, ele faz-te uma luta de treino. So com um bicho e que os
+# treinadores aceitam lutar. Todos tem coisas para dizer, e alguns fazem
+# perguntas.
 #
 # Para desafiares um treinador, anda contra ele. Para descansares, anda
-# contra a casa da avo.
+# contra a casa da avo. Para comprares sopas e redes, anda contra o balcao da
+# mercearia. Com uma rede apanhas um bicho a solta, e ele fica na tua equipa.
 #
 # Zero assets: os bichos sao formas com olhos. Se puseres um PNG com o nome
 # que esta em "imagem" na pasta comum/assets/imagens/, aparece a imagem.
@@ -34,9 +41,11 @@ LARGURA = 800
 ALTURA = 600
 FPS = 60
 
-TAMANHO_EQUIPA = 3       # quantos bichos levas contigo
-NIVEL_INICIAL = 5        # o nivel com que os teus bichos comecam
-SOPAS_NA_MOCHILA = 3     # a sopa da avo cura metade da vida. So ha mais em casa dela
+NIVEL_INICIAL = 5        # o nivel do primeiro bicho que apanhas
+SOPAS_NA_MOCHILA = 3     # a sopa da avo cura metade da vida. A avo enche-te a mochila
+EQUIPA_MAXIMA = 6        # quantos bichos cabem na equipa, com os que apanhares
+REDES_INICIAIS = 0       # as redes com que comecas: cada uma e uma tentativa de apanhar
+MOEDAS_INICIAIS = 30     # as moedas com que comecas. Ganham-se mais nas batalhas
 QUADRADO = 40            # o tamanho de um quadrado do mapa, em pixeis
 ZONA_COLUNAS = 20        # quantos quadrados cabem no ecra, de lado a lado
 ZONA_LINHAS = 14         # e de cima a baixo
@@ -77,6 +86,7 @@ PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 #   _   soalho: o chao dentro de um edificio. Anda-se a vontade
 #       (um espaco) nada: fica preto, e nao se passa
 #   H   uma casa da avo: anda contra ela para curar a equipa e encher as sopas
+#   $   o balcao de uma loja: anda contra ele para comprares (ve a LOJA)
 #   P   a partida: onde comecas (so um, no mundo todo)
 #   1 a 9   um treinador: o 1 e o primeiro da lista TREINADORES, o 2 e o
 #           segundo, e por ai fora. Anda contra ele para o desafiares.
@@ -110,7 +120,7 @@ ZONAS = {
         "A..A....eee...A.H..A",
         "A.......eee........A",
         "A....A.......A.....A",
-        ".................3..",
+        ".................4..",
         "....................",
         "A....A.......A.....A",
         "A..eee.............A",
@@ -126,7 +136,7 @@ ZONAS = {
         "A...AA......AA.....A",
         "A..................A",
         "A..................A",
-        "..............4....A",
+        "..............5....A",
         "...................A",
         "A..................A",
         "A...AA......AA.....A",
@@ -139,7 +149,7 @@ ZONAS = {
         "AAAAAAAAA..AAAAAAAAA",
         "A..................A",
         "A..H....###........A",
-        "A..P....#M#..eee...A",
+        "A..P.1..#M#..eee...A",
         "A............eee...A",
         "A............eee...A",
         "A...................",
@@ -207,7 +217,7 @@ ZONAS = {
         "A............eee...A",
         "A..................A",
         "....................",
-        ".........2..........",
+        ".........3..........",
         "A..................A",
         "A....~~~......~~~..A",
         "A..~~~~~~~..~~~~~~~A",
@@ -237,8 +247,8 @@ ZONAS = {
         "                    ",
         "     ##########     ",
         "     #________#     ",
-        "     #___1____#     ",
-        "     #_####___#     ",
+        "     #___2____#     ",
+        "     #_##$#___#     ",
         "     #________#     ",
         "     #________#     ",
         "     #________#     ",
@@ -271,6 +281,15 @@ MUNDO = [
 # linha aqui com uma letra que ainda nao uses, e essa letra nos dois sitios.
 PORTAS = {
     "M": "mercearia",
+}
+
+# --- A loja ---
+# O que se vende ao balcao (a letra $ no mapa), e por quantas moedas. O que
+# cada coisa FAZ quando a compras esta na funcao receber_compra, mais abaixo:
+# para venderes uma coisa nova, uma linha aqui e um "elif" la.
+LOJA = {
+    "Sopa": {"preco": 15},
+    "Rede": {"preco": 25},
 }
 
 # --- Os tipos ---
@@ -326,6 +345,11 @@ ATAQUES = {
 # --- Os bichos ---
 # Os numeros sao os valores BASE, ao nivel 1. Cada nivel acima soma 10%.
 # forma: "circulo", "quadrado", "triangulo" ou "gota"
+# imagem:         o nome de um PNG com o bicho visto de frente: e como se ve
+#                 quando e o adversario, e nos menus
+# imagem_costas:  o bicho visto de costas: e como se ve o TEU, na batalha
+#                 (Se o PNG existir em comum/assets/imagens/, aparece a imagem;
+#                 se nao, o bicho e desenhado com a forma e a cor dele.)
 # som:   o nome de um WAV. Se ele existir em comum/assets/sons/, ouve-se
 #        quando o bicho entra em campo.
 # Para inventares um bicho: copia um destes, muda-lhe o nome e os numeros.
@@ -334,49 +358,116 @@ BICHOS = {
     "Galo de Barcelos": {
         "tipo": "fogo", "vida": 45, "ataque": 15, "defesa": 10, "velocidade": 14,
         "ataques": ["Bicada", "Crista em Brasa", "Cocoricó", "Estalido"],
-        "cor": (200, 45, 45), "forma": "triangulo", "imagem": "galo.png", "som": "galo.wav",
+        "cor": (200, 45, 45), "forma": "triangulo", "imagem": "galo.png", "imagem_costas": "galo-costas.png",
+        "som": "galo.wav",
     },
     "Castanha Assada": {
         "tipo": "fogo", "vida": 55, "ataque": 12, "defesa": 13, "velocidade": 7,
         "ataques": ["Investida", "Fumarada", "Estalido", "Casca Dura"],
-        "cor": (130, 70, 35), "forma": "gota", "imagem": "castanha.png", "som": "castanha.wav",
+        "cor": (130, 70, 35), "forma": "gota", "imagem": "castanha.png", "imagem_costas": "castanha-costas.png",
+        "som": "castanha.wav",
     },
     "Sardinhão": {
         "tipo": "agua", "vida": 48, "ataque": 13, "defesa": 10, "velocidade": 15,
         "ataques": ["Investida", "Esguicho", "Onda da Nazaré", "Escamas"],
-        "cor": (120, 160, 200), "forma": "gota", "imagem": "sardinhao.png", "som": "sardinhao.wav",
+        "cor": (120, 160, 200), "forma": "gota", "imagem": "sardinhao.png", "imagem_costas": "sardinhao-costas.png",
+        "som": "sardinhao.wav",
     },
     "Polvo Lagareiro": {
         "tipo": "agua", "vida": 60, "ataque": 11, "defesa": 13, "velocidade": 6,
         "ataques": ["Tentáculo", "Tinta de Choco", "Esguicho", "Patada"],
-        "cor": (170, 80, 150), "forma": "circulo", "imagem": "polvo.png", "som": "polvo.wav",
+        "cor": (170, 80, 150), "forma": "circulo", "imagem": "polvo.png", "imagem_costas": "polvo-costas.png",
+        "som": "polvo.wav",
     },
     "Sobreirinho": {
         "tipo": "planta", "vida": 58, "ataque": 11, "defesa": 15, "velocidade": 5,
         "ataques": ["Chicote de Cortiça", "Bolotada", "Seiva", "Casca Dura"],
-        "cor": (120, 100, 50), "forma": "quadrado", "imagem": "sobreirinho.png", "som": "sobreirinho.wav",
+        "cor": (120, 100, 50), "forma": "quadrado", "imagem": "sobreirinho.png", "imagem_costas": "sobreirinho-costas.png",
+        "som": "sobreirinho.wav",
     },
     "Couve Galega": {
         "tipo": "planta", "vida": 50, "ataque": 13, "defesa": 11, "velocidade": 11,
         "ataques": ["Folha de Couve", "Seiva", "Investida", "Bolotada"],
-        "cor": (60, 150, 70), "forma": "circulo", "imagem": "couve.png", "som": "couve.wav",
+        "cor": (60, 150, 70), "forma": "circulo", "imagem": "couve.png", "imagem_costas": "couve-costas.png",
+        "som": "couve.wav",
     },
     "Lince Ibérico": {
         "tipo": "normal", "vida": 46, "ataque": 15, "defesa": 9, "velocidade": 16,
         "ataques": ["Arranhão", "Salto Felino", "Rugido", "Patada"],
-        "cor": (205, 155, 85), "forma": "quadrado", "imagem": "lince.png", "som": "lince.wav",
+        "cor": (205, 155, 85), "forma": "quadrado", "imagem": "lince.png", "imagem_costas": "lince-costas.png",
+        "som": "lince.wav",
     },
 }
 
+# --- Tu ---
+# O teu boneco, no mapa. As tres imagens sao PNG em comum/assets/imagens/:
+# quando existem, aparecem; quando nao, o boneco e desenhado com formas.
+#   cor             a cor da camisola do boneco desenhado
+#   imagem          de frente (quando andas para baixo)
+#   imagem_costas   de costas (quando andas para cima)
+#   imagem_lado     de lado, a olhar para a DIREITA (para a esquerda, o jogo
+#                   vira-a ao contrario)
+JOGADOR = {
+    "cor": (240, 200, 70),
+    "imagem": "jogador.png",
+    "imagem_costas": "jogador-costas.png",
+    "imagem_lado": "jogador-lado.png",
+}
+
 # --- Os treinadores ---
-# Estao no mapa: o primeiro desta lista e o 1, o segundo e o 2... Podes
+# Estao no mapa: o primeiro desta lista e o 1, o segundo e o 2... Para falares
+# com um, anda contra ele: diz as falas dele e depois desafia-te. Podes
 # desafia-los pela ordem que quiseres, mas os ultimos sao mais fortes.
 # Ganhas a todos os que estao no mapa, ganhas a feira.
-# cor_fundo: a cor do campo de batalha, e da camisola dele no mapa.
+#   frase         o grito dele, quando a batalha comeca
+#   cor_fundo     a cor do campo de batalha, e da camisola dele no mapa
+#   equipa        os bichos que leva, pela ordem em que entram
+#   falas         (so se quiseres) o que diz antes da luta: uma lista de
+#                 textos, que passam com Enter
+#   falas_depois  (so se quiseres) o que diz quando ja lhe ganhaste
+#   da_rede       True se e ele que da a primeira rede. Enquanto nao tiveres
+#                 nenhum bicho, em vez de lutar diz as falas_rede e da-te uma
+#                 rede. Quando voltares com um bicho, luta como os outros.
+#   falas_rede    o que diz quando da a rede
+# UMA PERGUNTA: no meio das falas pode ir uma pergunta, com as respostas a
+# escolha e o que ele diz a cada uma:
+#   {"pergunta": "Queres lutar?",
+#    "respostas": {"Sim": "Entao prepara-te!", "Nao": "Fica para a proxima."},
+#    "sem_luta": "Nao"}
+# "sem_luta" (so se quiseres) e a resposta que acaba a conversa sem batalha.
 TREINADORES = [
     {
+        "nome": "Mestre Zacarias",
+        "da_rede": True,
+        "falas_rede": [
+            "Olá! Andas à procura de bichos?",
+            "Eu já não tenho idade para andar pela erva alta.",
+            "Toma esta rede. Apanha o teu primeiro bicho e volta cá!",
+        ],
+        "falas": [
+            "Ah, já tens um bicho! Deixa ver o que ele vale.",
+            "É só um treino, não te assustes.",
+        ],
+        "frase": "Devagar se vai ao longe!",
+        "falas_depois": [
+            "Muito bem! Estás pronto para a feira.",
+            "Na mercearia vendem redes e sopas. E a avó cura os bichos.",
+        ],
+        "cor_fundo": (190, 170, 220),
+        "equipa": [
+            {"bicho": "Couve Galega", "nivel": 3},
+        ],
+    },
+    {
         "nome": "Tia da Mercearia",
+        "falas": [
+            "Bom dia! As compras são ali ao balcão.",
+            {"pergunta": "Ou vens para lutar comigo?",
+             "respostas": {"Sim": "Então prepara-te!", "Agora não": "Faz bem. Compra uma sopa primeiro."},
+             "sem_luta": "Agora não"},
+        ],
         "frase": "Os meus bichos comem melhor do que tu!",
+        "falas_depois": ["Ganhaste-me bem ganho. Leva cumprimentos à tua avó."],
         "cor_fundo": (150, 200, 230),
         "equipa": [
             {"bicho": "Couve Galega", "nivel": 3},
@@ -385,7 +476,9 @@ TREINADORES = [
     },
     {
         "nome": "Pescador da Póvoa",
+        "falas": ["Chiu... espantas-me o peixe.", "Bom, já que aqui estás..."],
         "frase": "Cheira a maresia... e a vitória!",
+        "falas_depois": ["O mar hoje não está para mim."],
         "cor_fundo": (110, 170, 210),
         "equipa": [
             {"bicho": "Sardinhão", "nivel": 5},
@@ -394,7 +487,9 @@ TREINADORES = [
     },
     {
         "nome": "Guarda Florestal",
+        "falas": ["Alto! Para a feira só passa quem me ganhar."],
         "frase": "Ninguém passa pelo meu montado.",
+        "falas_depois": ["Podes passar. A feira é já ali."],
         "cor_fundo": (170, 200, 150),
         "equipa": [
             {"bicho": "Sobreirinho", "nivel": 6},
@@ -404,7 +499,14 @@ TREINADORES = [
     },
     {
         "nome": "Campeã da Feira",
+        "falas": [
+            "Então és tu que andas a ganhar a toda a gente.",
+            {"pergunta": "Tens a certeza de que queres lutar comigo?",
+             "respostas": {"Tenho!": "Gosto de quem não tem medo.", "Ainda não": "Treina mais um bocado e volta."},
+             "sem_luta": "Ainda não"},
+        ],
         "frase": "Três anos invicta. Hoje não vai ser diferente.",
+        "falas_depois": ["A feira tem uma campeã nova. Parabéns!"],
         "cor_fundo": (230, 170, 140),
         "equipa": [
             {"bicho": "Galo de Barcelos", "nivel": 7},
@@ -493,14 +595,16 @@ def escurecer(cor, quanto):
 # =====================================================================
 
 # --- As regras do jogo ---
-# Ha oito funcoes neste ficheiro que sao as REGRAS. Cinco sao da batalha:
+# Ha onze funcoes neste ficheiro que sao as REGRAS. Cinco sao da batalha:
 # quanto magoa um ataque (calcular_dano), quando sai um golpe critico
 # (golpe_critico), quanta experiencia e precisa para subir de nivel
 # (xp_para_subir), quem ataca primeiro (quem_ataca_primeiro) e que ataque o
 # inimigo escolhe (escolher_ataque_inimigo). Tres sao do mapa: onde se pode
 # andar (pode_andar), quando salta um bicho da erva (ha_batalha_na_erva) e
-# que bicho salta (escolher_bicho_selvagem). Mudar uma delas muda a maneira
-# como o jogo se comporta.
+# que bicho salta (escolher_bicho_selvagem). E tres sao das redes e das
+# moedas: quando se consegue apanhar um bicho (consegue_apanhar), quantas
+# moedas da uma batalha (premio_da_batalha) e o que se recebe ao comprar
+# (receber_compra). Mudar uma delas muda a maneira como o jogo se comporta.
 #
 # Dentro delas podes usar tudo o que o jogo tem. Um bicho em batalha e um
 # dicionario:
@@ -534,8 +638,9 @@ def escurecer(cor, quanto):
 #                                       solta, False se e contra um treinador
 #   treinadores_vencidos                a lista dos que ja venceste (0 e o
 #                                       primeiro treinador, 1 o segundo...)
+#   sopas, redes, moedas                o que levas na mochila
 # Para mudar as sopas dentro de uma funcao, a primeira linha dela tem de ser
-# "global sopas".
+# "global sopas" (e o mesmo com as redes e as moedas: "global sopas, moedas").
 
 def valor_no_nivel(base, nivel):
     # Cada nivel acima do 1 soma 10% do valor base.
@@ -653,13 +758,11 @@ def xp_para_subir(bicho):
 #                          O ESTADO DO JOGO
 # =====================================================================
 
-estado = "menu"          # menu, escolha, mundo, batalha, vitoria, derrota
+estado = "menu"          # menu, mundo, conversa, loja, encontro, batalha, vitoria, derrota
 fase = "texto"           # dentro da batalha: texto, menu, ataques, equipa
 cursor = 0               # qual opcao do menu esta escolhida
 
 nomes_dos_bichos = list(BICHOS.keys())
-escolhidos = []          # nomes escolhidos no ecra de escolha
-cursor_escolha = 0
 
 minha_equipa = []
 equipa_inimiga = []
@@ -667,6 +770,9 @@ ativo_meu = 0
 ativo_inimigo = 0
 indice_treinador = 0
 sopas = SOPAS_NA_MOCHILA
+redes = REDES_INICIAIS
+moedas = MOEDAS_INICIAIS
+cursor_loja = 0          # qual coisa da loja esta escolhida
 troca_obrigatoria = False
 
 # No mapa: onde estas, para onde olhas e quantos passos ja deste.
@@ -676,6 +782,12 @@ descanso = {"zona": "", "coluna": 1, "linha": 1}
 # Por que porta entraste em cada edificio, para saires pela mesma:
 # entradas["M"] = ("aldeia", 9, 3)
 entradas = {}
+redes_dadas = []             # os treinadores que ja te deram a rede deles (0 e o primeiro...)
+# A conversa que esta a decorrer: o que ainda falta dizer (textos, e
+# perguntas), quem fala, e o que acontece quando acabar ("luta", "rede" ou "").
+conversa = []
+quem_fala = ""
+depois_da_conversa = ""
 treinadores_vencidos = []    # 0 e o primeiro treinador, 1 o segundo...
 por_vencer = 0               # quantos treinadores do mundo ainda faltam
 batalha_selvagem = False     # a batalha e contra um bicho a solta?
@@ -691,7 +803,18 @@ mensagens = []
 #   {"quem": "jogador", "tipo": "atacar", "ataque": "Bicada"}
 fila_acoes = []
 
-OPCOES_MENU = ["Lutar", "Equipa", "Sopa", "Fugir"]
+OPCOES_MENU = ["Lutar", "Equipa", "Sopa", "Apanhar", "Fugir"]
+
+
+def opcoes_do_menu():
+    # O que se pode escolher no menu da batalha. Contra um treinador nao ha
+    # "Apanhar": os bichos dele nao se apanham.
+    opcoes = []
+    for opcao in OPCOES_MENU:
+        if opcao == "Apanhar" and not batalha_selvagem:
+            continue
+        opcoes.append(opcao)
+    return opcoes
 
 
 def dizer(texto):
@@ -713,13 +836,12 @@ def treinador():
     return TREINADORES[indice_treinador]
 
 
-def comecar_escolha():
-    global estado, escolhidos, cursor_escolha, indice_treinador
-    estado = "escolha"
-    escolhidos = []
-    cursor_escolha = 0
-    indice_treinador = 0
+def comecar_jogo():
+    # Do principio: sem bichos, e tudo o resto como no inicio.
+    global minha_equipa
+    minha_equipa = []
     memoria.clear()
+    comecar_mundo()
 
 
 def comecar_batalha():
@@ -901,8 +1023,8 @@ def ir_para(zona, coluna, linha):
 
 
 def comecar_mundo():
-    # Poe-te na partida, com as sopas todas e nenhum treinador vencido.
-    global sopas, por_vencer
+    # Poe-te na partida, com a mochila do inicio e nenhum treinador vencido.
+    global sopas, redes, moedas, por_vencer
     voltar_ao_mundo()
     zona, coluna, linha = encontrar_partida()
     ir_para(zona, coluna, linha)
@@ -912,16 +1034,21 @@ def comecar_mundo():
     descanso["coluna"] = coluna
     descanso["linha"] = linha
     entradas.clear()
+    redes_dadas.clear()
     treinadores_vencidos.clear()
     por_vencer = treinadores_por_vencer()
     sopas = SOPAS_NA_MOCHILA
-    dizer("Anda com as setas. Vai contra um treinador para o desafiares.")
+    redes = REDES_INICIAIS
+    moedas = MOEDAS_INICIAIS
+    dizer("Anda com as setas. Para falares com alguém, vai contra essa pessoa.")
 
 
 def chao_livre(letra):
     # Um quadrado onde se pode ficar parado: da para andar la, e nao e uma
     # porta, nem a casa da avo, nem um treinador.
-    if letra in PORTAS or letra == "H" or treinador_do_quadrado(letra) != -1:
+    if letra in PORTAS or letra == "H" or letra == "$":
+        return False
+    if treinador_do_quadrado(letra) != -1:
         return False
     return pode_andar(letra)
 
@@ -957,8 +1084,9 @@ def passar_a_porta(letra):
 # ONDE SE PODE ANDAR
 # Recebe a letra de um quadrado do mapa e devolve True se da para andar para
 # la, ou False se nao da. Como esta: nao se passa nas arvores (A), na agua
-# (~), nas paredes (#) nem no nada (um espaco). (A casa da avo e os
-# treinadores nao passam por aqui: contra eles vai-se sempre de encontro.)
+# (~), nas paredes (#) nem no nada (um espaco). (A casa da avo, o balcao da
+# loja e os treinadores nao passam por aqui: contra eles vai-se sempre de
+# encontro. E na erva alta so se entra com um bicho ou uma rede.)
 # Ideias: nadar, isto e, passar na agua se levares na equipa um bicho do tipo
 # "agua"; uma letra nova para uma cerca; uma ponte "=" por cima da agua.
 def pode_andar(letra):
@@ -980,14 +1108,103 @@ def ha_batalha_na_erva():
 # QUE BICHO SALTA DA ERVA
 # Devolve o bicho a solta, feito com criar_bicho(nome, nivel). Como esta: um
 # bicho qualquer de BICHOS, um a tres niveis abaixo do teu bicho mais forte.
+# Enquanto nao tens nenhum, vem ao NIVEL_INICIAL: e o teu primeiro bicho.
 # Ideias: so bichos de agua na praia (if jogador["zona"] == "praia"); bichos
 # mais fortes na serra; um bicho raro, que so salta 1 vez em cada 20.
 def escolher_bicho_selvagem():
     nome = random.choice(list(BICHOS.keys()))
+    if len(minha_equipa) == 0:
+        return criar_bicho(nome, NIVEL_INICIAL)
     nivel = nivel_mais_alto(minha_equipa) - random.randint(1, 3)
     if nivel < 1:
         nivel = 1
     return criar_bicho(nome, nivel)
+
+
+# QUANDO SE CONSEGUE APANHAR UM BICHO
+# Corre quando atiras uma rede a um bicho a solta. Recebe esse bicho e devolve
+# True se ficou apanhado, ou False se se escapou (a rede gasta-se na mesma).
+# Como esta: enquanto nao tens nenhum bicho, apanha-se sempre (nao tens com
+# que lutar). Depois, um bicho com a vida toda escapa-se sempre: e preciso
+# magoa-lo um bocadinho primeiro. Ja magoado e sorte, e quanto menos vida
+# tiver, mais facil e: 40 em cada 100 mal lhe tocaste, quase 100 em cada 100
+# quando esta quase a desmaiar.
+# Ideias: apanhar sempre; so se apanha um bicho com menos de metade da vida;
+# os bichos de nivel mais alto que os teus serem mais dificeis.
+def consegue_apanhar(bicho):
+    if len(minha_equipa) == 0:
+        return True
+    if bicho["vida"] == bicho["vida_max"]:
+        return False
+    falta = 1 - bicho["vida"] / bicho["vida_max"]
+    return random.randint(1, 100) <= 40 + 60 * falta
+
+
+# QUANTAS MOEDAS DA UMA BATALHA
+# Corre quando ganhas uma batalha. Recebe a equipa que venceste (uma lista de
+# bichos) e selvagem, que e True se era um bicho a solta. Devolve as moedas
+# que ganhas. Como esta: um bicho a solta da 2 moedas por cada nivel dele; um
+# treinador da 5 por cada nivel de cada bicho que levava.
+# Ideias: os treinadores pagarem o dobro; nao ganhar nada com bichos a solta;
+# um premio de sorte, entre 1 e 50.
+def premio_da_batalha(equipa, selvagem):
+    niveis = 0
+    for bicho in equipa:
+        niveis = niveis + bicho["nivel"]
+    if selvagem:
+        return niveis * 2
+    return niveis * 5
+
+
+# O QUE SE RECEBE AO COMPRAR
+# Corre quando compras uma coisa na loja, ja com as moedas pagas. nome: o
+# nome dela, como esta escrito na LOJA.
+# Ideias: uma coisa nova. Poe "Pomada": {"preco": 40} na LOJA e aqui um
+# elif nome == "Pomada": que cure a equipa toda (curar_tudo(minha_equipa));
+# ou um "Bolo" que de 20 de experiencia ao teu primeiro bicho.
+def receber_compra(nome):
+    global sopas, redes
+    if nome == "Sopa":
+        sopas = sopas + 1
+    elif nome == "Rede":
+        redes = redes + 1
+
+
+def abrir_loja():
+    global estado, cursor_loja, aviso
+    estado = "loja"
+    cursor_loja = 0
+    aviso = ""
+
+
+def fechar_loja():
+    global estado
+    estado = "mundo"
+
+
+def comprar(nome):
+    # Paga e recebe, se as moedas chegarem. Diz como correu.
+    global moedas
+    preco = LOJA[nome]["preco"]
+    if moedas < preco:
+        return "Não tens moedas que cheguem para: " + nome
+    moedas = moedas - preco
+    receber_compra(nome)
+    return "Compraste: " + nome
+
+
+def tecla_na_loja(tecla):
+    global cursor_loja, aviso
+    nomes = list(LOJA.keys())
+    if tecla == pygame.K_ESCAPE or tecla == pygame.K_BACKSPACE or len(nomes) == 0:
+        fechar_loja()
+        return
+    if tecla == pygame.K_UP:
+        cursor_loja = (cursor_loja - 1) % len(nomes)
+    if tecla == pygame.K_DOWN:
+        cursor_loja = (cursor_loja + 1) % len(nomes)
+    if tecla == pygame.K_RETURN or tecla == pygame.K_SPACE:
+        aviso = comprar(nomes[cursor_loja % len(nomes)])
 
 
 def descansar():
@@ -1003,23 +1220,145 @@ def descansar():
     ao_descansar()
 
 
-def desafiar(numero):
-    # Foste contra um treinador: comeca a batalha, se ainda nao o venceste.
-    global indice_treinador, batalha_selvagem
-    if numero in treinadores_vencidos:
-        dizer(TREINADORES[numero]["nome"] + ": «Já me ganhaste. Boa sorte!»")
+def comecar_conversa(nome, falas, a_seguir):
+    # Alguem fala contigo: as falas aparecem uma de cada vez, e passam com
+    # Enter. a_seguir diz o que acontece no fim: "luta" (comeca a batalha
+    # contra o treinador de indice_treinador), "rede" (recebes uma) ou "".
+    global estado, conversa, quem_fala, depois_da_conversa, cursor, aviso
+    conversa = list(falas)
+    quem_fala = nome
+    depois_da_conversa = a_seguir
+    cursor = 0
+    aviso = ""
+    if len(conversa) == 0:
+        acabar_conversa()
+    else:
+        estado = "conversa"
+
+
+def acabar_conversa():
+    global estado
+    estado = "mundo"
+    if depois_da_conversa == "luta":
+        comecar_batalha()
+    elif depois_da_conversa == "rede":
+        receber_compra("Rede")
+        dizer("Recebeste uma rede! Na erva alta, atira-a a um bicho à solta.")
+
+
+def tecla_na_conversa(tecla):
+    global cursor, depois_da_conversa
+    if tecla == pygame.K_ESCAPE or tecla == pygame.K_BACKSPACE:
+        # Virar costas a meio: a conversa acaba, sem luta e sem prendas.
+        depois_da_conversa = ""
+        conversa.clear()
+        acabar_conversa()
         return
+    confirmar = tecla == pygame.K_RETURN or tecla == pygame.K_SPACE
+    fala = conversa[0]
+    if isinstance(fala, str):
+        if confirmar:
+            conversa.pop(0)
+            if len(conversa) == 0:
+                acabar_conversa()
+        return
+    # E uma pergunta: as setas escolhem a resposta, Enter responde.
+    respostas = list(fala["respostas"].keys())
+    if tecla == pygame.K_UP:
+        cursor = (cursor - 1) % len(respostas)
+    if tecla == pygame.K_DOWN:
+        cursor = (cursor + 1) % len(respostas)
+    if confirmar:
+        resposta = respostas[cursor]
+        conversa.pop(0)
+        cursor = 0
+        if "sem_luta" in fala and fala["sem_luta"] == resposta:
+            depois_da_conversa = ""
+        # O que ele diz a essa resposta e a fala que vem a seguir.
+        conversa.insert(0, fala["respostas"][resposta])
+        ao_responder(quem_fala, fala["pergunta"], resposta)
+
+
+def falas_de(ficha, chave, se_nao_houver):
+    # As falas que estao na ficha de um treinador com esse nome ("falas",
+    # "falas_rede"...), ou as que se dao aqui se ele nao as tiver.
+    if chave in ficha:
+        return ficha[chave]
+    return se_nao_houver
+
+
+def desafiar(numero):
+    # Foste contra um treinador: ele fala contigo e depois, conforme o caso,
+    # da-te uma rede, luta, ou fica so pela conversa.
+    global indice_treinador, batalha_selvagem
+    ficha = TREINADORES[numero]
     indice_treinador = numero
     batalha_selvagem = False
-    comecar_batalha()
+
+    if len(minha_equipa) == 0:
+        # Sem bichos nao ha luta. Quem da a rede, da-a (e da outra a quem
+        # ficou sem redes antes de apanhar o primeiro bicho).
+        if "da_rede" in ficha and ficha["da_rede"]:
+            if numero not in redes_dadas or redes == 0:
+                if numero not in redes_dadas:
+                    redes_dadas.append(numero)
+                falas = falas_de(ficha, "falas_rede", ["Toma esta rede, e vai apanhar o teu primeiro bicho!"])
+                comecar_conversa(ficha["nome"], falas, "rede")
+            else:
+                comecar_conversa(ficha["nome"], ["Vai à erva alta com a rede que te dei!"], "")
+        else:
+            comecar_conversa(ficha["nome"], ["Sem bichos não há luta. Apanha um primeiro!"], "")
+        return
+
+    if numero in treinadores_vencidos:
+        comecar_conversa(ficha["nome"], falas_de(ficha, "falas_depois", ["Já me ganhaste. Boa sorte!"]), "")
+        return
+    comecar_conversa(ficha["nome"], falas_de(ficha, "falas", []), "luta")
 
 
 def encontrar_bicho():
-    # Saltou um bicho da erva: comeca uma batalha contra ele.
-    global batalha_selvagem, bicho_a_solta
+    # Saltou um bicho da erva: comeca uma batalha contra ele. Sem bichos nao
+    # ha batalha: e um encontro, em que so se pode atirar a rede ou fugir.
+    global batalha_selvagem, bicho_a_solta, estado, cursor, aviso
     bicho_a_solta = escolher_bicho_selvagem()
+    if len(minha_equipa) == 0:
+        estado = "encontro"
+        cursor = 0
+        aviso = "Salta da erva um " + bicho_a_solta["nome"] + " à solta!"
+        som_do_bicho(bicho_a_solta)
+        return
     batalha_selvagem = True
     comecar_batalha()
+
+
+def tecla_no_encontro(tecla):
+    # O encontro com um bicho a solta quando ainda nao tens bichos.
+    global cursor, redes, aviso
+    if tecla == pygame.K_UP or tecla == pygame.K_DOWN:
+        cursor = 1 - cursor
+    if tecla == pygame.K_ESCAPE or tecla == pygame.K_BACKSPACE:
+        voltar_ao_mundo()
+        aviso = "Fugiste a sete pés!"
+        return
+    if tecla != pygame.K_RETURN and tecla != pygame.K_SPACE:
+        return
+    if cursor == 1:
+        voltar_ao_mundo()
+        aviso = "Fugiste a sete pés!"
+    elif redes == 0:
+        aviso = "Não tens redes! Quem te deu a primeira dá-te outra."
+    else:
+        redes = redes - 1
+        if consegue_apanhar(bicho_a_solta):
+            minha_equipa.append(bicho_a_solta)
+            voltar_ao_mundo()
+            aviso = "Apanhaste-o! " + bicho_a_solta["nome"] + " é o teu primeiro bicho."
+            ao_apanhar(bicho_a_solta)
+        elif redes == 0:
+            voltar_ao_mundo()
+            aviso = "Escapou-se da rede, e era a última. Fugiu para a erva."
+        else:
+            aviso = "Escapou-se da rede! Tenta outra vez."
 
 
 def andar(passo_coluna, passo_linha):
@@ -1044,7 +1383,13 @@ def andar(passo_coluna, passo_linha):
     if letra == "H":
         descansar()
         return
+    if letra == "$":
+        abrir_loja()
+        return
     if not pode_andar(letra):
+        return
+    if letra == "e" and len(minha_equipa) == 0 and redes == 0:
+        dizer("Sem bichos nem redes, a erva alta é perigosa. Fala primeiro com quem te dê uma rede.")
         return
 
     antes = jogador["zona"]
@@ -1122,8 +1467,9 @@ def andar_com_as_setas():
 #   bicho["vida"] = min(bicho["vida_max"], bicho["vida"] + 10)
 #                           cura 10 de vida, sem passar da vida maxima
 #   ganhar_xp(bicho, 20)    da 20 de experiencia a um bicho teu
-#   sopas                   quantas sopas te restam. Para as MUDAR, a
+#   sopas, redes, moedas    o que levas na mochila. Para os MUDAR, a
 #                           primeira linha da funcao tem de ser "global sopas"
+#                           (ou "global redes", ou "global moedas")
 memoria = {}
 
 
@@ -1183,11 +1529,28 @@ def ao_ganhar_batalha():
 # (As setas, Enter, Espaco, Esc e Backspace ja fazem coisas no jogo.)
 # Ideias: a tecla S da mais uma sopa (batota!); a tecla C cura o teu bicho,
 # mas so uma vez por jogo (usa a memoria para te lembrares se ja foi usada).
-# Mais dificil: APANHAR um bicho a solta. Se a batalha e selvagem e o bicho
-# inimigo tem menos de um quarto da vida, a tecla C poe-no no lugar do teu
-# ultimo bicho (minha_equipa[-1] = equipa_inimiga[ativo_inimigo]) e depois
-# chama voltar_ao_mundo().
+# No mapa: a tecla M mostrar as moedas com o dizer().
 def ao_carregar_tecla(tecla):
+    pass
+
+
+# QUANDO RESPONDES A UMA PERGUNTA
+# Corre quando escolhes uma resposta numa conversa. nome: quem perguntou.
+# pergunta: o que perguntou. resposta: o que respondeste (como esta escrito
+# nas "respostas" dele).
+# Ideias: a Tia da Mercearia dar-te uma sopa se disseres que nao queres
+# lutar; perder 5 moedas por uma resposta malcriada; guardar na memoria o
+# que respondeste, para outro treinador falar disso mais tarde.
+def ao_responder(nome, pergunta, resposta):
+    pass
+
+
+# QUANDO APANHAS UM BICHO
+# bicho: o que acabou de ficar na rede. Ja esta na tua equipa (e o ultimo:
+# minha_equipa[-1]), com a vida que lhe restava.
+# Ideias: ficar logo com a vida toda; dizer uma frase de boas-vindas; contar
+# na memoria quantos ja apanhaste; ganhar 10 moedas por cada um.
+def ao_apanhar(bicho):
     pass
 
 
@@ -1279,8 +1642,8 @@ def jogador_escolheu(acao_jogador):
     acao_inimigo = {"quem": "inimigo", "tipo": "atacar", "ataque": escolher_ataque_inimigo()}
     eu = minha_equipa[ativo_meu]
     inimigo = equipa_inimiga[ativo_inimigo]
-    # Trocar de bicho e comer sopa vem sempre antes dos ataques.
-    # Entre dois ataques, decide a regra quem_ataca_primeiro.
+    # Trocar de bicho, comer sopa e atirar a rede vem sempre antes dos
+    # ataques. Entre dois ataques, decide a regra quem_ataca_primeiro.
     if acao_jogador["tipo"] != "atacar":
         fila_acoes = [acao_jogador, acao_inimigo]
     elif quem_ataca_primeiro(eu, inimigo) == "jogador":
@@ -1339,7 +1702,7 @@ def usar_ataque(atacante, alvo, nome):
 
 
 def executar(acao):
-    global ativo_meu, ativo_inimigo, sopas
+    global ativo_meu, ativo_inimigo, sopas, redes, a_fugir
     if acao["quem"] == "jogador":
         atacante = minha_equipa[ativo_meu]
         alvo = equipa_inimiga[ativo_inimigo]
@@ -1362,6 +1725,21 @@ def executar(acao):
         ativo_inimigo = acao["indice"]
         mensagens.append(treinador()["nome"] + " manda " + equipa_inimiga[ativo_inimigo]["nome"] + "!")
         som_do_bicho(equipa_inimiga[ativo_inimigo])
+    elif acao["tipo"] == "apanhar":
+        redes = redes - 1
+        mensagens.append("Atiras a rede a " + alvo["nome"] + "...")
+        if consegue_apanhar(alvo):
+            mensagens.append("Apanhaste-o! " + alvo["nome"] + " fica na tua equipa.")
+            minha_equipa.append(alvo)
+            # A batalha acaba aqui: o que faltava do turno ja nao acontece, e
+            # o fim_do_turno ve o a_fugir e volta ao mapa.
+            fila_acoes.clear()
+            a_fugir = True
+            ao_apanhar(alvo)
+        else:
+            mensagens.append("Escapou-se da rede!")
+            if alvo["vida"] == alvo["vida_max"]:
+                mensagens.append("Ainda tem a força toda: magoa-o um bocadinho primeiro.")
     elif acao["tipo"] == "sopa":
         sopas = sopas - 1
         cura = atacante["vida_max"] // 2
@@ -1384,7 +1762,7 @@ def ganhar_xp(bicho, quanto):
 
 
 def fim_do_turno():
-    global fase, estado, troca_obrigatoria, cursor
+    global fase, estado, troca_obrigatoria, cursor, moedas
     if a_fugir:
         voltar_ao_mundo()
         return
@@ -1398,6 +1776,10 @@ def fim_do_turno():
             ao_desmaiar(inimigo, eu)
             ganhar_xp(eu, inimigo["nivel"] * 12)
             if proximo_vivo(equipa_inimiga) == -1:
+                premio = int(premio_da_batalha(equipa_inimiga, batalha_selvagem))
+                if premio > 0:
+                    moedas = moedas + premio
+                    mensagens.append("Ganhaste " + str(premio) + " moedas.")
                 ao_ganhar_batalha()
             fase = "texto"
             return
@@ -1464,7 +1846,7 @@ def tecla_na_batalha(tecla):
         return
 
     if fase == "menu":
-        quantas = len(OPCOES_MENU)
+        quantas = len(opcoes_do_menu())
     elif fase == "ataques":
         quantas = len(BICHOS[eu["nome"]]["ataques"])
     else:
@@ -1475,7 +1857,7 @@ def tecla_na_batalha(tecla):
         cursor = (cursor + 1) % quantas
 
     if fase == "menu" and confirmar:
-        escolha = OPCOES_MENU[cursor]
+        escolha = opcoes_do_menu()[cursor]
         if escolha == "Lutar":
             fase = "ataques"
             cursor = 0
@@ -1491,6 +1873,17 @@ def tecla_na_batalha(tecla):
                 fase = "texto"
             else:
                 jogador_escolheu({"quem": "jogador", "tipo": "sopa"})
+        elif escolha == "Apanhar":
+            # (So aparece contra um bicho a solta.) E preciso uma rede, e
+            # haver lugar na equipa.
+            if redes == 0:
+                mensagens.append("Já não tens redes. Vendem-se na mercearia.")
+                fase = "texto"
+            elif len(minha_equipa) >= EQUIPA_MAXIMA:
+                mensagens.append("A tua equipa está cheia: não cabe mais nenhum.")
+                fase = "texto"
+            else:
+                jogador_escolheu({"quem": "jogador", "tipo": "apanhar"})
         elif escolha == "Fugir":
             # So se foge de um bicho a solta. Depois de lido o texto, o
             # fim_do_turno ve o a_fugir e volta ao mapa.
@@ -1584,6 +1977,36 @@ def desenhar_bicho(bicho, cx, cy, tamanho, olha_para):
         cor = BRANCO
     desenhar_corpo(bicho, cor, cx, cy, tamanho)
     desenhar_olhos(bicho, cx, cy, tamanho, olha_para)
+
+
+# O TEU BICHO, VISTO DE COSTAS
+# E assim que se desenha o teu bicho na batalha: ele olha para o adversario,
+# e tu ves-lhe as costas. Mostra a imagem_costas dele; se nao houver, a
+# imagem de frente; se tambem nao houver, o corpo sem olhos, com uma risca
+# nas costas.
+# Ideias: uma cauda; duas riscas em vez de uma; as costas mais escuras.
+def desenhar_bicho_de_costas(bicho, cx, cy, tamanho):
+    if bicho["vida_mostrada"] <= 0.5:
+        return
+    dados = BICHOS[bicho["nome"]]
+    cy = cy + int(math.sin(pygame.time.get_ticks() / 300 + cx) * 3)
+    if bicho["tremor"] > 0:
+        cx = cx + random.randint(-6, 6)
+
+    imagem = None
+    if "imagem_costas" in dados:
+        imagem = obter_imagem(dados["imagem_costas"], tamanho)
+    if imagem is None:
+        imagem = obter_imagem(dados["imagem"], tamanho)
+    if imagem is not None:
+        ecra.blit(imagem, (cx - tamanho // 2, cy - tamanho // 2))
+        return
+
+    cor = dados["cor"]
+    if bicho["tremor"] > 0 and bicho["tremor"] % 6 < 3:
+        cor = BRANCO
+    desenhar_corpo(bicho, cor, cx, cy, tamanho)
+    pygame.draw.line(ecra, escurecer(dados["cor"], 0.55), (cx, cy - tamanho // 5), (cx, cy + tamanho // 4), 5)
 
 
 # O CORPO DE UM BICHO
@@ -1688,6 +2111,11 @@ def desenhar_quadrado(letra, x, y):
         pygame.draw.line(ecra, escurecer(SOALHO, 0.85), (x, y + 20), (x + QUADRADO, y + 20), 1)
     elif letra == " ":
         pygame.draw.rect(ecra, PRETO, (x, y, QUADRADO, QUADRADO))
+    elif letra == "$":
+        pygame.draw.rect(ecra, SOALHO, (x, y, QUADRADO, QUADRADO))
+        pygame.draw.rect(ecra, TRONCO, (x, y + 6, QUADRADO, 28))
+        pygame.draw.circle(ecra, AMARELO, (meio, y + 20), 9)
+        pygame.draw.circle(ecra, escurecer(AMARELO, 0.6), (meio, y + 20), 9, 2)
     elif letra in PORTAS:
         pygame.draw.rect(ecra, PAREDE, (x, y, QUADRADO, QUADRADO))
         pygame.draw.rect(ecra, TRONCO, (x + 8, y + 4, 24, 36))
@@ -1695,14 +2123,28 @@ def desenhar_quadrado(letra, x, y):
 
 
 # TU, NO MAPA
-# olha_para: "cima", "baixo", "esquerda" ou "direita". Como esta: um corpo
-# amarelo, uma cabeca, e dois olhos virados para onde vais (de costas nao se
-# veem).
+# olha_para: "cima", "baixo", "esquerda" ou "direita". Como esta: mostra a
+# imagem do JOGADOR para esse lado (de frente, de costas ou de lado). Se ela
+# nao existir, desenha um corpo com a "cor" do JOGADOR, uma cabeca, e dois
+# olhos virados para onde vais (de costas nao se veem).
 # Ideias: outra cor de camisola; um chapeu; o teu primeiro bicho a andar
 # atras de ti, pequenino (desenhar_bicho(minha_equipa[0], x, y, 20, 1)).
 def desenhar_jogador(x, y, olha_para):
+    chave = "imagem"
+    if olha_para == "cima":
+        chave = "imagem_costas"
+    if olha_para == "esquerda" or olha_para == "direita":
+        chave = "imagem_lado"
+    if chave in JOGADOR:
+        imagem = obter_imagem(JOGADOR[chave], QUADRADO)
+        if imagem is not None:
+            if olha_para == "esquerda":
+                imagem = pygame.transform.flip(imagem, True, False)
+            ecra.blit(imagem, (x, y))
+            return
+
     meio = x + QUADRADO // 2
-    pygame.draw.rect(ecra, AMARELO, (meio - 9, y + 20, 18, 17), border_radius=5)
+    pygame.draw.rect(ecra, JOGADOR["cor"], (meio - 9, y + 20, 18, 17), border_radius=5)
     pygame.draw.circle(ecra, PAREDE, (meio, y + 13), 10)
     pygame.draw.circle(ecra, PRETO, (meio, y + 13), 10, 2)
     if olha_para == "cima":
@@ -1737,6 +2179,97 @@ def desenhar_treinador(treinador, x, y, vencido):
         pygame.draw.rect(ecra, VERMELHO, (meio + 9, y + 11, 4, 4))
 
 
+def partir_texto(texto, letras):
+    # Parte um texto comprido em linhas com esse numero de letras, no maximo,
+    # sem cortar palavras a meio.
+    linhas = []
+    linha = ""
+    for palavra in texto.split(" "):
+        if linha != "" and len(linha) + 1 + len(palavra) > letras:
+            linhas.append(linha)
+            linha = palavra
+        elif linha == "":
+            linha = palavra
+        else:
+            linha = linha + " " + palavra
+    linhas.append(linha)
+    return linhas
+
+
+def desenhar_aviso():
+    # A caixa com o que foi dito, por cima do mapa. Cresce para cima quando o
+    # texto precisa de mais linhas.
+    if aviso == "":
+        return
+    linhas = partir_texto(aviso, 62)
+    altura = 22 + 28 * len(linhas)
+    y = 552 - altura
+    pygame.draw.rect(ecra, PAINEL, (20, y, LARGURA - 40, altura), border_radius=12)
+    pygame.draw.rect(ecra, BRANCO, (20, y, LARGURA - 40, altura), 3, border_radius=12)
+    for linha in linhas:
+        mostrar_texto(linha, 38, y + 12, BRANCO, fonte)
+        y = y + 28
+
+
+def desenhar_conversa():
+    # A conversa aparece por cima do mapa: quem fala, o que diz e, se for
+    # uma pergunta, as respostas a escolha.
+    desenhar_mundo()
+    if len(conversa) == 0:
+        return
+    fala = conversa[0]
+    respostas = []
+    if isinstance(fala, str):
+        texto = fala
+    else:
+        texto = fala["pergunta"]
+        respostas = list(fala["respostas"].keys())
+    linhas = partir_texto(texto, 62)
+    altura = 52 + 28 * len(linhas) + 32 * len(respostas)
+    y = 552 - altura
+    pygame.draw.rect(ecra, PAINEL, (20, y, LARGURA - 40, altura), border_radius=12)
+    pygame.draw.rect(ecra, BRANCO, (20, y, LARGURA - 40, altura), 3, border_radius=12)
+    mostrar_texto(quem_fala, 38, y + 12, AMARELO, fonte_pequena)
+    y = y + 36
+    for linha in linhas:
+        mostrar_texto(linha, 38, y, BRANCO, fonte)
+        y = y + 28
+    indice = 0
+    for resposta in respostas:
+        cor = BRANCO
+        if indice == cursor:
+            cor = AMARELO
+            mostrar_texto(">", 60, y + 4, AMARELO, fonte)
+        mostrar_texto(resposta, 84, y + 4, cor, fonte)
+        y = y + 32
+        indice = indice + 1
+    if len(respostas) == 0 and pygame.time.get_ticks() // 400 % 2 == 0:
+        pygame.draw.polygon(ecra, AMARELO, [(748, 528), (768, 528), (758, 540)])
+
+
+def desenhar_encontro():
+    # Um bicho a solta e tu sem bichos: a rede, ou as pernas.
+    ecra.fill(BICHO_A_SOLTA["cor_fundo"])
+    pygame.draw.rect(ecra, escurecer(BICHO_A_SOLTA["cor_fundo"], 0.75), (0, 250, LARGURA, 190))
+    pygame.draw.ellipse(ecra, escurecer(BICHO_A_SOLTA["cor_fundo"], 0.55), (285, 265, 230, 55))
+    desenhar_bicho(bicho_a_solta, 400, 230, 130, -1)
+    desenhar_caixa_bicho(bicho_a_solta, 40, 40, False)
+    desenhar_painel()
+    y = 470
+    for linha in partir_texto(aviso, 34)[:3]:
+        mostrar_texto(linha, 34, y, BRANCO, fonte)
+        y = y + 30
+    opcoes = ["Atirar a rede (" + str(redes) + ")", "Fugir"]
+    indice = 0
+    for opcao in opcoes:
+        cor = BRANCO
+        if indice == cursor:
+            cor = AMARELO
+            mostrar_texto(">", 496, 478 + indice * 40, AMARELO, fonte)
+        mostrar_texto(opcao, 520, 478 + indice * 40, cor, fonte)
+        indice = indice + 1
+
+
 def desenhar_mundo():
     # So se desenha a zona onde estas: e o ecra inteiro.
     ecra.fill(PRETO)
@@ -1757,22 +2290,45 @@ def desenhar_mundo():
                 desenhar_treinador(TREINADORES[numero], x, y, numero in treinadores_vencidos)
     desenhar_jogador(jogador["coluna"] * QUADRADO, jogador["linha"] * QUADRADO, jogador["olha"])
 
-    # A caixa com o que foi dito, por cima do mapa.
-    if aviso != "":
-        pygame.draw.rect(ecra, PAINEL, (20, 500, LARGURA - 40, 50), border_radius=12)
-        pygame.draw.rect(ecra, BRANCO, (20, 500, LARGURA - 40, 50), 3, border_radius=12)
-        mostrar_texto(aviso, 38, 514, BRANCO, fonte)
+    if estado == "mundo":
+        desenhar_aviso()
 
     # A faixa de baixo: os treinadores que faltam, a equipa e as sopas.
     pygame.draw.rect(ecra, PAINEL, (0, ALTURA - 40, LARGURA, 40))
     mostrar_texto(jogador["zona"], 14, ALTURA - 28, AMARELO, fonte_pequena)
-    mostrar_texto("Treinadores por vencer: " + str(por_vencer), 120, ALTURA - 28, BRANCO, fonte_pequena)
-    x = 345
-    for bicho in minha_equipa[:3]:
-        mostrar_texto("Nv " + str(bicho["nivel"]), x, ALTURA - 28, AMARELO, fonte_pequena)
-        desenhar_barra_vida(bicho, x + 48, ALTURA - 26, 60)
-        x = x + 120
-    mostrar_texto("Sopas: " + str(sopas), LARGURA - 88, ALTURA - 28, BRANCO, fonte_pequena)
+    mostrar_texto("Por vencer: " + str(por_vencer), 120, ALTURA - 28, BRANCO, fonte_pequena)
+    # A vida de cada bicho da equipa, em barras pequenas.
+    x = 245
+    for bicho in minha_equipa[:EQUIPA_MAXIMA]:
+        desenhar_barra_vida(bicho, x, ALTURA - 26, 36)
+        x = x + 42
+    mochila = "Sopas " + str(sopas) + "   Redes " + str(redes) + "   Moedas " + str(moedas)
+    mostrar_texto(mochila, 520, ALTURA - 28, BRANCO, fonte_pequena)
+
+
+def desenhar_loja():
+    # A loja aparece por cima do mapa. (O aviso, aqui, e a frase da compra:
+    # vai dentro da loja, e nao na caixa do mapa.)
+    desenhar_mundo()
+    pygame.draw.rect(ecra, PAINEL, (160, 110, 480, 330), border_radius=14)
+    pygame.draw.rect(ecra, BRANCO, (160, 110, 480, 330), 3, border_radius=14)
+    mostrar_texto("Loja", 190, 130, AMARELO, fonte)
+    mostrar_texto("Tens " + str(moedas) + " moedas", 420, 134, BRANCO, fonte_pequena)
+    y = 185
+    indice = 0
+    for nome in LOJA:
+        cor = BRANCO
+        if indice == cursor_loja:
+            cor = AMARELO
+            mostrar_texto(">", 190, y, AMARELO, fonte)
+        mostrar_texto(nome, 215, y, cor, fonte)
+        mostrar_texto(str(LOJA[nome]["preco"]) + " moedas", 480, y + 4, cor, fonte_pequena)
+        y = y + 36
+        indice = indice + 1
+    if len(LOJA) == 0:
+        mostrar_texto("Hoje não há nada à venda.", 190, y, CINZA, fonte)
+    mostrar_texto(aviso, 190, 375, VERDE, fonte_pequena)
+    mostrar_texto("Enter: comprar  ·  Esc: sair", 190, 405, CINZA, fonte_pequena)
 
 
 def desenhar_caixa_bicho(bicho, x, y, com_numeros):
@@ -1808,7 +2364,7 @@ def desenhar_batalha():
     pygame.draw.ellipse(ecra, escurecer(treinador()["cor_fundo"], 0.55), (70, 385, 280, 60))
 
     desenhar_bicho(inimigo, 595, 180, 110, -1)
-    desenhar_bicho(eu, 210, 340, 150, 1)
+    desenhar_bicho_de_costas(eu, 210, 340, 150)
     desenhar_caixa_bicho(inimigo, 40, 40, False)
     desenhar_caixa_bicho(eu, 460, 300, True)
 
@@ -1821,18 +2377,21 @@ def desenhar_batalha():
 
     elif fase == "menu":
         mostrar_texto("O que faz " + eu["nome"] + "?", 34, 475, BRANCO, fonte)
-        y = 458
+        # As opcoes em duas colunas, tres em cada uma.
         indice = 0
-        for opcao in OPCOES_MENU:
+        for opcao in opcoes_do_menu():
             texto = opcao
             if opcao == "Sopa":
                 texto = "Sopa (" + str(sopas) + ")"
+            if opcao == "Apanhar":
+                texto = "Apanhar (" + str(redes) + ")"
+            x = 440 + (indice // 3) * 165
+            y = 468 + (indice % 3) * 36
             cor = BRANCO
             if indice == cursor:
                 cor = AMARELO
-                mostrar_texto(">", 545, y, AMARELO, fonte)
-            mostrar_texto(texto, 570, y, cor, fonte)
-            y = y + 32
+                mostrar_texto(">", x - 24, y, AMARELO, fonte)
+            mostrar_texto(texto, x, y, cor, fonte)
             indice = indice + 1
 
     elif fase == "ataques":
@@ -1879,106 +2438,31 @@ def desenhar_lista_equipa():
     if troca_obrigatoria:
         titulo = "Quem entra? (tens de escolher)"
     mostrar_texto(titulo, 130, 110, AMARELO, fonte)
+    # Ate tres bichos, cada um tem 100 pixeis de altura. Com mais (os que
+    # apanhaste), apertam-se: cabem seis, com 50 cada um.
+    passo = 100
+    if len(minha_equipa) > 3:
+        passo = 50
     y = 160
+    if passo == 50:
+        y = 152
     indice = 0
     for bicho in minha_equipa:
         if indice == cursor:
-            pygame.draw.rect(ecra, (60, 60, 90), (115, y - 8, 570, 90), border_radius=10)
-        desenhar_bicho(bicho, 170, y + 36, 60, 1)
+            pygame.draw.rect(ecra, (60, 60, 90), (115, y - 4, 570, passo - 6), border_radius=10)
+        desenhar_bicho(bicho, 170, y + passo // 2 - 8, passo * 3 // 5, 1)
         cor = BRANCO
         if bicho["vida"] <= 0:
             cor = CINZA
-        mostrar_texto(bicho["nome"] + "  Nv " + str(bicho["nivel"]), 230, y + 6, cor, fonte)
-        desenhar_barra_vida(bicho, 230, y + 42, 250)
-        mostrar_texto(str(bicho["vida"]) + " / " + str(bicho["vida_max"]), 500, y + 38, cor, fonte_pequena)
+        mostrar_texto(bicho["nome"] + "  Nv " + str(bicho["nivel"]), 230, y, cor, fonte)
+        desenhar_barra_vida(bicho, 230, y + passo - 22, 250)
+        mostrar_texto(str(bicho["vida"]) + " / " + str(bicho["vida_max"]), 500, y + passo - 26, cor, fonte_pequena)
         if bicho["vida"] <= 0:
-            mostrar_texto("desmaiado", 590, y + 38, VERMELHO, fonte_pequena)
+            mostrar_texto("desmaiado", 590, y + passo - 26, VERMELHO, fonte_pequena)
         elif indice == ativo_meu:
-            mostrar_texto("em campo", 590, y + 38, AMARELO, fonte_pequena)
-        y = y + 100
+            mostrar_texto("em campo", 590, y + passo - 26, AMARELO, fonte_pequena)
+        y = y + passo
         indice = indice + 1
-
-
-def desenhar_escolha():
-    ecra.fill(PRETO)
-    mostrar_texto("Escolhe " + str(TAMANHO_EQUIPA) + " bichos", 30, 20, AMARELO, fonte)
-    mostrar_texto("Enter escolhe · Backspace tira o último · o primeiro é o que entra primeiro", 30, 52, CINZA, fonte_pequena)
-    colunas = 4
-    # So cabem duas filas de cartoes. Com mais bichos do que isso, mostram-se
-    # as duas filas onde anda o cursor.
-    filas = (len(nomes_dos_bichos) + colunas - 1) // colunas
-    primeira_fila = max(0, min(cursor_escolha // colunas, filas - 2))
-    if primeira_fila > 0:
-        pygame.draw.polygon(ecra, AMARELO, [(770, 62), (790, 62), (780, 50)])
-    if primeira_fila + 2 < filas:
-        pygame.draw.polygon(ecra, AMARELO, [(770, 426), (790, 426), (780, 438)])
-    indice = 0
-    for nome in nomes_dos_bichos:
-        fila = indice // colunas - primeira_fila
-        if fila < 0 or fila > 1:
-            indice = indice + 1
-            continue
-        x = 30 + (indice % colunas) * 188
-        y = 85 + fila * 170
-        cartao = pygame.Rect(x, y, 176, 158)
-        cor_borda = CINZA
-        if indice == cursor_escolha:
-            cor_borda = AMARELO
-        pygame.draw.rect(ecra, PAINEL, cartao, border_radius=12)
-        pygame.draw.rect(ecra, cor_borda, cartao, 3, border_radius=12)
-        modelo = criar_bicho(nome, NIVEL_INICIAL)
-        desenhar_bicho(modelo, cartao.centerx, y + 60, 80, 1)
-        mostrar_texto(nome, x + 10, y + 112, BRANCO, fonte_pequena)
-        tipo = BICHOS[nome]["tipo"]
-        pygame.draw.rect(ecra, CORES_TIPO[tipo], (x + 10, y + 134, 70, 16), border_radius=8)
-        mostrar_texto(tipo, x + 16, y + 135, PRETO, fonte_pequena)
-        if nome in escolhidos:
-            numero = escolhidos.index(nome) + 1
-            pygame.draw.circle(ecra, AMARELO, (x + 154, y + 22), 16)
-            mostrar_texto(str(numero), x + 148, y + 12, PRETO, fonte)
-        indice = indice + 1
-
-    # A ficha do bicho onde esta o cursor.
-    dados = BICHOS[nomes_dos_bichos[cursor_escolha]]
-    y = 440
-    pygame.draw.rect(ecra, PAINEL, (30, y, 740, 145), border_radius=12)
-    mostrar_texto(nomes_dos_bichos[cursor_escolha], 50, y + 14, AMARELO, fonte)
-    linha = "Vida " + str(dados["vida"]) + "   Ataque " + str(dados["ataque"])
-    linha = linha + "   Defesa " + str(dados["defesa"]) + "   Velocidade " + str(dados["velocidade"])
-    mostrar_texto(linha, 50, y + 50, BRANCO, fonte_pequena)
-    x = 50
-    for nome in dados["ataques"]:
-        pygame.draw.circle(ecra, CORES_TIPO[ATAQUES[nome]["tipo"]], (x + 6, y + 96), 6)
-        mostrar_texto(nome, x + 18, y + 88, BRANCO, fonte_pequena)
-        x = x + 180
-
-
-def tecla_na_escolha(tecla):
-    global cursor_escolha, minha_equipa
-    colunas = 4
-    total = len(nomes_dos_bichos)
-    if tecla == pygame.K_RIGHT:
-        cursor_escolha = (cursor_escolha + 1) % total
-    if tecla == pygame.K_LEFT:
-        cursor_escolha = (cursor_escolha - 1) % total
-    if tecla == pygame.K_DOWN and cursor_escolha + colunas < total:
-        cursor_escolha = cursor_escolha + colunas
-    if tecla == pygame.K_UP and cursor_escolha - colunas >= 0:
-        cursor_escolha = cursor_escolha - colunas
-    if tecla == pygame.K_BACKSPACE or tecla == pygame.K_ESCAPE:
-        if len(escolhidos) > 0:
-            escolhidos.pop()
-    if tecla == pygame.K_RETURN or tecla == pygame.K_SPACE:
-        nome = nomes_dos_bichos[cursor_escolha]
-        if nome in escolhidos:
-            escolhidos.remove(nome)
-        else:
-            escolhidos.append(nome)
-        if len(escolhidos) == TAMANHO_EQUIPA:
-            minha_equipa = []
-            for escolhido in escolhidos:
-                minha_equipa.append(criar_bicho(escolhido, NIVEL_INICIAL))
-            comecar_mundo()
 
 
 # =====================================================================
@@ -1995,19 +2479,23 @@ while a_correr:
         if evento.type == pygame.KEYDOWN:
             confirmar = evento.key == pygame.K_RETURN or evento.key == pygame.K_SPACE
             if estado == "menu" and confirmar:
-                comecar_escolha()
-            elif estado == "escolha":
-                tecla_na_escolha(evento.key)
+                comecar_jogo()
             elif estado == "mundo":
                 tecla_no_mundo(evento.key)
                 ao_carregar_tecla(evento.key)
+            elif estado == "conversa":
+                tecla_na_conversa(evento.key)
+            elif estado == "loja":
+                tecla_na_loja(evento.key)
+            elif estado == "encontro":
+                tecla_no_encontro(evento.key)
             elif estado == "batalha":
                 tecla_na_batalha(evento.key)
                 ao_carregar_tecla(evento.key)
             elif estado == "derrota" and confirmar:
                 acordar_em_casa()
             elif estado == "vitoria" and evento.key == pygame.K_r:
-                comecar_escolha()
+                comecar_jogo()
 
     # ------------------------- 2. LOGICA --------------------------
     if estado == "mundo":
@@ -2037,10 +2525,14 @@ while a_correr:
         modelo = criar_bicho(nomes_dos_bichos[1], NIVEL_INICIAL)
         desenhar_bicho(modelo, 500, 380, 90, -1)
         mostrar_texto("Enter para começar", 290, 490, CINZA, fonte)
-    elif estado == "escolha":
-        desenhar_escolha()
+    elif estado == "encontro":
+        desenhar_encontro()
     elif estado == "mundo":
         desenhar_mundo()
+    elif estado == "conversa":
+        desenhar_conversa()
+    elif estado == "loja":
+        desenhar_loja()
     elif estado == "batalha":
         desenhar_batalha()
     elif estado == "vitoria":

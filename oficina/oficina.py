@@ -156,6 +156,11 @@ class Sessao:
         self.titulo = ""
         self.ajuda = ""
         self.imagem = None           # o nome do PNG que o bocado aberto usa, se usar
+        # Um bocado pode ter varias imagens (um bicho de frente e de costas):
+        # [{"nome": "De frente", "ficheiro": "galo.png"}, ...], e qual delas
+        # esta escolhida. "imagem" e sempre a escolhida.
+        self.imagens = []
+        self.qual_imagem = 0
         self.som = None              # e o do WAV
         self.ajudante = modulo_do_ajudante.Ajudante()
         self.fim_de_linha = "\n"
@@ -329,7 +334,8 @@ class Sessao:
             self.margem = blocos.margem_comum(bloco)
             self.titulo = regiao["titulo"]
             self.ajuda = regiao["ajuda"]
-            self.imagem = regiao.get("imagem")
+            self.qual_imagem = 0
+            self.acertar_imagem(regiao)
             self.som = regiao.get("som")
             self.pedidos = {}
             self.mensagens = []
@@ -344,6 +350,7 @@ class Sessao:
                 # O que dizem os botoes de apagar esta coisa e de escolher de
                 # uma lista (None se aqui nao os ha).
                 "apagar": regiao.get("apagar"), "lista": regiao.get("lista"),
+                "caixas": bool(regiao.get("caixas")),
             }
 
     def jogar(self, jogo):
@@ -359,7 +366,7 @@ class Sessao:
             self.margem = ""
             self.titulo = ""
             self.ajuda = ""
-            self.imagem = None
+            self.acertar_imagem(None)
             self.som = None
             self.pedidos = {}
             self.mensagens = []
@@ -467,8 +474,42 @@ class Sessao:
             regiao = self.config.regiao(fonte, self.escolha)
         except (SyntaxError, ValueError):
             return
-        self.imagem = regiao.get("imagem") if regiao else None
+        self.acertar_imagem(regiao)
         self.som = regiao.get("som") if regiao else None
+
+    def acertar_imagem(self, regiao):
+        # Que imagem esta aberta: a unica que a coisa tem ou, se tem varias,
+        # a que estiver escolhida.
+        self.imagens = (regiao or {}).get("imagens") or []
+        self.imagem = regiao.get("imagem") if regiao else None
+        if self.imagens:
+            self.qual_imagem = min(self.qual_imagem, len(self.imagens) - 1)
+            self.imagem = self.imagens[self.qual_imagem]["ficheiro"]
+
+    def escolher_imagem(self, qual):
+        # A crianca escolheu outra das imagens da coisa (a de costas, por exemplo).
+        with self.tranca:
+            if not isinstance(qual, int) or isinstance(qual, bool) or not 0 <= qual < len(self.imagens):
+                raise Falha("Essa imagem não existe.")
+            self.qual_imagem = qual
+            self.imagem = self.imagens[qual]["ficheiro"]
+            return {"imagem": self.estado_da_imagem()}
+
+    def caixas(self, dados):
+        # As caixas para marcar de uma coisa (ve "caixas" no ficheiro do jogo
+        # em oficina/jogos/). Como na lista: trabalha-se sobre o codigo do
+        # editor, e o codigo mudado volta para la.
+        with self.tranca:
+            config = self.config
+            if config is None or self.escolha == JOGAR or not hasattr(config, "caixas"):
+                raise Falha("Aqui não há caixas para marcar.")
+            fonte, _ = ler(caminho_do_jogo(config))
+            try:
+                return config.caixas(fonte, self.escolha, str(dados.get("codigo", "")), dados.get("chave"),
+                                     dados.get("valor"))
+            except (SyntaxError, ValueError) as erro:
+                texto = str(erro)
+                raise Falha(texto[:1].upper() + texto[1:])
 
     def estado_do_ficheiro(self, tipo):
         # None: este bocado nao usa imagem (ou som) nenhuma.
@@ -486,7 +527,11 @@ class Sessao:
         return {"nome": nome, "ha": True, "versao": os.stat(caminho).st_mtime_ns, "erro": None}
 
     def estado_da_imagem(self):
-        return self.estado_do_ficheiro("imagem")
+        estado = self.estado_do_ficheiro("imagem")
+        if estado is not None and len(self.imagens) > 1:
+            estado["opcoes"] = [imagem["nome"] for imagem in self.imagens]
+            estado["qual"] = self.qual_imagem
+        return estado
 
     def caminho_do_ficheiro(self, tipo):
         estado = self.estado_do_ficheiro(tipo)
@@ -881,6 +926,10 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(sessao.apagar)
         elif caminho == "/api/lista":
             self.tratar(lambda: sessao.lista(dados))
+        elif caminho == "/api/caixas":
+            self.tratar(lambda: sessao.caixas(dados))
+        elif caminho == "/api/qual-imagem":
+            self.tratar(lambda: sessao.escolher_imagem(dados.get("qual")))
         elif caminho == "/api/criar":
             self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo"))))
         elif caminho == "/api/pergunta":

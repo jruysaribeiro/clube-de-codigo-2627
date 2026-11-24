@@ -105,8 +105,12 @@
   #ajuda { margin: 0; padding: 0 14px 12px; max-height: 30vh; overflow: auto; white-space: pre; color: #cfcfe0; font: 12.5px/1.5 var(--letra-codigo); }
 
   /* ---------- a imagem do bocado ---------- */
-  #barra-imagem, #barra-som, #barra-lista { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); font-size: 14px; }
+  #barra-imagem, #barra-som, #barra-lista, #barra-caixas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 14px; border-bottom: 1px solid var(--linha); background: var(--painel); font-size: 14px; }
   #barra-imagem button, #barra-som button, #barra-lista button { font-size: 14px; }
+  #quais-imagens { display: flex; gap: 4px; }
+  #quais-imagens button.escolhida { border-color: var(--amarelo); color: var(--amarelo); }
+  #barra-caixas label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  #barra-caixas input { width: 18px; height: 18px; accent-color: var(--amarelo); }
   #gravar-som.a-gravar { border-color: var(--vermelho); color: var(--vermelho); }
   #miniatura {
     width: 40px; height: 40px; flex: none; border: 1px solid var(--linha); border-radius: 6px;
@@ -250,6 +254,7 @@
   </details>
   <div id="barra-imagem" hidden>
     <img id="miniatura" alt="" hidden>
+    <span id="quais-imagens" hidden></span>
     <span id="texto-imagem"></span>
     <button type="button" id="desenhar-imagem">Desenhar</button>
     <button type="button" id="por-imagem">Escolher uma imagem</button>
@@ -262,6 +267,7 @@
     <button type="button" id="por-som">Escolher um som</button>
     <button type="button" id="tirar-som" hidden>Tirar o som</button>
   </div>
+  <div id="barra-caixas" hidden></div>
   <div id="barra-lista" hidden>
     <span>Em vez de escreveres os nomes:</span>
     <button type="button" id="abrir-lista"></button>
@@ -508,6 +514,7 @@ async function criarNovo(jogo, grupo) {
 // ordem em que se carrega neles. O que se escolhe vai para o codigo do
 // editor, e dai segue o caminho de sempre.
 let escolhidosDaLista = [];
+let haCaixas = false;        // a coisa aberta tem caixas para marcar?
 
 function pintarLista(opcoes) {
   const caixa = $("opcoes-lista");
@@ -639,12 +646,14 @@ async function abrir(jogo, escolha, recado) {
   mostrarImagem(dados.imagem);
   somAVista = undefined;
   mostrarSom(dados.som);
+  haCaixas = Boolean(dados.caixas);
   $("barra-lista").hidden = !dados.lista;
   $("abrir-lista").textContent = dados.lista || "";
   $("apagar").hidden = !dados.apagar;
   $("apagar").textContent = dados.apagar || "";
   $("lista").hidden = true;
   codigo.value = dados.codigo;
+  mostrarCaixas(haCaixas);
   codigo.setSelectionRange(0, 0);     // senao o Safari abre o codigo ja puxado para a direita
   linhaMal = null;
   pintar();
@@ -959,6 +968,62 @@ function mostrarImagem(imagem) {
   imagemAtual = imagem;
   $("por-imagem").textContent = imagem.ha ? "Trocar a imagem" : "Escolher uma imagem";
   $("tirar-imagem").hidden = !imagem.ha;
+  // Uma coisa com varias imagens (um bicho de frente e de costas): um botao
+  // para cada uma, e os outros botoes mexem na que estiver escolhida.
+  const quais = $("quais-imagens");
+  quais.hidden = !imagem.opcoes;
+  quais.replaceChildren();
+  (imagem.opcoes || []).forEach((nome, numero) => {
+    const botao = elemento("button", nome, numero === imagem.qual ? "escolhida" : "");
+    botao.type = "button";
+    botao.setAttribute("aria-pressed", numero === imagem.qual ? "true" : "false");
+    botao.onclick = async () => {
+      try {
+        mostrarImagem((await pedir("/api/qual-imagem", {qual: numero})).imagem);
+      } catch (erro) {
+        alert(erro.message);
+      }
+    };
+    quais.append(botao);
+  });
+}
+
+/* ---------------- caixas para marcar ---------------- */
+
+// Coisas que no codigo sao True ou False (um treinador da a rede?) marcam-se
+// numa caixa. Como na lista, o codigo mudado vai para o editor e dai segue o
+// caminho de sempre.
+async function mostrarCaixas(ha) {
+  const barra = $("barra-caixas");
+  barra.hidden = true;
+  barra.replaceChildren();
+  if (!ha) return;
+  let dados;
+  try {
+    dados = await pedir("/api/caixas", {codigo: codigo.value});
+  } catch (erro) {
+    return;       // o codigo tem um erro: as caixas voltam quando ele estiver bom
+  }
+  for (const caixa of dados.caixas) {
+    const rotulo = elemento("label");
+    const entrada = document.createElement("input");
+    entrada.type = "checkbox";
+    entrada.checked = caixa.ligada;
+    entrada.onchange = async () => {
+      try {
+        const novo = await pedir("/api/caixas", {codigo: codigo.value, chave: caixa.chave, valor: entrada.checked});
+        codigo.value = novo.codigo;
+        marcarLinha(null);
+        enviar();
+      } catch (erro) {
+        entrada.checked = !entrada.checked;
+        alert(erro.message);
+      }
+    };
+    rotulo.append(entrada, caixa.texto);
+    barra.append(rotulo);
+  }
+  barra.hidden = dados.caixas.length === 0;
 }
 
 async function encolher(ficheiro) {
@@ -1530,6 +1595,7 @@ $("repor").onclick = async () => {
 };
 $("guardar").onclick = () => guardarJogo(jogoAberto);
 $("apagar").onclick = apagarCoisa;
+$("barra-caixas").onmouseenter = () => { if (!document.activeElement || document.activeElement.type !== "checkbox") mostrarCaixas(haCaixas); };
 $("abrir-lista").onclick = abrirLista;
 $("guardar-lista").onclick = guardarLista;
 $("fechar-lista").onclick = () => { $("lista").hidden = true; };

@@ -82,13 +82,29 @@ Nos cinco jogos:
 
 Nas duas Bicharadas:
 
-- **Apagar este bicho** (com um bicho aberto) tira-o do jogo e das equipas
-  dos treinadores que o levavam. Tem de sobrar o bastante para uma equipa.
+- **Apagar** (o botão vermelho, com a coisa aberta) tira do jogo um bicho,
+  um ataque ou um treinador, e também dos sítios onde era usado: o bicho sai
+  das equipas dos treinadores, o ataque sai dos ataques dos bichos. Quem
+  ficaria sem nada fica com outro, e tem de sobrar sempre o bastante para o
+  jogo se jogar. Na Bicharada à Solta apagam-se também zonas e edifícios, e
+  o número de um treinador apagado sai do mapa (os seguintes descem um).
+  O ficheiro de antes fica ao lado, em `.anterior`.
 - **Escolher os bichos** (com um treinador aberto) mostra os bichos que
   existem, para se carregar nos que ele leva, pela ordem em que entram. Abre
   sozinho quando se cria um treinador novo, e pode-se voltar lá depois.
   (No ficheiro do jogo em `oficina/jogos/`: `apagar()` e `lista()`, e as
   chaves `"apagar"` e `"lista"` que a `regiao` devolve.)
+
+Só na Bicharada à Solta:
+
+- Com um treinador aberto há a caixa **Dá a rede no início**: é ela que diz
+  quem dá a primeira rede a quem começa sem bichos. (`caixas()` e a chave
+  `"caixas"`.)
+- Um bicho tem duas imagens, **De frente** e **De costas**, e o boneco do
+  jogador tem três. Os botões por cima do código escolhem em qual delas
+  mexem o **Desenhar** e o **Escolher uma imagem**. (A chave `"imagens"`.)
+- Um treinador aberto mostra-se em cenas: a dar a rede (se for ele), as
+  falas e a luta, e as falas de depois.
 
 Uma função que só corre mais tarde (a de uma tecla, por exemplo) pode
 rebentar já depois de guardada: o jogo pára com o erro à vista, e corrige-se

@@ -14,6 +14,7 @@ import ast
 import collections
 import inspect
 import random
+import re
 
 import blocos
 from jogos import bicharada as base
@@ -27,19 +28,18 @@ DESCRICAO = "A Bicharada com um mundo: andas de zona em zona, e os bichos saltam
 SOBRE_OS_GRUPOS = {
     "Mapa": "O mundo é feito de zonas, cada uma do tamanho do ecrã e desenhada com letras. "
             "Sais por um lado de uma, entras na do lado.",
-    "Edifícios": "Os sítios onde se entra por uma porta. Cada um é uma zona por dentro.",
+    "Edifícios": "Os sítios onde se entra por uma porta (cada um é uma zona por dentro), e o que se vende na loja.",
     "Bichos": "Tipo, vida, ataque, forma, cor. Podes pôr uma imagem tua.",
     "Ataques": "O poder, a precisão e o efeito de cada ataque.",
-    "Treinadores": "Quem encontras no mapa, o que dizem e que bichos levam.",
+    "Treinadores": "Quem encontras no mapa: as falas e as perguntas deles, e que bichos levam.",
     "Tipos": "As cores dos tipos, e quem é forte contra quem.",
     "Regras do jogo": "Aqui mudas a maneira como o jogo se comporta, na batalha e no mapa: é programar a sério.",
     "Acontecimentos": "Estão vazios: o que lá escreveres passa a acontecer nesse momento. É aqui que se inventa.",
     "Desenhos": "Como se desenha um bicho, um quadrado do mapa, tu e os treinadores.",
 }
 
-# Apagar um bicho e escolher de uma lista os bichos de um treinador fazem-se
-# como na Bicharada.
-apagar = base.apagar
+# Escolher de uma lista os bichos de um treinador faz-se como na Bicharada.
+# (Apagar tambem, mas aqui ha o mapa para acertar: ve o apagar, mais abaixo.)
 lista = base.lista
 
 CRIAVEIS = dict(base.CRIAVEIS)
@@ -59,6 +59,16 @@ SUGESTOES = {
               "Como é que isto funciona?"],
     "portas": ["Como é que faço um edifício novo?", "Para que serve a letra de cada porta?",
                "Como é que ponho duas portas no mesmo edifício?"],
+    "loja": ["Põe à venda uma Pomada que cura a equipa toda, por 40 moedas", "Faz as redes mais baratas",
+             "Como é que ponho uma coisa nova à venda?"],
+    "consegue_apanhar": ["Faz com que se apanhe sempre", "Só se apanha um bicho com menos de metade da vida",
+                         LINHA_A_LINHA],
+    "premio_da_batalha": ["Os treinadores pagam o dobro", "Os bichos à solta não dão moedas nenhumas", LINHA_A_LINHA],
+    "receber_compra": ["Faz uma Pomada que cura a equipa toda", "Faz um Bolo que dá 20 de experiência ao meu primeiro bicho",
+                       LINHA_A_LINHA],
+    "ao_apanhar": ["O bicho que apanho fica logo com a vida toda", "Ganho 10 moedas por cada bicho que apanho", QUE_FAZER],
+    "ao_responder": ["Se disser à Tia da Mercearia que não quero lutar, ela dá-me uma sopa",
+                     "Guarda na memoria o que respondi, para outro treinador falar disso", QUE_FAZER],
     "pode_andar": ["Deixa-me andar na água se tiver um bicho de água na equipa",
                    "Faz a letra c ser uma cerca por onde não se passa", LINHA_A_LINHA],
     "ha_batalha_na_erva": ["Faz saltar um bicho 1 vez em cada 3 passos",
@@ -70,6 +80,10 @@ SUGESTOES = {
     "ao_descansar": ["A avó dá-me uma sopa a mais", "A avó diz uma frase diferente de cada vez", QUE_FAZER],
     "a_cada_frame": ["Faz um relógio que diz há quantos segundos ando no mapa",
                      "Os meus bichos recuperam 1 de vida a cada 2 segundos", QUE_FAZER],
+    "jogador": ["Muda a cor da minha camisola para azul", "Para que servem as três imagens?",
+                "Como é que desenho o meu boneco?"],
+    "desenhar_bicho_de_costas": ["Põe uma cauda nas costas do bicho", "Faz as costas mais escuras do que a frente",
+                                 "Explica-me este desenho linha a linha"],
     "desenhar_quadrado": ["Põe flores amarelas na relva", "Faz as paredes de tijolo vermelho",
                           "Explica-me este desenho linha a linha"],
     "desenhar_jogador": ["Põe-me um chapéu vermelho", "Faz o meu primeiro bicho andar atrás de mim, pequenino",
@@ -84,24 +98,34 @@ REGRAS = {
     "pode_andar": ("Onde se pode andar", ["letra"]),
     "ha_batalha_na_erva": ("Quando salta um bicho da erva", []),
     "escolher_bicho_selvagem": ("Que bicho salta da erva", []),
+    "consegue_apanhar": ("Quando se consegue apanhar um bicho", ["bicho"]),
+    "premio_da_batalha": ("Quantas moedas dá uma batalha", ["equipa", "selvagem"]),
+    "receber_compra": ("O que se recebe ao comprar", ["nome"]),
 }
 ACONTECIMENTOS = {
     "ao_dar_passo": ("Quando dás um passo", ["letra"]),
     "ao_descansar": ("Quando descansas em casa da avó", []),
     "a_cada_frame": ("A cada frame, no mapa", []),
+    "ao_apanhar": ("Quando apanhas um bicho", ["bicho"]),
+    "ao_responder": ("Quando respondes a uma pergunta", ["nome", "pergunta", "resposta"]),
 }
 DESENHOS = {
     "desenhar_quadrado": ("Um quadrado do mapa", ["letra", "x", "y"]),
     "desenhar_jogador": ("Tu, no mapa", ["x", "y", "olha_para"]),
     "desenhar_treinador": ("Um treinador, no mapa", ["treinador", "x", "y", "vencido"]),
+    "desenhar_bicho_de_costas": ("O teu bicho, visto de costas", ["bicho", "cx", "cy", "tamanho"]),
 }
 # tipo da escolha -> as funcoes do mapa desse tipo. (O grupo onde aparecem e
 # as explicacoes gerais sao os mesmos das funcoes da batalha.)
 FUNCOES = {"regra": REGRAS, "evento": ACONTECIMENTOS, "desenho": DESENHOS}
-DO_MAPA = list(REGRAS) + list(ACONTECIMENTOS) + list(DESENHOS)
+# (Esta e da batalha: abre no palco das batalhas, como as do bicharada.py.)
+NA_BATALHA = ["desenhar_bicho_de_costas"]
+DO_MAPA = [nome for nome in list(REGRAS) + list(ACONTECIMENTOS) + list(DESENHOS) if nome not in NA_BATALHA]
 
 # Com estas, o boneco anda de erva em erva, que e onde elas se veem.
-NA_ERVA = ["ha_batalha_na_erva", "escolher_bicho_selvagem"]
+NA_ERVA = ["ha_batalha_na_erva", "escolher_bicho_selvagem", "consegue_apanhar", "ao_apanhar"]
+# Com estas, o boneco atira a rede aos bichos que saltam, em vez de fugir.
+COM_REDE = ["consegue_apanhar", "ao_apanhar"]
 
 SOZINHO = (" O boneco anda sozinho, e foge dos bichos que saltam da erva. Se clicares no jogo e"
            " carregares numa seta, ele espera uns segundos e deixa-te andar a ti.")
@@ -114,6 +138,19 @@ DICAS = {
              " sítio e vê as zonas mudarem. O ponto amarelo és tu: clica no jogo e anda com as setas.",
     "portas": "Estás a ver o mundo todo, em ponto pequeno, e os edifícios por baixo. Cada porta é uma"
               " letra, escrita cá fora e lá dentro. O ponto amarelo és tu: clica no jogo e anda com as setas.",
+    "jogador": "És tu, no mapa: clica no jogo e anda com as setas para te veres de frente, de costas e de lado."
+               " Por cima do código escolhes qual das três imagens queres desenhar ou trocar.",
+    "bicho": "O teu bicho é o de baixo, visto de costas; lá em cima vês-o de frente, na ficha."
+             " Por cima do código escolhes se desenhas a imagem de frente ou a de costas."
+             " Muda um número e vê a ficha lá em cima. Setas e Enter para jogar, Esc para voltar atrás.",
+    "desenho_da_batalha": "Isto é o desenho: muda-o e vês logo, na batalha e em todos os bichos lá em cima."
+                          " Um bicho que tenha imagem de costas mostra a imagem, e não este desenho."
+                          " A batalha joga-se sozinha.",
+    "loja": "Estás ao balcão, com moedas para experimentar: setas e Enter para comprar. Muda um preço, ou"
+            " acrescenta uma coisa, e vê a loja mudar. O que cada coisa faz está na regra «O que se recebe ao comprar».",
+    "treinador": "O treinador fala contigo e depois luta: é o que está nas falas dele. Enter passa as falas"
+                 " (sozinhas também passam), e as setas escolhem a resposta a uma pergunta."
+                 " «Escolher os bichos» mostra os bichos que existem. Depois da luta ele diz as falas_depois.",
     "regra": "Isto é uma regra do mapa: muda-a e o jogo passa a comportar-se de outra maneira."
              " O quadro do canto mostra o que a tua regra responde agora." + SOZINHO,
     "evento": "Tira o pass e escreve o que queres que aconteça nesse momento."
@@ -121,8 +158,8 @@ DICAS = {
     "desenho": "Isto é o desenho: muda-o e vês logo, na zona toda." + SOZINHO,
 }
 
-LEGENDA = "A árvore  ~ água  e erva alta  . relva  # parede  _ soalho  H casa da avó  P partida  1-9 treinadores"
-CONHECIDAS = ".eA~HP#_ 123456789"
+LEGENDA = "A árvore  ~ água  e erva alta  . relva  # parede  _ soalho  H avó  $ loja  P partida  1-9 treinadores"
+CONHECIDAS = ".eA~HP#_ $123456789"
 ZONA = (20, 14)          # quantas letras tem uma zona: por linha, e linhas
 PASSOS = ((0, 1), (0, -1), (1, 0), (-1, 0))      # a ordem e a do passar_a_porta do jogo
 
@@ -199,8 +236,13 @@ class Mundo:
     def e_treinador(self, letra):
         return letra in "123456789" and int(letra) <= self.treinadores
 
+    def contra(self, letra):
+        # As coisas contra as quais se vai, em vez de se passar por cima: uma
+        # casa da avo, o balcao de uma loja, um treinador.
+        return letra == "H" or letra == "$" or self.e_treinador(letra)
+
     def livre(self, letra):
-        if letra in self.portas or letra == "H" or self.e_treinador(letra):
+        if letra in self.portas or self.contra(letra):
             return False
         return bool(self.pode(letra))
 
@@ -229,8 +271,8 @@ class Mundo:
         # Ate onde se chega a pe a partir de um sitio. Devolve tres coisas:
         #   passos   {sitio: quantos passos ate la}
         #   veio     {sitio: (o sitio anterior, o passo dado)}
-        #   contra   {o sitio de uma casa da avo ou de um treinador:
-        #             (o sitio de onde se vai contra ele, o passo)}
+        #   contra   {o sitio de uma casa da avo, de um balcao ou de um
+        #             treinador: (de onde se vai contra ele, o passo)}
         passos = {partida: 0}
         veio = {partida: None}
         contra = {}
@@ -240,7 +282,7 @@ class Mundo:
             for passo in PASSOS:
                 vizinho = self.passo(sitio, passo[0], passo[1])
                 letra = self.letra(*vizinho)
-                if letra == "H" or self.e_treinador(letra):
+                if self.contra(letra):
                     contra.setdefault(vizinho, (sitio, passo))
                     continue
                 if not self.pode(letra):
@@ -298,8 +340,12 @@ def escolhas(fonte):
         return []
     interiores = _interiores(arvore)
     lista = [{"id": "mundo", "grupo": "Mapa", "titulo": "O mundo: como as zonas se juntam"}]
+    if blocos.instrucao(arvore, "JOGADOR") is not None:
+        lista.append({"id": "jogador", "grupo": "Mapa", "titulo": "Tu: o teu boneco"})
     if blocos.instrucao(arvore, "PORTAS") is not None:
         lista.append({"id": "portas", "grupo": "Edifícios", "titulo": "As portas"})
+    if blocos.instrucao(arvore, "LOJA") is not None:
+        lista.append({"id": "loja", "grupo": "Edifícios", "titulo": "A loja: o que se vende"})
     numero = 0
     for nome, _, _ in _zonas_escritas(arvore):
         titulo = nome or "Zona " + str(numero + 1)
@@ -319,6 +365,20 @@ def escolhas(fonte):
     return lista
 
 
+def _juntar_imagens(resposta, ficha, chaves):
+    # Quando uma coisa tem varias imagens, a regiao leva "imagens": o nome
+    # que a Oficina mostra para cada uma, e o ficheiro escrito no codigo.
+    # ("imagem" fica com a primeira, que e a que se abre.)
+    imagens = []
+    for chave, nome in chaves:
+        ficheiro = blocos.valor_da_chave(ficha, chave)
+        if ficheiro is not None:
+            imagens.append({"nome": nome, "ficheiro": ficheiro})
+    if imagens:
+        resposta["imagem"] = imagens[0]["ficheiro"]
+        resposta["imagens"] = imagens
+
+
 def regiao(fonte, escolha):
     # Igual a do bicharada.py, mais o mundo, as portas, as zonas e as funcoes
     # do mapa.
@@ -326,14 +386,18 @@ def regiao(fonte, escolha):
     linhas = fonte.split("\n")
     tipo, _, numero = escolha.partition(":")
 
-    if escolha == "mundo" or escolha == "portas":
+    if escolha in ("mundo", "portas", "loja", "jogador"):
         no = blocos.instrucao(arvore, escolha.upper())
         if no is None:
             return None
-        titulo = "O mundo" if escolha == "mundo" else "As portas"
-        return {"inicio": no.lineno, "fim": no.end_lineno, "titulo": titulo, "imagem": None, "som": None,
-                "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[escolha],
-                "sugestoes": SUGESTOES[escolha]}
+        titulo = {"mundo": "O mundo", "portas": "As portas", "loja": "A loja", "jogador": "Tu"}[escolha]
+        resposta = {"inicio": no.lineno, "fim": no.end_lineno, "titulo": titulo, "imagem": None, "som": None,
+                    "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[escolha],
+                    "sugestoes": SUGESTOES[escolha]}
+        if escolha == "jogador":
+            _juntar_imagens(resposta, no.value, [("imagem", "De frente"), ("imagem_costas", "De costas"),
+                                                 ("imagem_lado", "De lado")])
+        return resposta
 
     if tipo == "zona":
         no = blocos.instrucao(arvore, "ZONAS")
@@ -344,7 +408,8 @@ def regiao(fonte, escolha):
         dentro = nome in _interiores(arvore)
         return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": None, "som": None,
                 "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS["zona"],
-                "sugestoes": SUGESTOES["interior" if dentro else "zona"]}
+                "sugestoes": SUGESTOES["interior" if dentro else "zona"],
+                "apagar": "Apagar este edifício" if dentro else "Apagar esta zona"}
 
     if tipo in FUNCOES and numero in FUNCOES[tipo]:
         no = blocos.funcao(arvore, numero)
@@ -355,11 +420,20 @@ def regiao(fonte, escolha):
             geral = blocos.comentarios_a_partir_de(linhas, inicio)
             if geral and geral != ajuda:
                 ajuda = ajuda + "\n\n" + geral
-        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda, "dica": DICAS[tipo],
+        dica = DICAS["desenho_da_batalha"] if numero in NA_BATALHA else DICAS[tipo]
+        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda, "dica": dica,
                 "titulo": FUNCOES[tipo][numero][0], "imagem": None, "som": None, "sugestoes": SUGESTOES[numero]}
 
     resposta = base.regiao(fonte, escolha)
+    if resposta is not None and tipo == "bicho" and numero.isdigit():
+        # Cada bicho tem duas imagens: de frente e de costas.
+        ficha = base._fichas(blocos.instrucao(arvore, "BICHOS"))[int(numero)][1]
+        _juntar_imagens(resposta, ficha, [("imagem", "De frente"), ("imagem_costas", "De costas")])
+        resposta["dica"] = DICAS["bicho"]
     if resposta is not None and tipo == "treinador" and numero.isdigit():
+        # (Ha caixas para marcar: ve a funcao caixas, mais abaixo.)
+        resposta["caixas"] = True
+        resposta["dica"] = DICAS["treinador"]
         letra = str(int(numero) + 1)
         zonas = _valor(arvore, "ZONAS")
         onde = [nome for nome in zonas if letra in "".join(zonas[nome])] if _sao_zonas(zonas) else []
@@ -572,17 +646,56 @@ def _novo_edificio(fonte):
     return "\n".join(linhas), "zona:" + str(len(mundo.zonas)), aviso
 
 
+def _novo_treinador(fonte):
+    # Aqui um treinador novo nao e copia do primeiro (que e quem da a rede):
+    # e uma ficha simples, com uma fala e o primeiro bicho que houver.
+    arvore = ast.parse(fonte)
+    no = blocos.instrucao(arvore, "TREINADORES")
+    partes = base._fichas(no)
+    bichos = base._fichas(blocos.instrucao(arvore, "BICHOS"))
+    if not partes or not bichos:
+        raise ValueError("não percebi como estão escritos os TREINADORES no ficheiro.")
+    nome = base._nome_livre("Treinador novo", [blocos.valor_da_chave(parte[1], "nome") for parte in partes])
+    linhas = fonte.split("\n")
+    ultima = partes[-1][3]
+    if not linhas[ultima - 1].rstrip().endswith(","):
+        linhas[ultima - 1] = linhas[ultima - 1].rstrip() + ","
+    linhas[ultima:ultima] = [
+        "    {",
+        '        "nome": "' + nome + '",',
+        '        "falas": ["Olá! Ainda não sei o que dizer."],',
+        '        "frase": "Vamos a isto!",',
+        '        "falas_depois": ["Boa luta!"],',
+        '        "cor_fundo": (200, 190, 150),',
+        '        "equipa": [',
+        '            {"bicho": "' + str(bichos[0][0]) + '", "nivel": 5},',
+        "        ],",
+        "    },",
+    ]
+    aviso = 'Criei o "' + nome + '". Escolhe os bichos dele, e muda-lhe o nome e as falas.'
+    return "\n".join(linhas), "treinador:" + str(len(partes)), aviso
+
+
 def novo(fonte, grupo):
     if grupo == "Mapa":
         return _nova_zona(fonte)
     if grupo == "Edifícios":
         return _novo_edificio(fonte)
-    nova, escolha, aviso = base.novo(fonte, grupo)
+    if grupo == "Treinadores":
+        nova, escolha, aviso = _novo_treinador(fonte)
+    else:
+        nova, escolha, aviso = base.novo(fonte, grupo)
     if grupo == "Bichos":
-        aviso = aviso + " E pode saltar da erva, à solta."
+        # (A copia vinha com a imagem de costas do bicho copiado.)
+        linhas = nova.split("\n")
+        nome, _, inicio, fim = base._fichas(blocos.instrucao(ast.parse(nova), "BICHOS"))[-1]
+        for linha in range(inicio - 1, fim):
+            linhas[linha] = re.sub(r'"imagem_costas": "[^"]*"',
+                                   '"imagem_costas": "' + base._ficheiro(nome) + '-costas.png"', linhas[linha])
+        nova = "\n".join(linhas)
+        aviso = aviso.replace(" No jogo inteiro já aparece no ecrã de escolha.", "") + " Pode saltar da erva, à solta."
     if grupo == "Treinadores":
         numero = int(escolha.partition(":")[2]) + 1
-        aviso = aviso.split(" No jogo inteiro")[0]
         nova, zona = _por_treinador(nova, numero)
         if zona is not None:
             aviso = (aviso + " Pu-lo no mapa: é o " + str(numero) + ', na zona "' + zona
@@ -592,6 +705,172 @@ def novo(fonte, grupo):
         else:
             aviso = aviso + " Ainda não está no mapa: numa zona, escreve um " + str(numero) + " onde o quiseres."
     return nova, escolha, aviso
+
+
+# =====================================================================
+#                        CAIXAS PARA MARCAR
+# =====================================================================
+# Ha coisas que no codigo sao um True ou um False, e que na Oficina se
+# marcam numa caixa: aqui, se um treinador da a rede no inicio. Como na
+# lista dos bichos, trabalha-se sobre o codigo que esta no editor.
+#   sem "chave": devolve as caixas e como estao
+#   com "chave": devolve {"codigo": ...} ja com esse valor
+
+CAIXAS = {"da_rede": "Dá a rede no início (sem bichos, em vez de lutar dá uma rede; depois faz uma luta de treino)"}
+
+
+def caixas(fonte, escolha, codigo, chave=None, valor=None):
+    if escolha.partition(":")[0] != "treinador":
+        raise ValueError("aqui não há caixas para marcar.")
+    texto = codigo.rstrip()
+    virgula = texto.endswith(",")
+    if virgula:
+        texto = texto[:-1]
+    try:
+        ficha = ast.parse(texto, mode="eval").body
+    except SyntaxError:
+        raise ValueError("o código tem um erro: corrige-o primeiro, ou carrega em Repor o original.")
+    if not isinstance(ficha, ast.Dict):
+        raise ValueError("não percebi a ficha deste treinador.")
+    valores = {}
+    for k, v in zip(ficha.keys, ficha.values):
+        if blocos.texto_constante(k) in CAIXAS:
+            valores[blocos.texto_constante(k)] = v
+    if chave is None:
+        return {"caixas": [{"chave": qual, "texto": CAIXAS[qual],
+                            "ligada": isinstance(valores.get(qual), ast.Constant) and valores[qual].value is True}
+                           for qual in CAIXAS]}
+    if chave not in CAIXAS:
+        raise ValueError("essa caixa não existe.")
+    linhas = texto.split("\n")
+    escrito = "True" if valor else "False"
+    if chave in valores:
+        no = valores[chave]
+        if no.lineno != no.end_lineno:
+            raise ValueError('não percebi o que está escrito em "' + chave + '".')
+        linha = linhas[no.lineno - 1]
+        linhas[no.lineno - 1] = (linha[:base._coluna(linha, no.col_offset)] + escrito
+                                 + linha[base._coluna(linha, no.end_col_offset):])
+    elif valor:
+        # Ainda nao esta na ficha: vai para uma linha nova, a seguir a primeira coisa dela.
+        primeira = ficha.values[0]
+        modelo = linhas[ficha.keys[0].lineno - 1]
+        margem = modelo[:len(modelo) - len(modelo.lstrip())]
+        if ficha.keys[0].lineno == ficha.lineno:
+            margem = margem + "    "
+        if not linhas[primeira.end_lineno - 1].rstrip().endswith((",", "{")):
+            raise ValueError("não consegui acrescentar à ficha: escreve tu \"" + chave + '": True, numa linha nova.')
+        linhas[primeira.end_lineno:primeira.end_lineno] = [margem + '"' + chave + '": True,']
+    return {"codigo": "\n".join(linhas) + ("," if virgula else "") + codigo[len(codigo.rstrip()):]}
+
+
+# =====================================================================
+#                          APAGAR UMA COISA
+# =====================================================================
+# Os bichos e os ataques apagam-se como na Bicharada. Um treinador tambem,
+# mas aqui tem um numero no mapa: esse numero sai, e os dos treinadores que
+# vinham a seguir descem um. Uma zona (ou o interior de um edificio) sai das
+# ZONAS, do MUNDO e das PORTAS.
+
+def _trocas_nas_zonas(arvore, linhas, mudar, menos=None):
+    # As letras das zonas, no ficheiro, passam por mudar(zona, o texto da
+    # linha), que devolve o texto novo, do mesmo tamanho. Devolve as trocas a
+    # fazer (ve o _aplicar do bicharada.py). "menos" e uma zona onde nao se mexe.
+    trocas = []
+    no = blocos.instrucao(arvore, "ZONAS")
+    for chave, valor in zip(no.value.keys, no.value.values):
+        nome = blocos.texto_constante(chave)
+        if nome == menos or not isinstance(valor, ast.List):
+            continue
+        for fila in valor.elts:
+            antes = blocos.texto_constante(fila)
+            if antes is None or fila.lineno != fila.end_lineno:
+                continue
+            depois = mudar(nome, antes)
+            escrito = linhas[fila.lineno - 1]
+            onde = base._coluna(escrito, fila.col_offset) + 1
+            if depois != antes and len(depois) == len(antes) and escrito[onde:onde + len(antes)] == antes:
+                trocas.append((fila.lineno, onde, onde + len(antes), depois))
+    return trocas
+
+
+def _apagar_treinador(fonte, escolha):
+    numero = int(escolha.partition(":")[2]) + 1
+    arvore, mundo = _ler_mundo(fonte)
+    if mundo is None:
+        return base.apagar(fonte, escolha)
+    quantos = mundo.treinadores
+    desceram = []
+
+    def mudar(nome, texto):
+        nova = ""
+        for lugar, letra in enumerate(texto):
+            if letra in "123456789" and int(letra) == numero:
+                # No lugar dele fica o chao que houver ao lado.
+                letra = "_" if "_" in texto[max(0, lugar - 1):lugar + 2] else "."
+            elif letra in "123456789" and numero < int(letra) <= quantos:
+                desceram.append(letra)
+                letra = str(int(letra) - 1)
+            nova = nova + letra
+        return nova
+
+    linhas = fonte.split("\n")
+    nova = base._aplicar(linhas, [], _trocas_nas_zonas(arvore, linhas, mudar))
+    nova, aviso = base.apagar(nova, escolha)
+    if desceram:
+        aviso = aviso + " No mapa, os treinadores que vinham a seguir passaram a ter o número abaixo."
+    return nova, aviso
+
+
+def _apagar_zona(fonte, escolha):
+    arvore, mundo = _ler_mundo(fonte)
+    partes = _zonas_escritas(arvore)
+    numero = escolha.partition(":")[2]
+    if mundo is None or not numero.isdigit() or int(numero) >= len(partes):
+        raise ValueError("isso não se pode apagar.")
+    nome, inicio, fim = partes[int(numero)]
+    if len(partes) < 2:
+        raise ValueError("tem de haver pelo menos uma zona.")
+    letras = "".join(mundo.zonas[nome])
+    if "P" in letras:
+        raise ValueError("é nesta zona que se começa (tem o P). Muda primeiro o P para outra zona.")
+    linhas = fonte.split("\n")
+    cortes = [(inicio, fim)]
+    trocas = []
+
+    # No MUNDO fica um buraco no lugar dela, para as outras nao mudarem de sitio.
+    no = blocos.instrucao(arvore, "MUNDO")
+    for fila in no.value.elts:
+        for este in fila.elts if isinstance(fila, ast.List) else []:
+            if blocos.texto_constante(este) == nome and este.lineno == este.end_lineno:
+                base._trocar_no(linhas, este, '""', trocas)
+    # As portas que davam para ela saem das PORTAS, e ca fora passam a parede.
+    portas = [letra for letra in mundo.portas if mundo.portas[letra] == nome]
+    no = blocos.instrucao(arvore, "PORTAS")
+    for (chave, primeira, ultima), valor in zip(blocos.entradas(no) or [], no.value.values):
+        if blocos.texto_constante(valor) == nome:
+            cortes.append((primeira, ultima))
+    trocas += _trocas_nas_zonas(arvore, linhas, lambda _, texto: "".join("#" if letra in portas else letra
+                                                                          for letra in texto), menos=nome)
+
+    interior = len(portas) > 0
+    aviso = ('Apaguei o edifício "' if interior else 'Apaguei a zona "') + str(nome) + '".'
+    if interior:
+        aviso = aviso + " Cá fora, onde era a porta ficou parede: as paredes dele continuam lá, podes tirá-las."
+    perdidos = [letra for letra in "123456789" if letra in letras and mundo.e_treinador(letra)]
+    if perdidos:
+        aviso = (aviso + " Os treinadores que lá estavam ficaram sem sítio: escreve o " + " e o ".join(perdidos)
+                 + " noutra zona.")
+    return base._aplicar(linhas, cortes, trocas), aviso
+
+
+def apagar(fonte, escolha):
+    tipo = escolha.partition(":")[0]
+    if tipo == "zona":
+        return _apagar_zona(fonte, escolha)
+    if tipo == "treinador":
+        return _apagar_treinador(fonte, escolha)
+    return base.apagar(fonte, escolha)
 
 
 # =====================================================================
@@ -723,6 +1002,89 @@ def _ver_mundo(ns, treinadores, aberto, problemas, avisos):
                       "um desenho (em Desenhos) ou uma regra.")
 
 
+def _ver_falas(falas, quem, chave, problemas):
+    # As falas de um treinador: uma lista de textos e de perguntas.
+    exemplo = ' Uma pergunta é assim: {"pergunta": "Queres lutar?", "respostas": {"Sim": "Vamos!", "Não": "Adeus."}}.'
+    if not isinstance(falas, list):
+        problemas.append(quem + ': as "' + chave + '" são uma lista de textos, entre [ ].')
+        return
+    for fala in falas:
+        if isinstance(fala, str):
+            continue
+        if not isinstance(fala, dict):
+            problemas.append(quem + ': nas "' + chave + '", cada fala é um texto entre aspas, ou uma pergunta.' + exemplo)
+            return
+        respostas = fala.get("respostas")
+        if not isinstance(fala.get("pergunta"), str) or not isinstance(respostas, dict) or len(respostas) == 0:
+            problemas.append(quem + ': uma pergunta precisa de "pergunta" e de "respostas".' + exemplo)
+            return
+        for resposta, texto in respostas.items():
+            if not isinstance(resposta, str) or not isinstance(texto, str):
+                problemas.append(quem + ": cada resposta é um texto, e à frente dela vai o que ele diz, também um texto.")
+                return
+        if "sem_luta" in fala and fala["sem_luta"] not in respostas:
+            problemas.append(quem + ': o "sem_luta" tem de ser uma das respostas: ' + ", ".join(respostas) + ".")
+
+
+def _ver_conversas(ns, treinadores, aberto, problemas, avisos):
+    # aberto: e um treinador que esta aberto no editor?
+    da_rede = False
+    for ficha in treinadores if isinstance(treinadores, list) else []:
+        if not isinstance(ficha, dict):
+            continue
+        quem = ficha.get("nome") if isinstance(ficha.get("nome"), str) else "Um treinador"
+        for chave in ("falas", "falas_depois", "falas_rede"):
+            if chave in ficha:
+                _ver_falas(ficha[chave], quem, chave, problemas)
+        if "da_rede" in ficha and not isinstance(ficha["da_rede"], bool):
+            problemas.append(quem + ': o "da_rede" é True ou False, sem aspas.')
+        da_rede = da_rede or ficha.get("da_rede") is True
+    comeca_com = ns.get("REDES_INICIAIS")
+    if aberto and not da_rede and not (base._numero(comeca_com) and comeca_com > 0):
+        avisos.append("Nenhum treinador dá a rede no início: sem rede não se apanha o primeiro bicho, "
+                      "e o jogo não anda. Marca a caixa num deles.")
+
+
+def _ver_loja_e_jogador(ns, problemas, avisos):
+    loja = ns.get("LOJA")
+    if not isinstance(loja, dict):
+        problemas.append('A LOJA tem de estar entre { }: {"Sopa": {"preco": 15}}.')
+    else:
+        for nome, ficha in loja.items():
+            if not isinstance(nome, str) or not isinstance(ficha, dict):
+                problemas.append('Na LOJA, cada coisa é um nome entre aspas e a ficha dela: "Sopa": {"preco": 15}.')
+                break
+            base._ver_numero(ficha, "LOJA, " + nome, "preco", 0, 9999, problemas)
+        if len(loja) > 6:
+            avisos.append("Na loja só cabem 6 coisas no ecrã: as outras ficam de fora.")
+    jogador = ns.get("JOGADOR")
+    if not isinstance(jogador, dict):
+        problemas.append("O JOGADOR tem de estar entre { }.")
+        return
+    base._ver_cor(jogador, "JOGADOR", "cor", problemas)
+    for chave in ("imagem", "imagem_costas", "imagem_lado"):
+        if chave in jogador:
+            _ver_imagem(jogador, "JOGADOR", chave, ns, problemas)
+    for nome, ficha in ns["BICHOS"].items() if isinstance(ns.get("BICHOS"), dict) else []:
+        if isinstance(ficha, dict) and "imagem_costas" in ficha:
+            _ver_imagem(ficha, str(nome), "imagem_costas", ns, problemas)
+
+
+def _ver_imagem(ficha, quem, chave, ns, problemas):
+    # Como no bicharada.py, para uma chave qualquer: se o ficheiro existe mas
+    # nao e uma imagem, o jogo para ao desenhar.
+    nome = ficha[chave]
+    if not isinstance(nome, str) or nome.strip() == "":
+        problemas.append(quem + ': a "' + chave + '" é o nome de um ficheiro, entre aspas, como "bicho.png".')
+        return
+    try:
+        caminho = ns["PASTA_ASSETS"] / "imagens" / nome
+        if caminho.exists():
+            ns["pygame"].image.load(caminho)
+    except Exception:
+        problemas.append(quem + ': não consegui abrir a imagem "' + nome + '". É mesmo uma imagem (PNG)?')
+
+
 def _sem_deixar_marcas(ns, funcao):
     # Corre uma funcao do jogo so para ver o que ela responde: o que ela
     # disser, e o que guardar na memoria, nao fica la.
@@ -758,6 +1120,17 @@ def _experimentar(ns, regra, problemas):
         if not _e_um_bicho(ns, valor):
             problemas.append("escolher_bicho_selvagem tem de devolver um bicho feito com criar_bicho(nome, nivel). "
                              "Devolveu " + repr(valor)[:60] + ".")
+    elif regra == "consegue_apanhar":
+        modelo = ns["criar_bicho"](list(ns["BICHOS"])[0], 3)
+        _sem_deixar_marcas(ns, lambda: ns["consegue_apanhar"](modelo))
+    elif regra == "premio_da_batalha":
+        equipa = [ns["criar_bicho"](list(ns["BICHOS"])[0], 3)]
+        for selvagem in (True, False):
+            valor = _sem_deixar_marcas(ns, lambda: ns["premio_da_batalha"](equipa, selvagem))
+            if not base._numero(valor) or valor < 0:
+                problemas.append("premio_da_batalha tem de devolver um número de moedas (zero ou mais). Devolveu "
+                                 + repr(valor)[:40] + ".")
+                break
 
 
 # =====================================================================
@@ -769,9 +1142,14 @@ class Palco(base.Palco):
     def __init__(self, escolha):
         super().__init__(escolha)
         # no_mapa: o palco e o mapa, e nao uma batalha.
-        self.dados = self.tipo in ("zona", "mundo", "portas")     # anda so a crianca
+        self.dados = self.tipo in ("zona", "mundo", "portas", "loja", "jogador")     # anda so a crianca
         self.de_cima = self.tipo in ("mundo", "portas")           # ve-se o mundo todo, pequeno
         self.no_mapa = self.dados or self.regra in DO_MAPA
+        # Um treinador abre num palco so dele: fala e depois luta (ve as cenas).
+        self.falador = self.tipo == "treinador"
+        self.cena = None
+        self.pausa = 0
+        self.ultima_compra = ""
         self.caminho = []            # os passos que o boneco vai dar: [(de onde, o passo), ...]
         self.voltas = 0
         self.relogio = 0
@@ -780,7 +1158,9 @@ class Palco(base.Palco):
     def verificar(self, ns):
         problemas, avisos = super().verificar(ns)
         _ver_funcoes(ns, problemas)
-        _ver_mundo(ns, self.ler(ns, "TREINADORES"), self.dados, problemas, avisos)
+        _ver_mundo(ns, self.ler(ns, "TREINADORES"), self.tipo in ("zona", "mundo", "portas"), problemas, avisos)
+        _ver_conversas(ns, self.ler(ns, "TREINADORES"), self.falador, problemas, avisos)
+        _ver_loja_e_jogador(ns, problemas, avisos)
         if self.regra in REGRAS and self.preparado and not problemas:
             _experimentar(ns, self.regra, problemas)
         return problemas, avisos
@@ -788,16 +1168,24 @@ class Palco(base.Palco):
     # --- Preparar e voltar a preparar ---
 
     def preparar(self, ns, pygame):
-        if not self.no_mapa:
+        if not self.no_mapa and not self.falador:
             super().preparar(ns, pygame)
             return
         self.letra = pygame.font.SysFont(None, 22)
         self.letra_pequena = pygame.font.SysFont(None, 18)
         self.preparado = True
         self.arrumar(ns)
-        self.passeio(ns, None)
+        if self.falador:
+            self.comecar_cena(ns, self.cenas(ns)[0], None)
+        else:
+            self.passeio(ns, None)
 
     def ao_mudar(self, ns):
+        if self.falador:
+            if self.preparado:
+                self.arrumar(ns)
+                self.comecar_cena(ns, self.cenas(ns)[0], None)
+            return
         if not self.no_mapa:
             super().ao_mudar(ns)
             return
@@ -816,7 +1204,7 @@ class Palco(base.Palco):
 
     def arrumar(self, ns):
         super().arrumar(ns)
-        if not self.no_mapa:
+        if not self.no_mapa and not self.falador:
             return
         # O palco das batalhas fica so com um treinador. No mapa estao todos,
         # cada um sem os bichos que ja nao existem.
@@ -853,6 +1241,11 @@ class Palco(base.Palco):
         ns["comecar_mundo"]()
         # (Sem a caixa que explica as teclas: tapava o fundo do mapa.)
         ns["aviso"] = noticia or ""
+        # No palco anda-se como a meio do jogo: com bichos, redes e moedas.
+        ns["redes"] = 5
+        ns["moedas"] = 100
+        if self.tipo == "loja":
+            ns["abrir_loja"]()
         if self.tipo == "zona":
             nomes = list(ns["ZONAS"])
             nome = nomes[min(self.numero, len(nomes) - 1)]
@@ -867,6 +1260,101 @@ class Palco(base.Palco):
                     ns["descanso"][chave] = ns["jogador"][chave]
         self.caminho = []
         self.redesenhar = True
+
+    # --- O treinador que fala, e depois luta ---
+    # Um treinador aberto mostra-se em cenas, umas a seguir as outras, com as
+    # funcoes do jogo: (se e ele que da a rede) a conversa em que a da, a
+    # quem ainda nao tem bichos; depois as falas e a luta; e, ganha a luta,
+    # as falas de depois. E volta ao principio.
+
+    def cenas(self, ns):
+        ficha = ns["TREINADORES"][self.quem(ns)]
+        if ficha.get("da_rede") is True:
+            return ["rede", "luta", "depois"]
+        return ["luta", "depois"]
+
+    def quem(self, ns):
+        return min(self.numero, len(ns["TREINADORES"]) - 1)
+
+    def comecar_cena(self, ns, cena, noticia):
+        numero = self.quem(ns)
+        self.cena = cena
+        self.pausa = 0
+        self.espera = 110
+        self.voltas = self.voltas + 1
+        equipa = []
+        for nome in self.equipa:
+            equipa.append(ns["criar_bicho"](nome, self.nivel))
+        ns["minha_equipa"] = equipa
+        ns["comecar_mundo"]()
+        ns["aviso"] = noticia or ""
+        ns["sopas"] = ns["SOPAS_NA_MOCHILA"]
+        # O boneco fica ao lado do treinador, se ele estiver no mapa.
+        este = self.mundo(ns)
+        sitio = este.encontrar(str(numero + 1), list(ns["ZONAS"])) if numero < 9 else None
+        if sitio is not None:
+            for passo, olha in zip(PASSOS, ("cima", "baixo", "esquerda", "direita")):
+                vizinho = este.passo(sitio, passo[0], passo[1])
+                if vizinho[0] != "" and este.livre(este.letra(*vizinho)):
+                    ns["ir_para"](*vizinho)
+                    ns["jogador"]["olha"] = olha
+                    break
+        if cena == "rede":
+            ns["minha_equipa"] = []
+            ns["redes"] = 0
+        elif cena == "depois":
+            ns["treinadores_vencidos"].append(numero)
+        ns["desafiar"](numero)
+        self.redesenhar = True
+
+    def quadro_do_falador(self, ns, pygame):
+        if not self.preparado:
+            self.preparar(ns, pygame)
+        teclas = pygame.key.get_pressed()
+        for tecla in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN, pygame.K_RETURN,
+                      pygame.K_SPACE, pygame.K_ESCAPE, pygame.K_BACKSPACE):
+            if teclas[tecla]:
+                self.maos = 300
+        if self.maos > 0:
+            self.maos = self.maos - 1
+
+        cenas = self.cenas(ns)
+        estado = ns["estado"]
+        if estado == "conversa":
+            # As falas passam sozinhas, devagar, se a crianca nao as passar.
+            self.pausa = 0
+            self.espera = self.espera - 1
+            if self.espera <= 0 and self.maos == 0:
+                fala = ns["conversa"][0]
+                if not isinstance(fala, str):
+                    ns["cursor"] = self.voltas % len(fala["respostas"])     # ora uma resposta, ora outra
+                ns["tecla_na_conversa"](pygame.K_RETURN)
+                self.espera = 110
+                self.redesenhar = True
+        elif estado == "derrota":
+            self.comecar_cena(ns, "luta", "A tua equipa desmaiou... Vamos outra vez!")
+        elif estado != "batalha":
+            # A cena acabou (ou a luta, ou a conversa sem luta): passa-se a seguinte.
+            self.pausa = self.pausa + 1
+            if self.pausa > 90 and self.maos == 0:
+                seguinte = cenas[(cenas.index(self.cena) + 1) % len(cenas)] if self.cena in cenas else cenas[0]
+                if seguinte == "depois" and self.quem(ns) not in ns["treinadores_vencidos"]:
+                    seguinte = cenas[0]          # nao houve luta: nao ha "depois"
+                self.comecar_cena(ns, seguinte, None)
+
+        estado = ns["estado"]
+        if self.redesenhar:
+            if estado == "conversa":
+                ns["desenhar_conversa"]()
+            elif estado == "batalha":
+                ns["desenhar_batalha"]()
+            elif estado == "mundo":
+                ns["desenhar_mundo"]()
+            self.redesenhar = False
+        ficha = ns["TREINADORES"][self.quem(ns)]
+        partes = [membro["bicho"] + " nv " + str(membro["nivel"]) for membro in ficha["equipa"]]
+        nomes = {"rede": "a dar a rede", "luta": "antes da luta, e a luta", "depois": "depois de lhe ganhares"}
+        self.faixa(ns, pygame, ficha["nome"] + " (" + nomes.get(self.cena, "") + "):   " + ",  ".join(partes))
 
     # --- O boneco que anda sozinho ---
 
@@ -885,6 +1373,19 @@ class Palco(base.Palco):
             # Ate a casa da avo mais perto: o ultimo passo e contra ela.
             casa = min(casas, key=lambda sitio: passos[contra[sitio][0]])
             return _caminho(veio, contra[casa][0]) + [contra[casa]]
+        if self.regra == "ao_responder":
+            # De treinador em treinador, para lhes responder as perguntas.
+            treinadores = sorted([sitio for sitio in contra if este.e_treinador(este.letra(*sitio))],
+                                 key=lambda sitio: passos[contra[sitio][0]])
+
+            def pergunta(sitio):
+                falas = ns["TREINADORES"][int(este.letra(*sitio)) - 1].get("falas")
+                return isinstance(falas, list) and any(isinstance(fala, dict) for fala in falas)
+            # (De preferencia os que fazem perguntas, que e o que aqui se quer ver.)
+            treinadores = [sitio for sitio in treinadores if pergunta(sitio)] or treinadores
+            if treinadores:
+                treinador = treinadores[self.voltas % min(2, len(treinadores))]
+                return _caminho(veio, contra[treinador][0]) + [contra[treinador]]
         alvos = [sitio for sitio in passos if sitio != aqui]
         if self.regra in NA_ERVA:
             alvos = [sitio for sitio in alvos if este.letra(*sitio) == "e"] or alvos
@@ -921,13 +1422,48 @@ class Palco(base.Palco):
             return
         if ns["estado"] == "mundo":
             if not self.dados:               # numa zona anda so a crianca
+                # (Para haver sempre lugar na equipa e redes para atirar.)
+                if len(ns["minha_equipa"]) >= ns["EQUIPA_MAXIMA"]:
+                    del ns["minha_equipa"][3:]
+                ns["redes"] = max(ns["redes"], 3)
+                if self.regra == "receber_compra" and self.relogio % 150 == 149 and len(ns["LOJA"]) > 0:
+                    # De vez em quando compra-se uma coisa, para se ver o que se recebe.
+                    nomes = list(ns["LOJA"])
+                    nome = nomes[(self.relogio // 150) % len(nomes)]
+                    ns["moedas"] = max(ns["moedas"], 100)
+                    self.ultima_compra = str(ns["comprar"](nome))
                 self.andar_sozinho(ns)
+        elif ns["estado"] == "conversa":
+            # As falas passam sozinhas, e as perguntas respondem-se ora com
+            # uma resposta, ora com outra.
+            self.espera = self.espera - 1
+            if self.espera <= 0:
+                fala = ns["conversa"][0]
+                if not isinstance(fala, str):
+                    ns["cursor"] = self.voltas % len(fala["respostas"])
+                ns["tecla_na_conversa"](pygame.K_RETURN)
+                self.espera = 80
+        elif ns["estado"] == "loja":
+            if self.tipo != "loja":
+                ns["fechar_loja"]()
+        elif ns["estado"] == "encontro":
+            ns["voltar_ao_mundo"]()
         elif ns["estado"] == "batalha":
-            if ns["batalha_selvagem"] and ns["fase"] == "menu" and "Fugir" in ns["OPCOES_MENU"]:
-                # De um bicho a solta foge-se, para voltar depressa ao mapa.
+            if self.regra == "ao_responder" and not ns["batalha_selvagem"]:
+                ns["voltar_ao_mundo"]()      # aqui interessa a conversa, e nao a luta
+            elif ns["batalha_selvagem"] and ns["fase"] == "menu" and "Fugir" in ns["opcoes_do_menu"]():
+                # De um bicho a solta foge-se, para voltar depressa ao mapa
+                # (ou atira-se-lhe a rede, se e isso que se quer ver).
                 self.espera = self.espera - 1
                 if self.espera <= 0:
-                    ns["cursor"] = ns["OPCOES_MENU"].index("Fugir")
+                    opcao = "Apanhar" if self.regra in COM_REDE and "Apanhar" in ns["opcoes_do_menu"]() else "Fugir"
+                    if opcao == "Apanhar":
+                        # (Ja magoado, como se tivesse havido luta: com a vida
+                        # toda, a regra original nao deixa apanhar.)
+                        bicho = ns["equipa_inimiga"][ns["ativo_inimigo"]]
+                        if bicho["vida"] == bicho["vida_max"]:
+                            bicho["vida"] = max(1, bicho["vida_max"] // 3)
+                    ns["cursor"] = ns["opcoes_do_menu"]().index(opcao)
                     ns["tecla_na_batalha"](pygame.K_RETURN)
                     self.espera = 40
             else:
@@ -967,9 +1503,36 @@ class Palco(base.Palco):
                 if min(niveis[nome]) != max(niveis[nome]):
                     nivel = nivel + " a " + str(max(niveis[nome]))
                 linhas.append((nome + " (" + nivel + "): " + str(len(niveis[nome])) + " vezes", ns["BRANCO"]))
+        elif self.regra == "consegue_apanhar":
+            linhas.append(("Em 100 redes atiradas, apanhava-se:", ns["AMARELO"]))
+            for nome, fracao in (("com a vida toda", 1.0), ("com metade da vida", 0.5), ("quase sem vida", 0.1)):
+                modelo = ns["criar_bicho"](list(ns["BICHOS"])[0], self.nivel)
+                modelo["vida"] = max(1, int(modelo["vida_max"] * fracao))
+
+                def cem_redes():
+                    return len([1 for _ in range(100) if ns["consegue_apanhar"](modelo)])
+                linhas.append((nome + ": " + str(_sem_deixar_marcas(ns, cem_redes)), ns["BRANCO"]))
+        elif self.regra == "premio_da_batalha":
+            linhas.append(("Quantas moedas dá ganhar a:", ns["AMARELO"]))
+            modelo = [ns["criar_bicho"](list(ns["BICHOS"])[0], 4)]
+            linhas.append(("um bicho à solta de nível 4: "
+                           + str(_sem_deixar_marcas(ns, lambda: ns["premio_da_batalha"](modelo, True))), ns["BRANCO"]))
+            for ficha in ns["TREINADORES"][:6]:
+                equipa = [ns["criar_bicho"](membro["bicho"], membro["nivel"]) for membro in ficha["equipa"]]
+                linhas.append((ficha["nome"] + ": "
+                               + str(_sem_deixar_marcas(ns, lambda: ns["premio_da_batalha"](equipa, False))), ns["BRANCO"]))
+        elif self.regra == "receber_compra":
+            linhas.append(("Na mochila:", ns["AMARELO"]))
+            linhas.append(("Sopas " + str(ns["sopas"]) + "   Redes " + str(ns["redes"]) + "   Moedas "
+                           + str(ns["moedas"]), ns["BRANCO"]))
+            for nome in list(ns["LOJA"])[:5]:
+                linhas.append((nome + ": " + str(ns["LOJA"][nome].get("preco")) + " moedas", ns["CINZA"]))
+            if self.ultima_compra:
+                linhas.append((self.ultima_compra, ns["VERDE"]))
         elif self.tipo == "evento":
-            linhas.append(("Passos: " + str(ns["jogador"]["passos"]) + "    Sopas: " + str(ns["sopas"]),
-                           ns["BRANCO"]))
+            linhas.append(("Passos: " + str(ns["jogador"]["passos"]) + "    Sopas: " + str(ns["sopas"])
+                           + "    Redes: " + str(ns["redes"]) + "    Moedas: " + str(ns["moedas"]), ns["BRANCO"]))
+            linhas.append(("Bichos na equipa: " + str(len(ns["minha_equipa"])), ns["BRANCO"]))
             linhas.append(("O que está na memoria:", ns["AMARELO"]))
             for chave in list(ns["memoria"])[:6]:
                 linhas.append((str(chave) + ": " + str(ns["memoria"][chave])[:30], ns["BRANCO"]))
@@ -980,6 +1543,9 @@ class Palco(base.Palco):
     # --- Todos os frames ---
 
     def quadro(self, ns, pygame):
+        if self.falador:
+            self.quadro_do_falador(ns, pygame)
+            return
         if not self.no_mapa:
             super().quadro(ns, pygame)
             return
@@ -989,10 +1555,12 @@ class Palco(base.Palco):
         if ns["estado"] == "derrota":
             ns["acordar_em_casa"]()
             self.redesenhar = True
-        elif ns["estado"] != "mundo" and ns["estado"] != "batalha":
+        elif ns["estado"] not in ("mundo", "batalha", "conversa", "loja", "encontro"):
             self.passeio(ns, "Ganhaste a todos os treinadores! Vamos outra vez.")
-        if self.de_cima and ns["estado"] == "batalha":
-            ns["voltar_ao_mundo"]()      # visto de cima nao ha batalhas: nao se viam
+        if self.de_cima and ns["estado"] != "mundo":
+            ns["voltar_ao_mundo"]()      # visto de cima nao ha batalhas nem conversas: nao se viam
+        if self.tipo == "loja" and ns["estado"] == "mundo":
+            ns["abrir_loja"]()           # aqui esta-se sempre ao balcao
 
         antes = ns["estado"]
         self.jogar_no_mapa(ns, pygame)
@@ -1012,11 +1580,16 @@ class Palco(base.Palco):
                 ns["desenhar_mundo"]()
             elif ns["estado"] == "batalha":
                 ns["desenhar_batalha"]()
+            elif ns["estado"] == "loja":
+                ns["desenhar_loja"]()
+            elif ns["estado"] == "conversa":
+                ns["desenhar_conversa"]()
         self.redesenhar = False
         self.desenhar_no_mapa(ns, pygame)
 
     def cor_da_letra(self, ns, letra):
         cores = {"A": ns["COPA"], "~": ns["AGUA"], "e": ns["ERVA_ALTA"], "H": ns["TELHADO"], "P": ns["AMARELO"],
+                 "$": ns["AMARELO"],
                  "#": ns["PAREDE"], "_": ns["SOALHO"], " ": ns["PRETO"]}
         if letra in ns["PORTAS"]:
             return ns["TRONCO"]
@@ -1094,21 +1667,14 @@ class Palco(base.Palco):
             texto = "O mundo visto de cima. O ponto amarelo és tu: clica aqui e anda com as setas."
         elif self.tipo == "portas":
             texto = "O mundo e os edifícios, vistos de cima. As portas são os quadrados castanhos."
+        elif self.tipo == "loja":
+            texto = "A loja: setas e Enter para comprar. Aqui tens sempre moedas para experimentar."
+        elif self.tipo == "jogador":
+            texto = "Tu, no mapa: anda com as setas para te veres de frente, de costas e de lado."
         else:
             genero = {"regra": "Regra", "evento": "Acontecimento", "desenho": "Desenho"}[self.tipo]
             texto = genero + ":   " + FUNCOES[self.tipo][self.regra][0] + "   (a função " + self.regra + ")"
-        # No mapa a faixa fica em baixo, para nao tapar a primeira linha de
-        # quadrados. Numa batalha fica em cima, como no palco das batalhas.
-        y = 0
-        if ns["estado"] == "mundo":
-            y = ns["ALTURA"] - 40
-        altura = 40 if y > 0 else 32
-        pygame.draw.rect(ecra, ns["PAINEL"], (0, y, ns["LARGURA"], altura))
-        pygame.draw.rect(ecra, ns["AMARELO"], (0, y, 6, altura))
-        desenho = self.letra.render(texto, True, ns["BRANCO"])
-        if desenho.get_width() > ns["LARGURA"] - 30:
-            desenho = self.letra_pequena.render(texto, True, ns["BRANCO"])
-        ecra.blit(desenho, (18, y + (altura - desenho.get_height()) // 2))
+        self.faixa(ns, pygame, texto)
 
         linhas = self.quadro_de_contas
         if ns["estado"] != "mundo" or len(linhas) == 0:
@@ -1122,6 +1688,54 @@ class Palco(base.Palco):
         for desenho in desenhos:
             ecra.blit(desenho, (caixa.x + 10, y), (0, 0, caixa.width - 20, 17))
             y = y + 17
+
+
+    def faixa(self, ns, pygame, texto):
+        # A faixa do palco, com o que esta aberto. No mapa fica em baixo, para
+        # nao tapar a primeira linha de quadrados. Numa batalha fica em cima,
+        # como no palco das batalhas.
+        ecra = ns["ecra"]
+        y = ns["ALTURA"] - 40
+        if ns["estado"] in ("batalha", "encontro"):
+            y = 0
+        altura = 40 if y > 0 else 32
+        pygame.draw.rect(ecra, ns["PAINEL"], (0, y, ns["LARGURA"], altura))
+        pygame.draw.rect(ecra, ns["AMARELO"], (0, y, 6, altura))
+        desenho = self.letra.render(texto, True, ns["BRANCO"])
+        if desenho.get_width() > ns["LARGURA"] - 30:
+            desenho = self.letra_pequena.render(texto, True, ns["BRANCO"])
+        ecra.blit(desenho, (18, y + (altura - desenho.get_height()) // 2), (0, 0, ns["LARGURA"] - 30, altura))
+
+    # --- O desenho que e da batalha ---
+
+    def desenhar(self, ns, pygame):
+        # (O palco das batalhas so conhece as funcoes do bicharada.py.)
+        if self.regra not in NA_BATALHA:
+            super().desenhar(ns, pygame)
+            return
+        ecra = ns["ecra"]
+        pygame.draw.rect(ecra, ns["PAINEL"], (0, 0, ns["LARGURA"], 32))
+        pygame.draw.rect(ecra, ns["AMARELO"], (0, 0, 6, 32))
+        texto = "Desenho:   " + FUNCOES[self.tipo][self.regra][0] + "   (a função " + self.regra + ")"
+        ecra.blit(self.letra.render(texto, True, ns["BRANCO"]), (18, 9))
+        if ns["fase"] != "equipa" and ns["estado"] == "batalha":
+            self.mostrar_montra(ns, pygame)
+
+    def mostrar_montra(self, ns, pygame):
+        if self.regra not in NA_BATALHA:
+            super().mostrar_montra(ns, pygame)
+            return
+        # Todos os bichos, pequenos e de costas, para se ver o desenho em todos.
+        ecra = ns["ecra"]
+        caixa = pygame.Rect(352, 40, 436, 66)
+        pygame.draw.rect(ecra, ns["PAINEL"], caixa, border_radius=6)
+        pygame.draw.rect(ecra, ns["AMARELO"], caixa, 2, border_radius=6)
+        passo = min(60, (caixa.width - 16) // max(1, len(self.montra)))
+        x = caixa.x + 8 + passo // 2
+        for modelo in self.montra:
+            if modelo["nome"] in ns["BICHOS"]:
+                ns["desenhar_bicho_de_costas"](modelo, x, caixa.centery, 40)
+            x = x + passo
 
 
 def criar_palco(escolha):
