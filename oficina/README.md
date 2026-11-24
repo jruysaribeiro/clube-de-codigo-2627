@@ -123,6 +123,16 @@ microfone, até 3 segundos; o browser pede autorização da primeira vez). Os
 sons ficam em `comum/assets/sons/`, e o jogo guarda os que já leu em
 `sons_carregados`, como faz com as imagens.
 
+- No **Desenhar** há ainda: a grelha de **16×16** ou de **32×32**
+  (passa-se de uma para a outra sem perder o desenho); **Espelhar**, que o
+  vira da esquerda para a direita; **Trocar cor**, que muda de uma vez todos
+  os quadradinhos de uma cor; e, nas coisas com várias imagens, **Copiar o
+  desenho** de outra (a de costas a começar pela de frente).
+- Com o ajudante ligado, o **Desenhar** tem uma caixa para descrever o boneco
+  («um galo vermelho») e o botão **Pedir ao ajudante**: o que ele desenhar
+  fica na grelha, para retocar. Um modelo de texto desenha mal: sai um
+  rascunho, uns melhores do que outros. (`INSTRUCOES_DO_DESENHO` e
+  `desenho()`, no `ajudante.py`.)
 - A imagem é encolhida para um quadrado pequeno e guardada em
   `comum/assets/imagens/`, com o nome que está no código. Mudar o nome no
   código é escolher outro ficheiro.

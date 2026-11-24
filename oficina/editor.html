@@ -150,6 +150,8 @@
   #cor-livre { width: 44px; height: 32px; padding: 0; border: 1px solid var(--linha); border-radius: 6px; background: none; }
   #desenho .fim { margin-top: auto; display: flex; gap: 8px; }
   #guardar-desenho { border-color: var(--verde); color: var(--verde); font-weight: 600; }
+  #pedido-desenho { flex: 1; min-width: 150px; font-size: 14px; padding: 6px 8px; background: var(--fundo, #14141f); color: inherit; border: 1px solid var(--linha); border-radius: 6px; }
+  #fala-desenho { margin: 0; font-size: 13px; color: var(--fraco); }
   .coisas button.novo { border-style: dashed; color: var(--amarelo); }
 
   .caixa { flex: 1; min-height: 140px; display: flex; background: #10101a; overflow: hidden; }
@@ -333,9 +335,24 @@
       <div class="ferramentas">
         <button type="button" id="lapis" class="escolhida">Lápis</button>
         <button type="button" id="balde">Balde</button>
+        <button type="button" id="trocar-cor" title="Carrega numa cor do desenho: todos os quadradinhos dessa cor passam a ter a cor escolhida">Trocar cor</button>
         <button type="button" id="borracha">Borracha</button>
+      </div>
+      <div class="ferramentas">
+        <button type="button" id="espelhar" title="Vira o desenho ao contrário, da esquerda para a direita">Espelhar</button>
         <button type="button" id="limpar-desenho">Apagar tudo</button>
       </div>
+      <div class="ferramentas">
+        <span>Quadradinhos:</span>
+        <button type="button" id="grelha-16" class="escolhida">16×16</button>
+        <button type="button" id="grelha-32">32×32</button>
+      </div>
+      <div class="ferramentas" id="copiar-de" hidden></div>
+      <form class="ferramentas" id="pedir-desenho" hidden>
+        <input id="pedido-desenho" maxlength="200" autocomplete="off" placeholder="Descreve o boneco: «um galo vermelho»" aria-label="O que o ajudante deve desenhar">
+        <button id="fazer-desenho">Pedir ao ajudante</button>
+      </form>
+      <p id="fala-desenho" hidden></p>
       <div class="fim">
         <button type="button" id="guardar-desenho">Pôr no jogo</button>
         <button type="button" id="fechar-desenho">Cancelar</button>
@@ -1078,7 +1095,8 @@ $("tirar-imagem").onclick = async () => {
 // Uma grelha de quadradinhos para pintar. O desenho vai para o jogo pelo
 // mesmo caminho de uma imagem escolhida do computador.
 
-const QUADRADINHOS = 16;
+let quadradinhos = 16;         // de lado: 16 ou 32
+const LADO_DO_DESENHO = 128;   // o PNG que vai para o jogo, seja qual for a grelha
 const CORES_DA_PALETA = ["#000000", "#ffffff", "#9a9ab4", "#5a3c28", "#e03c3c", "#ff8a3c", "#f0c846", "#5fd07a",
                          "#2e8b57", "#46b4e6", "#3c5adc", "#9b5ade", "#ff78b4", "#ffd2aa", "#784628", "#283250"];
 let pixeis = [];               // a cor de cada quadradinho, ou null (transparente)
@@ -1089,13 +1107,15 @@ let aPintar = false;
 function desenharGrelha() {
   const tela = $("grelha");
   const pincel = tela.getContext("2d");
-  const lado = tela.width / QUADRADINHOS;
-  for (let i = 0; i < QUADRADINHOS * QUADRADINHOS; i++) {
-    const x = i % QUADRADINHOS, y = Math.floor(i / QUADRADINHOS);
+  const lado = tela.width / quadradinhos;
+  for (let i = 0; i < quadradinhos * quadradinhos; i++) {
+    const x = i % quadradinhos, y = Math.floor(i / quadradinhos);
     // sem cor: um xadrez, para se ver que e transparente
     pincel.fillStyle = pixeis[i] || ((x + y) % 2 ? "#2c2c44" : "#1e1e30");
     pincel.fillRect(x * lado, y * lado, lado, lado);
   }
+  $("grelha-16").classList.toggle("escolhida", quadradinhos === 16);
+  $("grelha-32").classList.toggle("escolhida", quadradinhos === 32);
 }
 
 function encher(inicio, cor) {
@@ -1107,28 +1127,67 @@ function encher(inicio, cor) {
     const i = fila.pop();
     if (pixeis[i] !== antiga) continue;
     pixeis[i] = cor;
-    const x = i % QUADRADINHOS;
+    const x = i % quadradinhos;
     if (x > 0) fila.push(i - 1);
-    if (x < QUADRADINHOS - 1) fila.push(i + 1);
-    if (i >= QUADRADINHOS) fila.push(i - QUADRADINHOS);
-    if (i < QUADRADINHOS * (QUADRADINHOS - 1)) fila.push(i + QUADRADINHOS);
+    if (x < quadradinhos - 1) fila.push(i + 1);
+    if (i >= quadradinhos) fila.push(i - quadradinhos);
+    if (i < quadradinhos * (quadradinhos - 1)) fila.push(i + quadradinhos);
   }
+}
+
+function trocarCor(inicio, cor) {
+  // Todos os quadradinhos com a cor deste, estejam onde estiverem, passam a
+  // ter a cor escolhida: a camisola vermelha fica azul de uma vez.
+  const antiga = pixeis[inicio];
+  if (antiga === null || antiga === cor) return;
+  for (let i = 0; i < pixeis.length; i++) if (pixeis[i] === antiga) pixeis[i] = cor;
+}
+
+function espelhar() {
+  // Vira o desenho da esquerda para a direita.
+  const novos = new Array(pixeis.length);
+  for (let i = 0; i < pixeis.length; i++) {
+    const x = i % quadradinhos, y = Math.floor(i / quadradinhos);
+    novos[y * quadradinhos + (quadradinhos - 1 - x)] = pixeis[i];
+  }
+  pixeis = novos;
+  desenharGrelha();
+}
+
+function mudarGrelha(novo) {
+  // De 16 para 32, cada quadradinho passa a quatro iguais: o desenho fica
+  // igual, com espaco para mais pormenor. De 32 para 16 fica-se com um de
+  // cada quatro, e perde-se pormenor.
+  if (novo === quadradinhos) return;
+  if (novo < quadradinhos && pixeis.some(cor => cor !== null)
+      && !confirm("Passar para 16×16?\n\nO desenho fica com menos pormenor.")) return;
+  const novos = new Array(novo * novo).fill(null);
+  for (let y = 0; y < novo; y++) {
+    for (let x = 0; x < novo; x++) {
+      const xa = Math.floor(x * quadradinhos / novo), ya = Math.floor(y * quadradinhos / novo);
+      novos[y * novo + x] = pixeis[ya * quadradinhos + xa];
+    }
+  }
+  quadradinhos = novo;
+  pixeis = novos;
+  desenharGrelha();
 }
 
 function pintar_quadradinho(ev) {
   const caixa = $("grelha").getBoundingClientRect();
-  const x = Math.floor((ev.clientX - caixa.left) * QUADRADINHOS / caixa.width);
-  const y = Math.floor((ev.clientY - caixa.top) * QUADRADINHOS / caixa.height);
-  if (x < 0 || y < 0 || x >= QUADRADINHOS || y >= QUADRADINHOS) return;
-  const i = y * QUADRADINHOS + x;
+  const x = Math.floor((ev.clientX - caixa.left) * quadradinhos / caixa.width);
+  const y = Math.floor((ev.clientY - caixa.top) * quadradinhos / caixa.height);
+  if (x < 0 || y < 0 || x >= quadradinhos || y >= quadradinhos) return;
+  const i = y * quadradinhos + x;
   if (ferramenta === "balde") encher(i, corDoLapis);
+  else if (ferramenta === "trocar-cor") trocarCor(i, corDoLapis);
   else pixeis[i] = ferramenta === "borracha" ? null : corDoLapis;
   desenharGrelha();
 }
 
 function escolherFerramenta(nome) {
   ferramenta = nome;
-  for (const id of ["lapis", "balde", "borracha"]) $(id).classList.toggle("escolhida", id === nome);
+  for (const id of ["lapis", "balde", "trocar-cor", "borracha"]) $(id).classList.toggle("escolhida", id === nome);
 }
 
 function escolherCor(cor) {
@@ -1137,26 +1196,97 @@ function escolherCor(cor) {
   if (ferramenta === "borracha") escolherFerramenta("lapis");
 }
 
+function lerImagem(imagem, lado) {
+  // As cores de uma imagem, encolhida para uma grelha com esse lado.
+  const tela = document.createElement("canvas");
+  tela.width = tela.height = lado;
+  const pincel = tela.getContext("2d");
+  pincel.imageSmoothingEnabled = imagem.width > lado * 8;
+  pincel.drawImage(imagem, 0, 0, lado, lado);
+  const dados = pincel.getImageData(0, 0, lado, lado).data;
+  const cores = new Array(lado * lado).fill(null);
+  for (let i = 0; i < cores.length; i++) {
+    if (dados[i * 4 + 3] > 127) cores[i] = "rgb(" + dados[i * 4] + "," + dados[i * 4 + 1] + "," + dados[i * 4 + 2] + ")";
+  }
+  return cores;
+}
+
+async function porNaGrelha(endereco) {
+  // Poe uma imagem na grelha, para se continuar a desenhar por cima. Fica
+  // em 16x16 se a imagem foi desenhada assim (de quatro em quatro, os
+  // quadradinhos sao iguais), e em 32x32 se tem mais pormenor do que isso.
+  const imagem = await createImageBitmap(await (await fetch(endereco)).blob());
+  const finos = lerImagem(imagem, 32);
+  let grossa = true;
+  for (let y = 0; y < 32 && grossa; y += 2) {
+    for (let x = 0; x < 32 && grossa; x += 2) {
+      const cor = finos[y * 32 + x];
+      grossa = finos[y * 32 + x + 1] === cor && finos[(y + 1) * 32 + x] === cor && finos[(y + 1) * 32 + x + 1] === cor;
+    }
+  }
+  quadradinhos = grossa ? 16 : 32;
+  pixeis = grossa ? lerImagem(imagem, 16) : finos;
+}
+
 async function abrirDesenho() {
-  pixeis = new Array(QUADRADINHOS * QUADRADINHOS).fill(null);
+  quadradinhos = 16;
+  pixeis = new Array(quadradinhos * quadradinhos).fill(null);
   if (imagemAtual && imagemAtual.ha) {
-    // Ja ha imagem: comeca-se por ela, encolhida para a grelha.
-    try {
-      const atual = await createImageBitmap(await (await fetch("/api/imagem?v=" + imagemAtual.versao)).blob());
-      const tela = document.createElement("canvas");
-      tela.width = tela.height = QUADRADINHOS;
-      const pincel = tela.getContext("2d");
-      pincel.imageSmoothingEnabled = atual.width > QUADRADINHOS * 8;
-      pincel.drawImage(atual, 0, 0, QUADRADINHOS, QUADRADINHOS);
-      const dados = pincel.getImageData(0, 0, QUADRADINHOS, QUADRADINHOS).data;
-      for (let i = 0; i < pixeis.length; i++) {
-        if (dados[i * 4 + 3] > 127) pixeis[i] = "rgb(" + dados[i * 4] + "," + dados[i * 4 + 1] + "," + dados[i * 4 + 2] + ")";
-      }
-    } catch (erro) {}
+    // Ja ha imagem: comeca-se por ela.
+    try { await porNaGrelha("/api/imagem?v=" + imagemAtual.versao); } catch (erro) {}
   }
   $("nome-desenho").textContent = imagemAtual ? imagemAtual.nome : "";
+  // Uma coisa com varias imagens (um bicho de frente e de costas): pode-se
+  // comecar pelo desenho de uma das outras, em vez de comecar do zero.
+  const copiar = $("copiar-de");
+  copiar.replaceChildren();
+  const opcoes = (imagemAtual && imagemAtual.opcoes) || [];
+  opcoes.forEach((nome, numero) => {
+    if (numero === imagemAtual.qual || !imagemAtual.ha_opcoes || !imagemAtual.ha_opcoes[numero]) return;
+    const botao = elemento("button", "Copiar o desenho: " + nome.toLowerCase());
+    botao.type = "button";
+    botao.onclick = async () => {
+      if (pixeis.some(cor => cor !== null)
+          && !confirm("Copiar o desenho «" + nome + "» para aqui?\n\nO que está na grelha é trocado por ele.")) return;
+      try {
+        await porNaGrelha("/api/imagem?qual=" + numero + "&v=" + Date.now());
+        desenharGrelha();
+      } catch (erro) {
+        alert("Não consegui abrir esse desenho.");
+      }
+    };
+    copiar.append(botao);
+  });
+  copiar.hidden = copiar.children.length === 0;
+  $("pedir-desenho").hidden = !haAjudante;
+  $("fala-desenho").hidden = true;
   desenharGrelha();
   $("desenho").hidden = false;
+}
+
+async function pedirDesenho(ev) {
+  // O aluno descreve o boneco e o ajudante desenha-o. Desenha mal: o que
+  // vier fica na grelha, para se retocar a vontade.
+  ev.preventDefault();
+  const pedido = $("pedido-desenho").value.trim();
+  if (!pedido) return;
+  const fala = $("fala-desenho");
+  fala.hidden = false;
+  fala.textContent = "O ajudante está a desenhar… (demora uns 15 segundos)";
+  $("fazer-desenho").disabled = true;
+  try {
+    const dados = await pedir("/api/desenho", {pedido});
+    if (!pixeis.some(cor => cor !== null)
+        || confirm("Pôr o desenho do ajudante na grelha?\n\nO que lá está é trocado por ele.")) {
+      quadradinhos = dados.lado;
+      pixeis = dados.pixeis;
+      desenharGrelha();
+    }
+    fala.textContent = (dados.texto ? dados.texto + " " : "") + "O ajudante desenha mal: é só um começo, retoca à vontade.";
+  } catch (erro) {
+    fala.textContent = erro.message;
+  }
+  $("fazer-desenho").disabled = false;
 }
 
 async function guardarDesenho() {
@@ -1166,13 +1296,13 @@ async function guardarDesenho() {
   }
   // Um PNG pequenino com um pixel por quadradinho, depois aumentado sem esborratar.
   const pequeno = document.createElement("canvas");
-  pequeno.width = pequeno.height = QUADRADINHOS;
+  pequeno.width = pequeno.height = quadradinhos;
   const pincel = pequeno.getContext("2d");
   pixeis.forEach((cor, i) => {
-    if (cor) { pincel.fillStyle = cor; pincel.fillRect(i % QUADRADINHOS, Math.floor(i / QUADRADINHOS), 1, 1); }
+    if (cor) { pincel.fillStyle = cor; pincel.fillRect(i % quadradinhos, Math.floor(i / quadradinhos), 1, 1); }
   });
   const grande = document.createElement("canvas");
-  grande.width = grande.height = QUADRADINHOS * 8;
+  grande.width = grande.height = LADO_DO_DESENHO;
   const pincelGrande = grande.getContext("2d");
   pincelGrande.imageSmoothingEnabled = false;
   pincelGrande.drawImage(pequeno, 0, 0, grande.width, grande.height);
@@ -1197,13 +1327,18 @@ escolherCor(corDoLapis);
 $("cor-livre").oninput = () => escolherCor($("cor-livre").value);
 $("lapis").onclick = () => escolherFerramenta("lapis");
 $("balde").onclick = () => escolherFerramenta("balde");
+$("trocar-cor").onclick = () => escolherFerramenta("trocar-cor");
 $("borracha").onclick = () => escolherFerramenta("borracha");
+$("espelhar").onclick = espelhar;
+$("pedir-desenho").onsubmit = pedirDesenho;
+$("grelha-16").onclick = () => mudarGrelha(16);
+$("grelha-32").onclick = () => mudarGrelha(32);
 $("limpar-desenho").onclick = () => { pixeis.fill(null); desenharGrelha(); };
 $("guardar-desenho").onclick = guardarDesenho;
 $("fechar-desenho").onclick = () => { $("desenho").hidden = true; };
 $("desenhar-imagem").onclick = abrirDesenho;
 $("grelha").addEventListener("pointerdown", ev => { aPintar = true; $("grelha").setPointerCapture(ev.pointerId); pintar_quadradinho(ev); });
-$("grelha").addEventListener("pointermove", ev => { if (aPintar && ferramenta !== "balde") pintar_quadradinho(ev); });
+$("grelha").addEventListener("pointermove", ev => { if (aPintar && ferramenta !== "balde" && ferramenta !== "trocar-cor") pintar_quadradinho(ev); });
 $("grelha").addEventListener("pointerup", () => { aPintar = false; });
 $("grelha").addEventListener("pointercancel", () => { aPintar = false; });
 

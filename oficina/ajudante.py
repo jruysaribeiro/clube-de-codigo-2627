@@ -85,6 +85,55 @@ linha 3, coluna 5: H
 6. Na dúvida, não faças perguntas: faz a mudança que te parecer melhor e diz o que fizeste. O aluno vê o resultado e pode desfazer. Só perguntas se não fizeres mesmo ideia do que ele quer.
 7. Só ajudas com o jogo e com programação. Se te pedirem outra coisa, diz com simpatia que aqui só tratas do jogo."""
 
+# No editor de desenho, o aluno descreve um boneco e o modelo desenha-o com
+# ordens de pintar numa grelha de 16 por 16 (ver desenho). Um modelo de texto
+# deste tamanho desenha mal: sai um rascunho para o aluno retocar.
+CORES_DO_DESENHO = {
+    "vermelho": "#e03c3c", "laranja": "#ff8a3c", "amarelo": "#f0c846", "verde": "#5fd07a",
+    "verde-escuro": "#2e8b57", "azul": "#3c5adc", "azul-claro": "#46b4e6", "roxo": "#9b5ade",
+    "rosa": "#ff78b4", "castanho": "#784628", "bege": "#ffd2aa", "preto": "#000000",
+    "branco": "#ffffff", "cinzento": "#9a9ab4", "nada": None,
+}
+# Outros nomes que o modelo da as mesmas cores.
+OUTROS_NOMES = {"marrom": "castanho", "castanho-escuro": "castanho", "cinza": "cinzento", "cinzento-claro": "cinzento",
+                "azul-escuro": "azul", "verde-claro": "verde", "cor-de-rosa": "rosa", "violeta": "roxo",
+                "lilás": "roxo", "creme": "bege", "cor-de-pele": "bege", "dourado": "amarelo",
+                "transparente": "nada", "vazio": "nada"}
+LADO_DO_DESENHO = 16
+
+INSTRUCOES_DO_DESENHO = """És o ajudante de desenho da Oficina do Clube de Código. Desenhas bonecos pequenos em pixel art para um jogo, numa grelha de 16 linhas por 16 colunas: a linha 1 é a de cima, a coluna 1 é a da esquerda. A grelha começa vazia (transparente).
+
+Responde com UMA frase curta, em português de Portugal, a dizer o que desenhaste, e depois as ordens de pintar dentro de um bloco ```desenho, uma por linha, exatamente com estas palavras:
+linhas 5 a 12, colunas 4 a 13: vermelho
+linha 7, coluna 6: branco
+Cada ordem pinta um retângulo CHEIO com UMA cor. As ordens fazem-se por ordem: a de baixo pinta por cima da de cima.
+As cores que há: """ + ", ".join(CORES_DO_DESENHO) + """. ("nada" apaga: usa-o só para arredondar os cantos, nunca no meio do boneco.)
+
+Como desenhar:
+1. Primeiro o corpo: um ou dois retângulos grandes e cheios, ao centro, que ocupem a maior parte da grelha.
+2. Depois as partes que saem do corpo: cabeça, patas, asas, cauda, orelhas, com retângulos mais pequenos.
+3. Por cima, os pormenores: dois olhos (um quadradinho branco com um preto), boca ou bico, riscas.
+4. Usa entre 12 e 25 ordens, e pelo menos duas cores.
+Visto de costas não se veem os olhos nem a boca.
+
+Um exemplo, para «um sapo verde»:
+```desenho
+linhas 6 a 13, colunas 3 a 14: verde
+linha 6, coluna 3: nada
+linha 6, coluna 14: nada
+linhas 3 a 6, colunas 4 a 7: verde
+linhas 3 a 6, colunas 10 a 13: verde
+linhas 4 a 5, colunas 5 a 6: branco
+linhas 4 a 5, colunas 11 a 12: branco
+linha 5, coluna 6: preto
+linha 5, coluna 11: preto
+linha 10, colunas 6 a 11: verde-escuro
+linhas 11 a 12, colunas 6 a 11: bege
+linhas 14 a 15, colunas 3 a 5: verde-escuro
+linhas 14 a 15, colunas 12 a 14: verde-escuro
+```
+Desenha sempre o que o aluno pedir, mesmo que seja difícil: não faças perguntas."""
+
 # Uma linha de um mapa, no codigo: espacos, o texto entre aspas e a virgula.
 LINHA_DE_MAPA = re.compile(r'^(\s*)"([^"\\]*)"(,?)\s*$')
 # Uma ordem do modelo: "linhas 6 a 8, colunas 9 a 13: ~"
@@ -239,6 +288,38 @@ def responder(pedacos, codigo):
                "por exemplo: «um lago nas linhas 5 a 8, a meio».")
         return
     yield "\n\n```oficina\n" + novo + "\n```\n"
+
+
+def mensagens_do_desenho(pedido):
+    return [{"role": "system", "content": INSTRUCOES_DO_DESENHO},
+            {"role": "user", "content": cortar(pedido, 300)}]
+
+
+def desenho(resposta):
+    # O que o modelo desenhou: (as cores dos 16x16 quadradinhos, linha a
+    # linha, cada uma "#rrggbb" ou None; a frase dele; quantas ordens fez).
+    lado = LADO_DO_DESENHO
+    cores = [None] * (lado * lado)
+    ordens = 0
+    for texto in resposta.split("\n"):
+        ordem = ORDEM.search(texto.strip())
+        if not ordem:
+            continue
+        nome = ordem.group(5).strip().strip("`.,;").lower().replace(" ", "-")
+        nome = OUTROS_NOMES.get(nome, nome)
+        if nome not in CORES_DO_DESENHO:
+            continue
+        ordens = ordens + 1
+        linha1 = int(ordem.group(1))
+        linha2 = int(ordem.group(2) or linha1)
+        coluna1 = int(ordem.group(3))
+        coluna2 = int(ordem.group(4) or coluna1)
+        for linha in range(min(linha1, linha2), max(linha1, linha2) + 1):
+            for coluna in range(min(coluna1, coluna2), max(coluna1, coluna2) + 1):
+                if 1 <= linha <= lado and 1 <= coluna <= lado:
+                    cores[(linha - 1) * lado + coluna - 1] = CORES_DO_DESENHO[nome]
+    frase = re.split(r"```|^\s*linhas?\s+\d", resposta, maxsplit=1, flags=re.MULTILINE | re.IGNORECASE)[0]
+    return cores, " ".join(frase.split())[:200], ordens
 
 
 def sem_blocos(texto):

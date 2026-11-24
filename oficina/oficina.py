@@ -531,6 +531,12 @@ class Sessao:
         if estado is not None and len(self.imagens) > 1:
             estado["opcoes"] = [imagem["nome"] for imagem in self.imagens]
             estado["qual"] = self.qual_imagem
+            # Quais delas ja existem: e de uma dessas que se pode copiar o
+            # desenho para comecar outra (a de costas a partir da de frente).
+            pasta, forma = FICHEIROS["imagem"][0], FICHEIROS["imagem"][1]
+            estado["ha_opcoes"] = [bool(forma.fullmatch(str(imagem["ficheiro"])))
+                                   and os.path.isfile(os.path.join(pasta, str(imagem["ficheiro"])))
+                                   for imagem in self.imagens]
         return estado
 
     def caminho_do_ficheiro(self, tipo):
@@ -563,7 +569,8 @@ class Sessao:
                 f.write(conteudo)
             os.replace(caminho + ".novo", caminho)
             self.avisar_dos_ficheiros()
-            return {tipo: self.estado_do_ficheiro(tipo)}
+            # (A imagem leva tambem quais sao as outras imagens da coisa.)
+            return {tipo: self.estado_da_imagem() if tipo == "imagem" else self.estado_do_ficheiro(tipo)}
 
     def tirar_ficheiro(self, tipo):
         with self.tranca:
@@ -571,11 +578,19 @@ class Sessao:
             if os.path.isfile(caminho):
                 os.remove(caminho)
             self.avisar_dos_ficheiros()
-            return {tipo: self.estado_do_ficheiro(tipo)}
+            # (A imagem leva tambem quais sao as outras imagens da coisa.)
+            return {tipo: self.estado_da_imagem() if tipo == "imagem" else self.estado_do_ficheiro(tipo)}
 
-    def ler_ficheiro(self, tipo):
+    def ler_ficheiro(self, tipo, qual=None):
+        # qual: nas coisas com varias imagens, o numero de outra que nao a
+        # escolhida (para copiar o desenho dela).
         with self.tranca:
             caminho = self.caminho_do_ficheiro(tipo)
+            if tipo == "imagem" and qual is not None:
+                pasta, forma = FICHEIROS["imagem"][0], FICHEIROS["imagem"][1]
+                if not 0 <= qual < len(self.imagens) or not forma.fullmatch(str(self.imagens[qual]["ficheiro"])):
+                    raise Falha("Essa imagem não existe.")
+                caminho = os.path.join(pasta, self.imagens[qual]["ficheiro"])
             if not os.path.isfile(caminho):
                 raise Falha("Ainda não há.")
             with open(caminho, "rb") as f:
@@ -660,6 +675,18 @@ class Sessao:
                 dados.get("erro"), dados.get("linha"), dados.get("conversa"), pergunta)
         # (Num mapa, o modelo responde com ordens, e e aqui que se aplicam.)
         return modulo_do_ajudante.responder(self.ajudante.perguntar(mensagens), dados.get("codigo"))
+
+    def desenhar(self, dados):
+        # No editor de desenho: o aluno descreve um boneco, e o ajudante
+        # devolve os quadradinhos pintados (um rascunho, para retocar).
+        pedido = str(dados.get("pedido") or "").strip()
+        if pedido == "":
+            raise Falha("Escreve primeiro o que queres que ele desenhe.")
+        resposta = "".join(self.ajudante.perguntar(modulo_do_ajudante.mensagens_do_desenho(pedido)))
+        cores, frase, ordens = modulo_do_ajudante.desenho(resposta)
+        if all(cor is None for cor in cores):
+            raise Falha("O ajudante não conseguiu desenhar isso. Tenta descrever de outra maneira.")
+        return {"lado": modulo_do_ajudante.LADO_DO_DESENHO, "pixeis": cores, "texto": frase}
 
     # --- Levar o jogo para casa e traze-lo de volta ---
 
@@ -836,8 +863,10 @@ class Pedido(BaseHTTPRequestHandler):
                 self.responder(404, {"falha": "Não existe."})
         elif url.path in ("/api/imagem", "/api/som"):
             tipo = url.path[5:]
+            qual = parametros.get("qual", [""])[0]
             try:
-                self.responder(200, sessao.ler_ficheiro(tipo), "image/png" if tipo == "imagem" else "audio/wav")
+                dados = sessao.ler_ficheiro(tipo, int(qual) if qual.isdigit() else None)
+                self.responder(200, dados, "image/png" if tipo == "imagem" else "audio/wav")
             except Falha as falha:
                 self.responder(404, {"falha": str(falha)})
         elif url.path == "/api/descarregar":
@@ -933,6 +962,13 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(lambda: sessao.escolher_imagem(dados.get("qual")))
         elif caminho == "/api/criar":
             self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo"))))
+        elif caminho == "/api/desenho":
+            try:
+                self.responder(200, sessao.desenhar(dados))
+            except Falha as falha:
+                self.responder(400, {"falha": str(falha)})
+            except modulo_do_ajudante.Indisponivel as falha:
+                self.responder(503, {"falha": str(falha)})
         elif caminho == "/api/pergunta":
             self.pergunta(dados)
         elif caminho == "/api/carregar":
