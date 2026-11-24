@@ -1111,10 +1111,49 @@ def _apagar_ataque(fonte, escolha):
     return nova, aviso
 
 
+def _tipo_escrito(fonte, numero):
+    # O nome do tipo que esta aberto, ou None.
+    cores = base._fichas(blocos.instrucao(ast.parse(fonte), "CORES_TIPO"))
+    return cores[int(numero)][0] if numero.isdigit() and int(numero) < len(cores) else None
+
+
+def _tipo_nos_blocos(fonte, antigo, novo):
+    # Os blocos dizem os tipos dos bichos que deles saltam ("bichos"): quando
+    # um tipo muda de nome, ou e apagado (e passa a ser o "novo"), muda la
+    # tambem. Devolve o ficheiro e os nomes dos blocos em que mexeu.
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    trocas, mexidos = [], []
+    for letra, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "BLOCOS")):
+        no = base._no_da_chave(ficha, "bichos") if isinstance(ficha, ast.Dict) else None
+        if not isinstance(no, ast.List) or no.lineno != no.end_lineno:
+            continue
+        tipos = [blocos.texto_constante(este) for este in no.elts]
+        if antigo not in tipos or None in tipos:
+            continue
+        novos = []
+        for este in tipos:
+            este = novo if este == antigo else este
+            if este not in novos:
+                novos.append(este)
+        base._trocar_no(linhas, no, "[" + ", ".join('"' + este + '"' for este in novos) + "]", trocas)
+        mexidos.append(blocos.valor_da_chave(ficha, "nome") or str(letra))
+    return base._aplicar(linhas, [], trocas), mexidos
+
+
 def renomear(fonte, escolha, nome):
     # Como na Bicharada, mais as zonas: o nome muda nas ZONAS, no MUNDO e nas
-    # PORTAS que davam para ela.
+    # PORTAS que davam para ela. E um tipo muda tambem nos blocos.
     tipo, _, numero = escolha.partition(":")
+    if tipo == "tipo":
+        antigo = _tipo_escrito(fonte, numero)
+        fonte, escolha, aviso = base.renomear(fonte, escolha, nome)
+        novo = _tipo_escrito(fonte, numero)
+        if antigo is not None and novo is not None and novo != antigo:
+            fonte, mexidos = _tipo_nos_blocos(fonte, antigo, novo)
+            if mexidos:
+                aviso = aviso + " Mudei-o também nos blocos de onde saltam bichos desse tipo (" + ", ".join(mexidos) + ")."
+        return fonte, escolha, aviso
     if tipo != "zona":
         return base.renomear(fonte, escolha, nome)
     arvore = ast.parse(fonte)
@@ -1153,6 +1192,15 @@ def apagar(fonte, escolha):
         return _apagar_zona(fonte, escolha)
     if tipo == "bloco":
         return _apagar_bloco(fonte, escolha)
+    if tipo == "tipo":
+        antigo = _tipo_escrito(fonte, escolha.partition(":")[2])
+        de_todos = base._tipo_de_todos(ast.parse(fonte))
+        fonte, aviso = base.apagar(fonte, escolha)
+        if antigo is not None:
+            fonte, mexidos = _tipo_nos_blocos(fonte, antigo, de_todos)
+            if mexidos:
+                aviso = aviso + " Nos blocos de onde saltavam bichos desse tipo (" + ", ".join(mexidos) + ') ficou "' + de_todos + '".'
+        return fonte, aviso
     if tipo == "ataque":
         return _apagar_ataque(fonte, escolha)
     if tipo == "treinador":
@@ -1432,7 +1480,8 @@ def _ver_blocos(ns, problemas, avisos):
             else:
                 for tipo in ficha["bichos"]:
                     if tipos and tipo not in tipos:
-                        problemas.append(quem + ': o tipo "' + tipo + '", em "bichos", não existe.'
+                        problemas.append(quem + ': em "bichos" está o tipo "' + tipo + '", que não existe. Os tipos '
+                                         "que há: " + ", ".join(str(este) for este in tipos) + "."
                                          + base._parecido(tipo, list(tipos)))
 
 
