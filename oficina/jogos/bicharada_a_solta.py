@@ -168,7 +168,8 @@ DICAS = {
             " acrescenta uma coisa, e vê a loja mudar. O que cada coisa faz está na regra «O que se recebe ao comprar».",
     "treinador": "O treinador fala contigo e depois luta: é o que está nas falas dele. Enter passa as falas"
                  " (sozinhas também passam), e as setas escolhem a resposta a uma pergunta."
-                 " «Escolher os bichos» mostra os bichos que existem. Depois da luta ele diz as falas_depois.",
+                 " «Escolher os bichos» mostra os bichos que existem. Depois da luta ele diz as falas_depois."
+                 " «Desenhar» faz o boneco dele no mapa (ou começa por um modelo).",
     "regra": "Isto é uma regra do mapa: muda-a e o jogo passa a comportar-se de outra maneira."
              " O quadro do canto mostra o que a tua regra responde agora." + SOZINHO,
     "evento": "Tira o pass e escreve o que queres que aconteça nesse momento."
@@ -180,8 +181,10 @@ DICAS = {
 # la dentro nao ha arvores nem erva, e ca fora nao ha mesas nem estantes.
 # As letras que nao sao de nenhum bloco: a partida e os treinadores.
 CONHECIDAS = "P123456789"
-# Os blocos que nao se apagam: e o que fica no lugar dos outros.
+# Os blocos que nao se apagam: a relva e o soalho sao o que fica no lugar dos
+# outros, e sem a parede e o "nada" os edificios deixavam de ter forma.
 CHAO_DE_FORA, CHAO_DE_DENTRO = ".", "_"
+NAO_SE_APAGAM = {".": "A relva", "_": "O soalho", "#": "A parede", " ": 'O "nada"'}
 INICIO_DOS_INTERIORES = "# --- Os interiores ---"
 INICIO_DAS_ZONAS = "# --- As zonas ---"
 ZONA = (20, 14)          # quantas letras tem uma zona: por linha, e linhas
@@ -567,6 +570,9 @@ def regiao(fonte, escolha):
         # (Ha caixas para marcar: ve a funcao caixas, mais abaixo.)
         resposta["caixas"] = True
         resposta["dica"] = DICAS["treinador"]
+        # O boneco dele, no mapa.
+        ficha = base._fichas(blocos.instrucao(arvore, "TREINADORES"))[int(numero)][1]
+        resposta["imagem"] = blocos.valor_da_chave(ficha, "imagem") if isinstance(ficha, ast.Dict) else None
         letra = str(int(numero) + 1)
         zonas = _valor(arvore, "ZONAS")
         onde = [nome for nome in zonas if letra in "".join(zonas[nome])] if _sao_zonas(zonas) else []
@@ -717,7 +723,7 @@ def _nova_zona(fonte):
     antes = escrito[:corte].rstrip().rstrip(",")
     junta = ', "' if len(lista.elts) > 0 else '"'
     linhas[lista.lineno - 1] = antes + junta + nome + '"' + escrito[corte:]
-    _juntar_ao_dicionario(arvore, linhas, "ZONAS", _texto_da_zona(nome, ZONA_NOVA))
+    _juntar_ao_dicionario(arvore, linhas, "ZONAS", _texto_da_zona(nome, _so_com_blocos(arvore, ZONA_NOVA, CHAO_DE_FORA)))
 
     aviso = 'Criei a zona "' + nome + '": relva, com uma saída ao meio de cada lado.'
     if vizinha is None:
@@ -729,11 +735,23 @@ def _nova_zona(fonte):
     return "\n".join(linhas), "zona:" + str(len(mundo.zonas)), aviso
 
 
+def _so_com_blocos(arvore, filas, chao):
+    # Uma zona nova so leva blocos que existam: se alguem apagou as arvores
+    # ou as mesas, no lugar delas vai chao. (O "?" e o lugar da porta.)
+    os_blocos = _valor(arvore, "BLOCOS")
+    if not isinstance(os_blocos, dict):
+        return filas
+    # (Sem janelas, a parede fica inteira.)
+    filas = [fila if "j" in os_blocos else fila.replace("j", "#") for fila in filas]
+    return ["".join(letra if letra in os_blocos or letra == "?" else chao for letra in fila) for fila in filas]
+
+
 def _novo_edificio(fonte):
     arvore, mundo = _ler_mundo(fonte)
     if mundo is None:
         raise ValueError("não percebi como estão escritas as ZONAS, o MUNDO ou as PORTAS no ficheiro.")
     usadas = "".join("".join(filas) for filas in mundo.zonas.values()) + "".join(mundo.portas)
+    usadas = usadas + "".join(str(letra) for letra in mundo.blocos)
     letras = [letra for letra in LETRAS_DE_PORTA if letra not in usadas]
     if not letras:
         raise ValueError("já não há letras livres para mais uma porta.")
@@ -765,7 +783,8 @@ def _novo_edificio(fonte):
                 break
 
     # (Primeiro o dicionario que esta mais abaixo no ficheiro.)
-    novas = {"ZONAS": _texto_da_zona(nome, [fila.replace("?", letra) for fila in SALA_NOVA]),
+    sala = _so_com_blocos(arvore, SALA_NOVA, CHAO_DE_DENTRO)
+    novas = {"ZONAS": _texto_da_zona(nome, [fila.replace("?", letra) for fila in sala]),
              "PORTAS": ['    "' + letra + '": "' + nome + '",']}
     for dicionario in sorted(novas, key=lambda qual: blocos.instrucao(arvore, qual).lineno, reverse=True):
         _juntar_ao_dicionario(arvore, linhas, dicionario, novas[dicionario])
@@ -777,6 +796,14 @@ def _novo_edificio(fonte):
         aviso = (aviso + " Cá fora ainda não está em lado nenhum: numa zona, escreve ### e por baixo #"
                  + letra + "#, com relva à frente da porta.")
     return "\n".join(linhas), "zona:" + str(len(mundo.zonas)), aviso
+
+
+def _ficheiro_sem_acentos(nome):
+    # "Campeã da Feira" -> "campea-da-feira": os nomes dos ficheiros de
+    # imagem so levam letras sem acentos, algarismos, "-" e "_".
+    import unicodedata
+    simples = unicodedata.normalize("NFKD", base._ficheiro(nome)).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9_-]", "", simples) or "treinador"
 
 
 def _novo_treinador(fonte):
@@ -800,6 +827,7 @@ def _novo_treinador(fonte):
         '        "frase": "Vamos a isto!",',
         '        "falas_depois": ["Boa luta!"],',
         '        "cor_fundo": (200, 190, 150),',
+        '        "imagem": "' + _ficheiro_sem_acentos(nome) + '.png",',
         '        "equipa": [',
         '            {"bicho": "' + str(bichos[0][0]) + '", "nivel": 5},',
         "        ],",
@@ -848,9 +876,10 @@ def _apagar_bloco(fonte, escolha):
     if not numero.isdigit() or int(numero) >= len(partes):
         raise ValueError("isso não se pode apagar.")
     letra, ficha, inicio, fim = partes[int(numero)]
-    if letra in (CHAO_DE_FORA, CHAO_DE_DENTRO):
-        raise ValueError("a relva e o soalho não se apagam: são o que fica no lugar dos blocos que se apagam. "
-                         "Mas podes mudar-lhes o nome, a cor e o desenho.")
+    if letra in NAO_SE_APAGAM:
+        raise ValueError(NAO_SE_APAGAM[letra].lower() + " não se apaga: a relva e o soalho são o que fica no lugar "
+                         "dos blocos que se apagam, e as paredes e o «nada» dão a forma aos edifícios. "
+                         "Mas podes mudar-lhe o nome, a cor e o desenho.")
     interiores = _interiores(arvore)
     linhas = fonte.split("\n")
     quantos = []
@@ -1398,6 +1427,8 @@ def _ver_conversas(ns, treinadores, aberto, problemas, avisos):
         if not isinstance(ficha, dict):
             continue
         quem = ficha.get("nome") if isinstance(ficha.get("nome"), str) else "Um treinador"
+        if "imagem" in ficha:
+            _ver_imagem(ficha, quem, "imagem", ns, problemas)
         for chave in ("falas", "falas_depois", "falas_rede"):
             if chave in ficha:
                 _ver_falas(ficha[chave], quem, chave, problemas)

@@ -49,7 +49,7 @@ horta    praia     farol
 | Os edifícios: que letra é a porta de que interior | `PORTAS` |
 | O que se vende, e por quanto | `LOJA` |
 | O teu boneco: a cor e as três imagens | `JOGADOR` |
-| As falas, as perguntas e quem dá a rede | `TREINADORES` (`falas`, `falas_depois`, `falas_rede`, `da_rede`) |
+| As falas, as perguntas, quem dá a rede e o boneco de cada treinador | `TREINADORES` (`falas`, `falas_depois`, `falas_rede`, `da_rede`, `imagem`) |
 | Os ataques que um bicho sabe, e os que aprende a um certo nível | `BICHOS` (`ataques`, `aprende`), `ataques_de()` |
 | Onde se pode andar | `pode_andar()` |
 | Quando salta um bicho da erva, e qual | `ha_batalha_na_erva()`, `escolher_bicho_selvagem()` |
@@ -99,7 +99,8 @@ moedas), é o acontecimento `ao_responder()`.
   cor, de desenho (há um modelo de pixel art para cada um) e de regras: uma
   árvore por onde se passa, outro bloco que cura a equipa (`"faz": "cura"`)
   ou abre a loja (`"faz": "loja"`). Enquanto não tiverem imagem, o jogo
-  desenha-os como sempre desenhou. Só a relva e o soalho não se apagam;
+  desenha-os como sempre desenhou. A relva, o soalho, a parede e o «nada»
+  não se apagam;
 - os blocos de **dentro** de um edifício não são os de **fora** (a parede
   serve nos dois sítios). A ajuda de cada zona mostra só os que servem para
   essa zona, e a Oficina avisa quando um está no sítio errado;
@@ -124,7 +125,10 @@ moedas), é o acontecimento `ao_responder()`.
 - um **bicho** tem a lista **Escolher os ataques** (só os do tipo dele e os
   normais), e um ataque novo nasce sem dono;
 - a Oficina traz **modelos** de pixel art para todos os bichos (de frente e
-  de costas) e para o teu boneco: usam-se como estão, ou serve de começo;
+  de costas), para o teu boneco, para os treinadores e para os blocos:
+  usam-se como estão, ou servem de começo;
+- cada **treinador** tem a sua imagem no mapa (`imagem`), que se desenha com
+  «Desenhar». Sem imagem é um boneco de formas, com a camisola da `cor_fundo`;
 - um **bicho** tem as imagens **De frente** e **De costas**, e o **teu
   boneco** três (de frente, de costas, de lado): os botões por cima do código
   escolhem qual se desenha ou se troca. Quem não tiver imagem é desenhado

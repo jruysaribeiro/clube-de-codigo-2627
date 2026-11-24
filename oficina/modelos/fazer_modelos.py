@@ -1074,6 +1074,114 @@ def balcao(t):
     t.caixa(escurecer((246, 196, 60), 70), 13, 18, 6, 1)
 
 
+# =====================================================================
+# Os treinadores da Bicharada a Solta, no mapa. Sao todos feitos com o
+# mesmo boneco (o do jogador), com outra roupa, outro cabelo e uma coisa
+# so deles.
+# =====================================================================
+
+def boneco(t, camisola, calcas, cabelo, pele=PELE, cabelo_comprido=False, careca=False):
+    t.caixa(calcas, 11, 23, 4, 6)
+    t.caixa(calcas, 17, 23, 4, 6)
+    t.caixa(PRETO, 10, 28, 5, 3, 1)                                          # os sapatos
+    t.caixa(PRETO, 17, 28, 5, 3, 1)
+    t.caixa(camisola, 10, 14, 12, 10, 2)
+    t.caixa(escurecer(camisola, 30), 7, 15, 3, 7, 1)                         # os bracos
+    t.caixa(escurecer(camisola, 30), 22, 15, 3, 7, 1)
+    t.caixa(pele, 7, 21, 3, 2)
+    t.caixa(pele, 22, 21, 3, 2)
+    if cabelo_comprido:
+        t.caixa(cabelo, 8, 5, 16, 13, 4)
+    t.oval(pele, 9, 2, 14, 13)                                               # a cabeca
+    if careca:
+        t.caixa(cabelo, 9, 6, 2, 5)
+        t.caixa(cabelo, 21, 6, 2, 5)
+    else:
+        t.oval(cabelo, 9, 1, 14, 7)
+        t.caixa(cabelo, 9, 4, 2, 5)
+        t.caixa(cabelo, 21, 4, 2, 5)
+
+
+def cara(t, boca=PELE_ESCURA):
+    t.caixa(PRETO, 13, 8, 2, 3)
+    t.caixa(PRETO, 17, 8, 2, 3)
+    t.caixa(boca, 14, 12, 4, 1)
+
+
+@modelo("treinador-novo.png")
+def treinador_novo(t):
+    boneco(t, (200, 190, 150), (90, 90, 110), (60, 50, 50))
+    t.contornar()
+    cara(t)
+
+
+@modelo("mestre-zacarias.png")
+def mestre_zacarias(t):
+    branco = (235, 235, 240)
+    boneco(t, (150, 120, 200), (80, 70, 100), branco, careca=True)
+    t.caixa(branco, 11, 11, 10, 7, 3)                                        # a barba
+    t.caixa(MADEIRA, 26, 9, 2, 21)                                           # a bengala
+    t.caixa(MADEIRA, 23, 9, 4, 2)
+    t.contornar()
+    t.caixa(PRETO, 13, 8, 2, 2)
+    t.caixa(PRETO, 17, 8, 2, 2)
+    t.caixa(branco, 12, 6, 3, 1)                                             # as sobrancelhas
+    t.caixa(branco, 17, 6, 3, 1)
+
+
+@modelo("tia-da-mercearia.png")
+def tia_da_mercearia(t):
+    boneco(t, (110, 170, 220), (110, 170, 220), (150, 150, 160))
+    t.caixa((110, 170, 220), 9, 22, 14, 6, 2)                                # a saia
+    t.caixa(BRANCO, 12, 16, 8, 12, 1)                                        # o avental
+    t.oval((150, 150, 160), 13, -1, 6, 5)                                    # o carrapito
+    t.contornar()
+    cara(t, (200, 90, 90))
+    t.caixa((246, 196, 60), 15, 20, 2, 2)                                    # o bolso
+
+
+@modelo("pescador-da-povoa.png")
+def pescador_da_povoa(t):
+    amarelo = (240, 200, 60)
+    boneco(t, amarelo, (70, 90, 130), (90, 60, 40))
+    t.caixa(amarelo, 7, 3, 18, 3, 1)                                         # o chapeu de oleado
+    t.oval(amarelo, 10, 0, 12, 6)
+    t.caixa(MADEIRA, 27, 2, 1, 26)                                           # a cana de pesca
+    t.linha((230, 230, 240), (27, 2), (30, 12))
+    t.caixa((90, 60, 40), 12, 11, 8, 3, 1)                                   # a barba
+    t.contornar()
+    t.caixa(PRETO, 13, 8, 2, 2)
+    t.caixa(PRETO, 17, 8, 2, 2)
+
+
+@modelo("guarda-florestal.png")
+def guarda_florestal(t):
+    verde = (80, 130, 80)
+    boneco(t, verde, (110, 90, 60), (60, 45, 35))
+    t.caixa(escurecer(verde, 30), 7, 4, 18, 2, 1)                            # o chapeu de aba
+    t.caixa(escurecer(verde, 30), 10, 0, 12, 5, 2)
+    t.caixa((246, 196, 60), 15, 2, 2, 2)
+    t.caixa((70, 50, 30), 10, 21, 12, 2)                                     # o cinto
+    t.caixa((246, 196, 60), 15, 21, 2, 2)
+    t.caixa((246, 196, 60), 18, 16, 2, 2)                                    # o cracha
+    t.contornar()
+    cara(t)
+
+
+@modelo("campea-da-feira.png")
+def campea_da_feira(t):
+    ouro = (246, 196, 60)
+    boneco(t, (220, 90, 90), (90, 60, 110), (200, 120, 50), cabelo_comprido=True)
+    t.forma(ouro, [(10, 3), (10, -1), (13, 2), (16, -2), (19, 2), (22, -1), (22, 3)])   # a coroa
+    t.caixa(ouro, 10, 2, 12, 2)
+    t.oval(ouro, 14, 17, 4, 4)                                               # a medalha
+    t.linha((70, 110, 200), (12, 14), (15, 18))
+    t.linha((70, 110, 200), (20, 14), (17, 18))
+    t.contornar()
+    cara(t, (200, 70, 80))
+    t.ponto((220, 60, 60), 16, 0)
+
+
 def fazer():
     pygame.init()
     pygame.display.set_mode((16, 16))

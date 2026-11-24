@@ -697,6 +697,9 @@ JOGADOR = {
 # Ganhas a todos os que estao no mapa, ganhas a feira.
 #   frase         o grito dele, quando a batalha comeca
 #   cor_fundo     a cor do campo de batalha, e da camisola dele no mapa
+#   imagem        (so se quiseres) o nome de um PNG: o boneco dele no mapa.
+#                 Se existir em comum/assets/imagens/, e ele que se ve. Sem
+#                 imagem, e desenhado com formas
 #   equipa        os bichos que leva, pela ordem em que entram
 #   falas         (so se quiseres) o que diz antes da luta: uma lista de
 #                 textos, que passam com Enter
@@ -730,6 +733,7 @@ TREINADORES = [
             "Na mercearia vendem redes e sopas. E a avó cura os bichos.",
         ],
         "cor_fundo": (190, 170, 220),
+        "imagem": "mestre-zacarias.png",
         "equipa": [
             {"bicho": "Couve Galega", "nivel": 3},
         ],
@@ -745,6 +749,7 @@ TREINADORES = [
         "frase": "Os meus bichos comem melhor do que tu!",
         "falas_depois": ["Ganhaste-me bem ganho. Leva cumprimentos à tua avó."],
         "cor_fundo": (150, 200, 230),
+        "imagem": "tia-da-mercearia.png",
         "equipa": [
             {"bicho": "Couve Galega", "nivel": 3},
             {"bicho": "Castanha Assada", "nivel": 4},
@@ -756,6 +761,7 @@ TREINADORES = [
         "frase": "Cheira a maresia... e a vitória!",
         "falas_depois": ["O mar hoje não está para mim."],
         "cor_fundo": (110, 170, 210),
+        "imagem": "pescador-da-povoa.png",
         "equipa": [
             {"bicho": "Sardinhão", "nivel": 5},
             {"bicho": "Polvo Lagareiro", "nivel": 6},
@@ -767,6 +773,7 @@ TREINADORES = [
         "frase": "Ninguém passa pelo meu montado.",
         "falas_depois": ["Podes passar. A feira é já ali."],
         "cor_fundo": (170, 200, 150),
+        "imagem": "guarda-florestal.png",
         "equipa": [
             {"bicho": "Sobreirinho", "nivel": 6},
             {"bicho": "Lince Ibérico", "nivel": 6},
@@ -784,6 +791,7 @@ TREINADORES = [
         "frase": "Três anos invicta. Hoje não vai ser diferente.",
         "falas_depois": ["A feira tem uma campeã nova. Parabéns!"],
         "cor_fundo": (230, 170, 140),
+        "imagem": "campea-da-feira.png",
         "equipa": [
             {"bicho": "Galo de Barcelos", "nivel": 7},
             {"bicho": "Sardinhão", "nivel": 8},
@@ -2586,23 +2594,34 @@ def desenhar_jogador(x, y, olha_para):
 
 # UM TREINADOR, NO MAPA
 # treinador: a ficha dele, de TREINADORES. vencido: True se ja lhe ganhaste.
-# Como esta: a camisola tem a cor_fundo dele, e um ponto de exclamacao por
-# cima enquanto nao o venceres. Vencido, fica cinzento.
-# Ideias: uma coroa na ultima treinadora (if treinador["nome"] == ...); um
-# desenho diferente para cada um; os vencidos ficarem deitados.
+# Como esta: mostra a "imagem" dele, se a tiver (mais apagada, se ja o
+# venceste). Sem imagem, desenha um boneco com a camisola da cor_fundo dele
+# (cinzento, se ja o venceste). Enquanto nao o venceres, tem um ponto de
+# exclamacao por cima.
+# Ideias: uma coroa na ultima treinadora (if treinador["nome"] == ...); os
+# vencidos ficarem deitados; o ponto de exclamacao a saltar.
 def desenhar_treinador(treinador, x, y, vencido):
     meio = x + QUADRADO // 2
-    cor = escurecer(treinador["cor_fundo"], 0.8)
-    if vencido:
-        cor = CINZA
-    pygame.draw.rect(ecra, cor, (meio - 9, y + 20, 18, 17), border_radius=5)
-    pygame.draw.circle(ecra, PAREDE, (meio, y + 13), 10)
-    pygame.draw.circle(ecra, PRETO, (meio, y + 13), 10, 2)
-    pygame.draw.circle(ecra, PRETO, (meio - 4, y + 13), 2)
-    pygame.draw.circle(ecra, PRETO, (meio + 4, y + 13), 2)
+    imagem = None
+    if "imagem" in treinador:
+        imagem = obter_imagem(treinador["imagem"], QUADRADO)
+    if imagem is not None:
+        if vencido:
+            imagem = imagem.copy()
+            imagem.set_alpha(120)
+        ecra.blit(imagem, (x, y))
+    else:
+        cor = escurecer(treinador["cor_fundo"], 0.8)
+        if vencido:
+            cor = CINZA
+        pygame.draw.rect(ecra, cor, (meio - 9, y + 20, 18, 17), border_radius=5)
+        pygame.draw.circle(ecra, PAREDE, (meio, y + 13), 10)
+        pygame.draw.circle(ecra, PRETO, (meio, y + 13), 10, 2)
+        pygame.draw.circle(ecra, PRETO, (meio - 4, y + 13), 2)
+        pygame.draw.circle(ecra, PRETO, (meio + 4, y + 13), 2)
     if not vencido:
-        pygame.draw.rect(ecra, VERMELHO, (meio + 9, y, 4, 9))
-        pygame.draw.rect(ecra, VERMELHO, (meio + 9, y + 11, 4, 4))
+        pygame.draw.rect(ecra, VERMELHO, (meio + 13, y, 4, 9))
+        pygame.draw.rect(ecra, VERMELHO, (meio + 13, y + 11, 4, 4))
 
 
 def partir_texto(texto, letras):
@@ -2949,10 +2968,11 @@ while a_correr:
         ecra.fill(PRETO)
         mostrar_texto("BICHARADA À SOLTA", 120, 170, AMARELO, fonte_grande)
         mostrar_texto("Os bichos mais portugueses do mundo andam por aí", 135, 260, BRANCO, fonte)
-        # Os dois primeiros bichos de BICHOS, sejam eles quais forem.
+        # Os dois primeiros bichos de BICHOS, sejam eles quais forem (ou o
+        # mesmo duas vezes, se so houver um).
         modelo = criar_bicho(nomes_dos_bichos[0], NIVEL_INICIAL)
         desenhar_bicho(modelo, 300, 380, 90, 1)
-        modelo = criar_bicho(nomes_dos_bichos[1], NIVEL_INICIAL)
+        modelo = criar_bicho(nomes_dos_bichos[min(1, len(nomes_dos_bichos) - 1)], NIVEL_INICIAL)
         desenhar_bicho(modelo, 500, 380, 90, -1)
         mostrar_texto("Enter para começar", 290, 490, CINZA, fonte)
     elif estado == "encontro":
