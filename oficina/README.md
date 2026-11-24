@@ -169,6 +169,15 @@ as linhas diferentes a amarelo. O botão **Aplicar no meu código** põe-no no
 editor, e daí segue o caminho de sempre: só fica guardado se o jogo o
 aceitar, e há um **Desfazer**. Nada muda sem a criança carregar no botão.
 
+Num **mapa** (as zonas da Bicharada à Solta, o mapa d'O Cerco) o ajudante
+não escreve o mapa outra vez: um modelo pequeno engana-se a contar as letras
+de cada linha, ou devolve o mapa igual. Vê o mapa com as linhas e as colunas
+numeradas e responde com ordens pequenas («linhas 6 a 8, colunas 9 a 13: ~»),
+que a Oficina aplica. As linhas ficam sempre com o tamanho certo, e se as
+ordens não mudarem nada a Oficina di-lo. O aluno vê o mapa já mudado, com o
+botão **Aplicar**, como nas outras coisas. (`INSTRUCOES_DO_MAPA`, `grelha()`
+e `responder()`, no `ajudante.py`.)
+
 O ajudante engana-se de vez em quando. As instruções que ele recebe estão no
 início de `oficina/ajudante.py`.
 

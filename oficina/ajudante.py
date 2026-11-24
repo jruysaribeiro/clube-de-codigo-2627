@@ -25,6 +25,7 @@ import json
 import os
 import queue
 import random
+import re
 import socket
 import sys
 import threading
@@ -60,6 +61,35 @@ Regras:
 4. Se houver um erro, diz em que linha está e o que quer dizer.
 5. Se não souberes, ou o pedido não for claro, di-lo ou faz uma pergunta curta. Não inventes.
 6. Só ajudas com o jogo e com programação. Se te pedirem outra coisa, diz com simpatia que aqui só tratas do jogo."""
+
+
+# Quando o bocado aberto e um mapa de letras, o modelo recebe estas
+# instrucoes em vez das de cima. Pedir-lhe o mapa todo outra vez nao da: um
+# modelo pequeno engana-se a contar as letras de cada linha, ou devolve o
+# mapa igual. Assim ve o mapa com as linhas e as colunas numeradas e
+# responde com ORDENS pequenas, que a Oficina aplica (ver responder).
+INSTRUCOES_DO_MAPA = """És o ajudante da Oficina do Clube de Código. Falas com alunos dos 12 aos 18 anos que estão a mudar o mapa de um jogo. Responde sempre em português de Portugal, a tratar por tu, em poucas frases e com palavras simples.
+
+O mapa é uma grelha de letras: cada letra é um quadrado. Vês o mapa com as linhas e as colunas numeradas: a linha 1 é a de cima, a coluna 1 é a da esquerda.
+
+Regras:
+1. Quando o aluno só quer perceber (o que quer dizer uma letra, como se faz uma coisa), explica e não escrevas ordens.
+2. Quando o aluno pede uma mudança ao mapa, NÃO escrevas o mapa outra vez. Diz numa frase o que vais fazer e depois escreve as ordens dentro de um bloco ```mapa, uma por linha, exatamente com estas palavras:
+linha 6, colunas 9 a 13: ~
+linhas 6 a 8, colunas 9 a 13: ~
+linha 3, coluna 5: H
+   Cada ordem pinta um retângulo com UMA letra. As ordens fazem-se por ordem: a de baixo pinta por cima da de cima. É a Oficina que faz as mudanças no mapa.
+3. Usa só letras que o mapa já conhece (estão explicadas mais abaixo). O que não tem letra própria faz-se com as que há: uma casa, um balcão ou um muro são paredes; uma ponte é relva por cima da água; uma ilha é relva no meio da água.
+4. Faz uma mudança que se veja bem: um lago ou um rio ocupam várias linhas e várias colunas.
+5. Não apagues a partida, os números nem as portas, a não ser que o aluno peça.
+6. Na dúvida, não faças perguntas: faz a mudança que te parecer melhor e diz o que fizeste. O aluno vê o resultado e pode desfazer. Só perguntas se não fizeres mesmo ideia do que ele quer.
+7. Só ajudas com o jogo e com programação. Se te pedirem outra coisa, diz com simpatia que aqui só tratas do jogo."""
+
+# Uma linha de um mapa, no codigo: espacos, o texto entre aspas e a virgula.
+LINHA_DE_MAPA = re.compile(r'^(\s*)"([^"\\]*)"(,?)\s*$')
+# Uma ordem do modelo: "linhas 6 a 8, colunas 9 a 13: ~"
+ORDEM = re.compile(r"linhas?\s+(\d+)(?:\s*(?:a|até|ate|-)\s*(\d+))?\s*,?\s*(?:e\s+)?colunas?\s+(\d+)"
+                   r"(?:\s*(?:a|até|ate|-)\s*(\d+))?\s*[:=]\s*(.+)$", re.IGNORECASE)
 
 
 class Indisponivel(Exception):
@@ -117,15 +147,121 @@ def cortar(texto, maximo):
     return texto
 
 
+def grelha(codigo):
+    # As linhas de mapa de um bocado de codigo: [(numero da linha no bocado,
+    # espacos antes, as letras, a virgula), ...]. Vem vazia se o bocado nao e
+    # um mapa: num mapa quase todas as linhas sao letras entre aspas, e
+    # nenhuma tem palavras separadas por espacos (isso sao frases).
+    linhas = str(codigo or "").replace("\r\n", "\n").split("\n")
+    filas = []
+    for numero, linha in enumerate(linhas):
+        acerto = LINHA_DE_MAPA.match(linha)
+        if acerto:
+            filas.append((numero, acerto.group(1), acerto.group(2), acerto.group(3)))
+    com_texto = [linha for linha in linhas if linha.strip() != ""]
+    if len(filas) < 3 or len(filas) < len(com_texto) - 3:
+        return []
+    for _, _, letras, _ in filas:
+        if len(letras) < 4 or re.search(r"[A-Za-zÀ-ÿ]{2,} [A-Za-zÀ-ÿ]{2,}", letras.strip()):
+            return []
+    return filas
+
+
+def mapa_numerado(filas):
+    # O mapa como o modelo o ve, com uma regua por cima e o numero de cada linha.
+    largura = max(len(letras) for _, _, letras, _ in filas)
+    dezenas = "".join(str(coluna // 10 % 10) if coluna >= 10 else " " for coluna in range(1, largura + 1))
+    unidades = "".join(str(coluna % 10) for coluna in range(1, largura + 1))
+    texto = ["colunas:   " + dezenas, "           " + unidades]
+    for numero, (_, _, letras, _) in enumerate(filas, 1):
+        texto.append("linha %2d:  %s" % (numero, letras))
+    return "\n".join(texto)
+
+
+def aplicar_ordens(codigo, resposta):
+    # Faz no mapa as ordens que o modelo escreveu. Devolve (o codigo novo,
+    # quantos quadrados mudaram). As linhas nunca mudam de tamanho.
+    linhas = str(codigo or "").replace("\r\n", "\n").split("\n")
+    filas = grelha(codigo)
+    letras = [list(fila[2]) for fila in filas]
+    antes = [list(fila) for fila in letras]
+    for texto in resposta.split("\n"):
+        ordem = ORDEM.search(texto.strip())
+        if not ordem:
+            continue
+        linha1 = int(ordem.group(1))
+        linha2 = int(ordem.group(2) or linha1)
+        coluna1 = int(ordem.group(3))
+        coluna2 = int(ordem.group(4) or coluna1)
+        letra = ordem.group(5).strip().strip("`").strip()
+        if len(letra) >= 3 and letra[0] in "\"'" and letra[-1] in "\"'":
+            letra = letra[1:-1]
+        if letra.lower() in ("espaço", "espaco", "um espaço", "nada"):
+            letra = " "
+        if len(letra) != 1 or letra in "\"\\":
+            continue
+        for linha in range(min(linha1, linha2), max(linha1, linha2) + 1):
+            for coluna in range(min(coluna1, coluna2), max(coluna1, coluna2) + 1):
+                if 1 <= linha <= len(letras) and 1 <= coluna <= len(letras[linha - 1]):
+                    letras[linha - 1][coluna - 1] = letra
+    mudados = sum(1 for a, d in zip(antes, letras) for x, y in zip(a, d) if x != y)
+    for (numero, espacos, _, virgula), fila in zip(filas, letras):
+        linhas[numero] = espacos + '"' + "".join(fila) + '"' + virgula
+    return "\n".join(linhas), mudados
+
+
+def responder(pedacos, codigo):
+    # A resposta do modelo, tal como vai para a pagina. Quase sempre e a que
+    # ele escreve. Num mapa, as ordens dele nao se mostram: aplicam-se, e no
+    # lugar delas vai o mapa ja mudado, num bloco ```oficina (o mesmo que o
+    # modelo escreve nas outras coisas, com o botao Aplicar).
+    if not grelha(codigo):
+        yield from pedacos
+        return
+    tudo = ""
+    enviado = 0
+    for pedaco in pedacos:
+        tudo = tudo + pedaco
+        # Vai-se mostrando a conversa ate comecarem as ordens (e so linhas
+        # inteiras, para nao mostrar o inicio de uma ordem).
+        corte = re.search(r"```|^\s*linhas?\s+\d", tudo, re.MULTILINE | re.IGNORECASE)
+        ate = corte.start() if corte else tudo.rfind("\n") + 1
+        if ate > enviado:
+            yield tudo[enviado:ate]
+            enviado = ate
+    corte = re.search(r"```|^\s*linhas?\s+\d", tudo, re.MULTILINE | re.IGNORECASE)
+    if corte is None:
+        yield tudo[enviado:]         # so conversa: nao havia ordens
+        return
+    novo, mudados = aplicar_ordens(codigo, tudo[corte.start():])
+    if mudados == 0:
+        yield ("\n\nNão consegui mudar nada no mapa com este pedido. Diz-me onde queres a mudança, "
+               "por exemplo: «um lago nas linhas 5 a 8, a meio».")
+        return
+    yield "\n\n```oficina\n" + novo + "\n```\n"
+
+
+def sem_blocos(texto):
+    # Uma resposta antiga sem os blocos de codigo: num mapa, ver os mapas que
+    # ja escreveu levava o modelo a escrever outro, em vez das ordens.
+    return re.sub(r"```.*?(```|$)", "(aqui estava o mapa mudado)", str(texto or ""), flags=re.DOTALL)
+
+
 def mensagens(jogo, titulo, ajuda, codigo, erro, linha, conversa, pergunta):
     # O que o modelo recebe: as instrucoes, o bocado que o aluno tem aberto
     # (como esta agora no editor), o erro que a Oficina lhe mostra, a
     # conversa ate aqui e a pergunta.
     linhas = str(codigo or "").replace("\r\n", "\n").split("\n")
-    contexto = [INSTRUCOES, "", "O jogo chama-se " + str(jogo) + ". O aluno tem aberto este bocado: " + str(titulo) + "."]
+    filas = grelha(codigo)
+    contexto = [INSTRUCOES_DO_MAPA if filas else INSTRUCOES, "",
+                "O jogo chama-se " + str(jogo) + ". O aluno tem aberto este bocado: " + str(titulo) + "."]
     if ajuda:
         contexto += ["", "O que quer dizer cada coisa desse bocado:", cortar(ajuda, 3000)]
-    contexto += ["", "O código, como o aluno o tem agora:", "```python", cortar("\n".join(linhas), CODIGO_MAXIMO), "```"]
+    if filas:
+        contexto += ["", "O mapa, como o aluno o tem agora:", mapa_numerado(filas)]
+    else:
+        contexto += ["", "O código, como o aluno o tem agora:", "```python",
+                     cortar("\n".join(linhas), CODIGO_MAXIMO), "```"]
     if erro:
         contexto += ["", "A Oficina está a mostrar este aviso ao aluno:", cortar(erro, TEXTO_MAXIMO)]
         if isinstance(linha, int) and 1 <= linha <= len(linhas):
@@ -138,7 +274,8 @@ def mensagens(jogo, titulo, ajuda, codigo, erro, linha, conversa, pergunta):
     for fala in anteriores[-CONVERSA_MAXIMA:]:
         if isinstance(fala, dict) and fala.get("texto"):
             papel = "assistant" if fala.get("quem") == "ajudante" else "user"
-            resposta.append({"role": papel, "content": cortar(fala["texto"], TEXTO_MAXIMO)})
+            texto = sem_blocos(fala["texto"]) if filas and papel == "assistant" else fala["texto"]
+            resposta.append({"role": papel, "content": cortar(texto, TEXTO_MAXIMO)})
     resposta.append({"role": "user", "content": cortar(pergunta, TEXTO_MAXIMO)})
     return resposta
 

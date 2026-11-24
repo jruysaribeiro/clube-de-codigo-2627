@@ -658,7 +658,8 @@ class Sessao:
             mensagens = modulo_do_ajudante.mensagens(
                 self.config.NOME, self.titulo, self.ajuda, dados.get("codigo"),
                 dados.get("erro"), dados.get("linha"), dados.get("conversa"), pergunta)
-        return self.ajudante.perguntar(mensagens)
+        # (Num mapa, o modelo responde com ordens, e e aqui que se aplicam.)
+        return modulo_do_ajudante.responder(self.ajudante.perguntar(mensagens), dados.get("codigo"))
 
     # --- Levar o jogo para casa e traze-lo de volta ---
 
