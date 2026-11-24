@@ -392,6 +392,39 @@ def _juntar_imagens(resposta, ficha, chaves):
         resposta["imagens"] = imagens
 
 
+def _quem_e_quem(arvore, aqui):
+    # A lista dos treinadores que ha agora, com o numero de cada um e a zona
+    # onde esta, e a das portas. "aqui" e a zona que esta aberta.
+    zonas = _valor(arvore, "ZONAS")
+    zonas = zonas if _sao_zonas(zonas) else {}
+    treinadores = [blocos.valor_da_chave(ficha, "nome") or "sem nome"
+                   for _, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "TREINADORES"))]
+    texto = ["OS TREINADORES QUE HA AGORA, e o numero de cada um no mapa:"]
+    for numero, nome in enumerate(treinadores, 1):
+        if numero > 9:
+            texto.append("  -   " + nome + ": nao cabe no mapa (so ha numeros ate ao 9)")
+            continue
+        onde = [zona for zona in zonas if str(numero) in "".join(zonas[zona])]
+        if aqui in onde:
+            sitio = "esta nesta zona"
+        elif onde:
+            sitio = 'esta na zona "' + onde[0] + '"'
+        else:
+            sitio = "ainda nao esta em nenhuma zona: escreve um " + str(numero) + " onde o quiseres"
+        texto.append("  " + str(numero) + "   " + nome + " (" + sitio + ")")
+    texto.append("Para mudares um treinador de sitio, apaga o numero dele (poe relva, ou soalho) e escreve-o")
+    texto.append("noutro quadrado, desta zona ou de outra. Cada numero so se escreve uma vez.")
+    portas = _valor(arvore, "PORTAS")
+    if _sao_portas(portas) and portas:
+        texto.append("")
+        texto.append("AS PORTAS QUE HA AGORA:")
+        for letra, destino in portas.items():
+            fora = [zona for zona in zonas if zona != destino and letra in "".join(zonas[zona])]
+            texto.append("  " + letra + '   a porta de "' + destino + '"'
+                         + (' (ca fora, esta na zona "' + fora[0] + '")' if fora else " (ainda nao esta em nenhuma zona ca fora)"))
+    return "\n".join(texto)
+
+
 def regiao(fonte, escolha):
     # Igual a do bicharada.py, mais o mundo, as portas, as zonas e as funcoes
     # do mapa.
@@ -420,9 +453,12 @@ def regiao(fonte, escolha):
         nome, inicio, fim = partes[int(numero)]
         dentro = nome in _interiores(arvore)
         # A explicacao das letras e a de dentro ou a de fora, conforme a zona.
+        # E, por baixo, quem e cada numero e cada porta neste momento: isso
+        # muda quando se cria, apaga ou muda o nome a um treinador.
         ajuda = blocos.comentarios_a_partir_de(linhas, INICIO_DOS_INTERIORES if dentro else INICIO_DAS_ZONAS)
+        ajuda = (ajuda or blocos.ajuda_acima(linhas, no.lineno)) + "\n\n" + _quem_e_quem(arvore, nome)
         return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": None, "som": None,
-                "ajuda": ajuda or blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS["interior" if dentro else "zona"],
+                "ajuda": ajuda, "dica": DICAS["interior" if dentro else "zona"],
                 "sugestoes": SUGESTOES["interior" if dentro else "zona"],
                 "apagar": "Apagar este edifício" if dentro else "Apagar esta zona", "renomear": "Mudar o nome"}
 
