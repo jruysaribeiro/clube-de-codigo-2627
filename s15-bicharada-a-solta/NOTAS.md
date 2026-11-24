@@ -51,6 +51,7 @@ horta    praia     farol
 | O teu boneco: a cor e as três imagens | `JOGADOR` |
 | As falas, as perguntas, quem dá a rede e o boneco de cada treinador | `TREINADORES` (`falas`, `falas_depois`, `falas_rede`, `da_rede`, `imagem`) |
 | Os ataques que um bicho sabe, e os que aprende a um certo nível | `BICHOS` (`ataques`, `aprende`), `ataques_de()` |
+| O tamanho de cada bicho na batalha (1.0 é o normal) | `BICHOS` (`tamanho`), `tamanho_na_batalha()` |
 | Onde se pode andar | `pode_andar()` |
 | Quando salta um bicho da erva, e qual | `ha_batalha_na_erva()`, `escolher_bicho_selvagem()` |
 | Quando se consegue apanhar um bicho | `consegue_apanhar()` |

@@ -560,7 +560,7 @@ def regiao(fonte, escolha):
 
     resposta = base.regiao(fonte, escolha)
     if resposta is not None and tipo == "bicho" and numero.isdigit():
-        resposta["sugestoes"] = ["Faz com que só aprenda o ataque mais forte ao nível 10",
+        resposta["sugestoes"] = ["Faz este bicho maior na batalha",
                                  "Põe-no mais rápido mas com menos vida", "O que quer dizer o «aprende»?"]
         # Cada bicho tem duas imagens: de frente e de costas.
         ficha = base._fichas(blocos.instrucao(arvore, "BICHOS"))[int(numero)][1]
@@ -1446,6 +1446,11 @@ def _ver_aprende(ns, bichos, aberto, problemas, avisos):
     # que esta escrito no ficheiro.
     ataques = ns.get("ATAQUES") if isinstance(ns.get("ATAQUES"), dict) else {}
     for nome, ficha in bichos.items() if isinstance(bichos, dict) else []:
+        if isinstance(ficha, dict) and "tamanho" in ficha:
+            tamanho = ficha["tamanho"]
+            if isinstance(tamanho, bool) or not isinstance(tamanho, (int, float)) or tamanho < 0.3 or tamanho > 2.5:
+                problemas.append(str(nome) + ': o "tamanho" é um número entre 0.3 e 2.5, sem aspas: 1.0 é o normal, '
+                                 "1.5 é uma vez e meia maior.")
         if not isinstance(ficha, dict) or "aprende" not in ficha:
             continue
         aprende = ficha["aprende"]

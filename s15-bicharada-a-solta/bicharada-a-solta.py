@@ -614,6 +614,8 @@ ATAQUES = {
 #           bicho que ja aparece com esse nivel ja o sabe. No menu da batalha
 #           cabem 4: se souber mais, ficam os 4 ultimos que aprendeu.
 # forma: "circulo", "quadrado", "triangulo" ou "gota"
+# tamanho:  (so se quiseres) o tamanho dele na batalha: 1.0 e o normal, 1.5
+#           e uma vez e meia maior, 0.7 e mais pequeno. So muda este bicho
 # imagem:         o nome de um PNG com o bicho visto de frente: e como se ve
 #                 quando e o adversario, e nos menus
 # imagem_costas:  o bicho visto de costas: e como se ve o TEU, na batalha
@@ -628,49 +630,49 @@ BICHOS = {
         "tipo": "fogo", "vida": 45, "ataque": 15, "defesa": 10, "velocidade": 14,
         "ataques": ["Bicada", "Cocoricó"],
         "aprende": {"Crista em Brasa": 6, "Estalido": 9},
-        "cor": (200, 45, 45), "forma": "triangulo", "imagem": "galo.png", "imagem_costas": "galo-costas.png",
+        "cor": (200, 45, 45), "forma": "triangulo", "tamanho": 1.0, "imagem": "galo.png", "imagem_costas": "galo-costas.png",
         "som": "galo.wav",
     },
     "Castanha Assada": {
         "tipo": "fogo", "vida": 55, "ataque": 12, "defesa": 13, "velocidade": 7,
         "ataques": ["Investida", "Casca Dura"],
         "aprende": {"Fumarada": 4, "Estalido": 8},
-        "cor": (130, 70, 35), "forma": "gota", "imagem": "castanha.png", "imagem_costas": "castanha-costas.png",
+        "cor": (130, 70, 35), "forma": "gota", "tamanho": 1.0, "imagem": "castanha.png", "imagem_costas": "castanha-costas.png",
         "som": "castanha.wav",
     },
     "Sardinhão": {
         "tipo": "agua", "vida": 48, "ataque": 13, "defesa": 10, "velocidade": 15,
         "ataques": ["Investida", "Escamas"],
         "aprende": {"Esguicho": 4, "Onda da Nazaré": 8},
-        "cor": (120, 160, 200), "forma": "gota", "imagem": "sardinhao.png", "imagem_costas": "sardinhao-costas.png",
+        "cor": (120, 160, 200), "forma": "gota", "tamanho": 1.0, "imagem": "sardinhao.png", "imagem_costas": "sardinhao-costas.png",
         "som": "sardinhao.wav",
     },
     "Polvo Lagareiro": {
         "tipo": "agua", "vida": 60, "ataque": 11, "defesa": 13, "velocidade": 6,
         "ataques": ["Patada", "Tinta de Choco"],
         "aprende": {"Esguicho": 4, "Tentáculo": 7},
-        "cor": (170, 80, 150), "forma": "circulo", "imagem": "polvo.png", "imagem_costas": "polvo-costas.png",
+        "cor": (170, 80, 150), "forma": "circulo", "tamanho": 1.0, "imagem": "polvo.png", "imagem_costas": "polvo-costas.png",
         "som": "polvo.wav",
     },
     "Sobreirinho": {
         "tipo": "planta", "vida": 58, "ataque": 11, "defesa": 15, "velocidade": 5,
         "ataques": ["Chicote de Cortiça", "Casca Dura"],
         "aprende": {"Seiva": 5, "Bolotada": 8},
-        "cor": (120, 100, 50), "forma": "quadrado", "imagem": "sobreirinho.png", "imagem_costas": "sobreirinho-costas.png",
+        "cor": (120, 100, 50), "forma": "quadrado", "tamanho": 1.0, "imagem": "sobreirinho.png", "imagem_costas": "sobreirinho-costas.png",
         "som": "sobreirinho.wav",
     },
     "Couve Galega": {
         "tipo": "planta", "vida": 50, "ataque": 13, "defesa": 11, "velocidade": 11,
         "ataques": ["Investida", "Seiva"],
         "aprende": {"Folha de Couve": 4, "Bolotada": 8},
-        "cor": (60, 150, 70), "forma": "circulo", "imagem": "couve.png", "imagem_costas": "couve-costas.png",
+        "cor": (60, 150, 70), "forma": "circulo", "tamanho": 1.0, "imagem": "couve.png", "imagem_costas": "couve-costas.png",
         "som": "couve.wav",
     },
     "Lince Ibérico": {
         "tipo": "normal", "vida": 46, "ataque": 15, "defesa": 9, "velocidade": 16,
         "ataques": ["Arranhão", "Rugido"],
         "aprende": {"Patada": 5, "Salto Felino": 8},
-        "cor": (205, 155, 85), "forma": "quadrado", "imagem": "lince.png", "imagem_costas": "lince-costas.png",
+        "cor": (205, 155, 85), "forma": "quadrado", "tamanho": 1.0, "imagem": "lince.png", "imagem_costas": "lince-costas.png",
         "som": "lince.wav",
     },
 }
@@ -2328,6 +2330,16 @@ def desenhar_bicho(bicho, cx, cy, tamanho, olha_para):
     desenhar_olhos(bicho, cx, cy, tamanho, olha_para)
 
 
+# O TAMANHO DE UM BICHO NA BATALHA
+# normal: o tamanho, em pixeis, de um bicho com "tamanho": 1.0. Devolve o
+# deste bicho: o normal vezes o "tamanho" que ele tiver em BICHOS.
+def tamanho_na_batalha(bicho, normal):
+    dados = BICHOS[bicho["nome"]]
+    if "tamanho" in dados:
+        return int(normal * dados["tamanho"])
+    return normal
+
+
 # O TEU BICHO, VISTO DE COSTAS
 # E assim que se desenha o teu bicho na batalha: ele olha para o adversario,
 # e tu ves-lhe as costas. Mostra a imagem_costas dele; se nao houver, a
@@ -2697,7 +2709,8 @@ def desenhar_encontro():
     ecra.fill(BICHO_A_SOLTA["cor_fundo"])
     pygame.draw.rect(ecra, escurecer(BICHO_A_SOLTA["cor_fundo"], 0.75), (0, 250, LARGURA, 190))
     pygame.draw.ellipse(ecra, escurecer(BICHO_A_SOLTA["cor_fundo"], 0.55), (285, 265, 230, 55))
-    desenhar_bicho(bicho_a_solta, 400, 230, 130, -1)
+    tamanho = tamanho_na_batalha(bicho_a_solta, 130)
+    desenhar_bicho(bicho_a_solta, 400, 295 - tamanho // 2, tamanho, -1)
     desenhar_caixa_bicho(bicho_a_solta, 40, 40, False)
     desenhar_painel()
     y = 470
@@ -2820,8 +2833,12 @@ def desenhar_batalha():
     pygame.draw.ellipse(ecra, escurecer(treinador()["cor_fundo"], 0.55), (480, 205, 230, 55))
     pygame.draw.ellipse(ecra, escurecer(treinador()["cor_fundo"], 0.55), (70, 385, 280, 60))
 
-    desenhar_bicho(inimigo, 595, 180, 110, -1)
-    desenhar_bicho_de_costas(eu, 210, 340, 150)
+    # (Cada bicho tem o seu tamanho. Os pes ficam sempre no mesmo sitio, em
+    # cima da sombra: um bicho maior cresce para cima.)
+    tamanho = tamanho_na_batalha(inimigo, 110)
+    desenhar_bicho(inimigo, 595, 235 - tamanho // 2, tamanho, -1)
+    tamanho = tamanho_na_batalha(eu, 150)
+    desenhar_bicho_de_costas(eu, 210, 415 - tamanho // 2, tamanho)
     desenhar_caixa_bicho(inimigo, 40, 40, False)
     desenhar_caixa_bicho(eu, 460, 300, True)
 
