@@ -264,8 +264,8 @@ uv run --with pygame-ce halloween/noite-dos-doces.py
 ```
 
 > **Para correr outro ficheiro**, troca só o caminho no fim: por exemplo
-> `.venv/bin/python s12-bicharada/bicharada.py`. No Windows, as barras são
-> ao contrário: `.venv\Scripts\python s12-bicharada\bicharada.py`.
+> `.venv/bin/python s13-o-cerco/o-cerco.py`. No Windows, as barras são
+> ao contrário: `.venv\Scripts\python s13-o-cerco\o-cerco.py`.
 
 ## 2. A regra para correr qualquer ficheiro
 
@@ -443,12 +443,13 @@ página no browser: escolhe-se um jogo e **uma coisa** dele (um inimigo, uma
 torre, um nível), e fica o código dessa coisa de um lado e o jogo a correr do
 outro, a mudar enquanto se escreve. Para fechar: `Ctrl + C` no terminal.
 
-Abre cinco jogos: **FADO//NEON** (s10), **Bicharada** (s12), **Bicharada à
-Solta** (s15, a Bicharada com um mapa), **O Cerco** (s13) e **Mãos ao Ar!**
+Abre quatro jogos: **FADO//NEON** (s10), **Bicharada à Solta** (s15,
+batalhas por turnos com um mundo por onde se anda), **O Cerco** (s13) e **Mãos ao Ar!**
 (s14, aqui só com o teclado: não liga a câmara nem instala nada).
 
-- A Oficina mexe no **ficheiro verdadeiro** do jogo, e só guarda código que
-  correu sem rebentar. **Repor o original** desfaz um bocado; **Guardar o meu
+- A Oficina mexe no **ficheiro verdadeiro** do jogo, mas só quando se carrega
+  em **Guardar alterações**, e só deixa guardar código que correu sem
+  rebentar. **Repor o original** desfaz um bocado; **Guardar o meu
   jogo** dá um zip para levar (o jogo, as imagens e os sons), e **Abrir um
   jogo guardado** recebe esse zip e põe tudo no sítio.
 - Se o browser não abrir sozinho, abre o endereço que o terminal mostra
@@ -461,7 +462,7 @@ já foi mudado, para experimentar a sério; **Voltar** regressa ao código.
 
 ### Regras, acontecimentos e desenhos
 
-Além dos dados, os cinco jogos abrem **regras** (n'O Cerco: quem a torre
+Além dos dados, os quatro jogos abrem **regras** (n'O Cerco: quem a torre
 ataca, o que faz ao disparar...), **acontecimentos** (funções vazias que o
 jogo chama quando cai um inimigo, começa uma onda, se carrega numa tecla...)
 e **desenhos**. São funções pequenas: é aqui que se escreve, ou se pede ao

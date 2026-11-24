@@ -135,6 +135,10 @@
   #renomear { margin-left: auto; }
   #renomear[hidden] + #apagar { margin-left: auto; }
   #apagar { color: var(--vermelho); }
+  #guardar-alteracoes { border-color: var(--verde); color: var(--verde); font-weight: 600; }
+  #guardar-alteracoes:disabled { opacity: .45; cursor: default; }
+  #estado .noutro-sitio { margin: 8px 0 0; color: var(--texto); }
+  #estado .noutro-sitio button { font-size: 14px; margin-left: 6px; }
   #apagar:hover { border-color: var(--vermelho); }
 
   /* ---------- desenhar uma imagem ---------- */
@@ -193,6 +197,7 @@
   #estado ul { margin: 4px 0 0; padding-left: 20px; }
   #estado small { display: block; color: var(--fraco); font-family: var(--letra-codigo); font-size: 12px; margin-top: 3px; }
   #estado .avisos { color: var(--laranja); }
+  #estado .falta { margin: 6px 0 0; }
   #fala { padding: 6px 14px; border-top: 1px solid var(--linha); font: 13px/1.4 var(--letra-codigo); color: var(--fraco); white-space: pre-wrap; max-height: 80px; overflow: auto; }
   .baixo { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--linha); background: var(--painel); }
   .baixo button { font-size: 14px; }
@@ -306,6 +311,7 @@
     </form>
   </div>
   <div class="baixo">
+    <button id="guardar-alteracoes" hidden>Guardar alterações</button>
     <button id="repor">Repor o original</button>
     <button id="guardar">Guardar o meu jogo</button>
     <button id="reabrir" hidden>Pôr o jogo a correr outra vez</button>
@@ -386,6 +392,11 @@ let aJogarTudo = false;     // esta-se a jogar o jogo inteiro, sem codigo ao lad
 let voltarPara = null;      // a coisa a que se volta ao sair do jogo inteiro
 let haAjudante = false;     // ha computadores ajudantes na sala
 let ultimoPedido = 0;       // numero do ultimo codigo que o jogo aceitou receber
+// Guardar e com um botao. O que se escreve vai logo para o jogo, mas so fica
+// no ficheiro quando se carrega em "Guardar alteracoes", e so se pode
+// carregar depois de o jogo ter corrido com esse codigo sem rebentar.
+let codigoGuardado = null;  // o codigo deste bocado tal como esta no ficheiro
+let pedidoProvado = null;   // numero do ultimo codigo que correu sem rebentar
 let desde = 0;              // ultima mensagem do jogo que ja vimos
 let linhaMal = null;
 let espera = null;
@@ -599,6 +610,7 @@ async function guardarLista() {
 async function mudarNome() {
   // Muda o nome a coisa aberta em todos os sitios onde ela e usada (um
   // ataque, nas fichas dos bichos que o sabem), e volta a abri-la.
+  if (!(await podeSair())) return;
   const antigo = $("titulo").textContent;
   const nome = prompt('Que nome novo queres dar a "' + antigo + '"?', antigo);
   if (nome === null || nome.trim() === "" || nome.trim() === antigo) return;
@@ -614,6 +626,7 @@ async function mudarNome() {
 
 async function apagarCoisa() {
   const nome = $("titulo").textContent;
+  codigoGuardado = codigo.value;       // vai ser apagada: o que la estava por guardar ja nao interessa
   if (!confirm('Apagar "' + nome + '" do jogo?\n\nSai do jogo e de todos os sítios onde era usado.')) return;
   let dados;
   try {
@@ -702,6 +715,9 @@ async function abrir(jogo, escolha, recado) {
   $("apagar").textContent = dados.apagar || "";
   $("lista").hidden = true;
   codigo.value = dados.codigo;
+  codigoGuardado = dados.codigo;
+  pedidoProvado = null;
+  verGuardar();
   mostrarCaixas(haCaixas);
   codigo.setSelectionRange(0, 0);     // senao o Safari abre o codigo ja puxado para a direita
   linhaMal = null;
@@ -729,6 +745,46 @@ function lista(frases, classe) {
   return ul;
 }
 
+function porGuardar() {
+  return !$("editar").hidden && !aJogarTudo && codigo.value !== codigoGuardado;
+}
+
+function verGuardar() {
+  // O botao aparece quando ha alteracoes, e acende quando ja se pode guardar.
+  const botao = $("guardar-alteracoes");
+  botao.hidden = !porGuardar();
+  botao.disabled = !(pedidoProvado !== null && pedidoProvado === ultimoPedido);
+  botao.title = botao.disabled ? "Só dá para guardar quando o jogo estiver a correr com este código, sem erros"
+                               : "Põe estas alterações no ficheiro do jogo";
+}
+
+async function guardarAlteracoes() {
+  try {
+    await pedir("/api/guardar", {id: pedidoProvado});
+  } catch (erro) {
+    alert(erro.message);
+    return false;
+  }
+  codigoGuardado = codigo.value;
+  verGuardar();
+  dizer("bem", "Guardado.");
+  return true;
+}
+
+async function podeSair() {
+  // Antes de sair do bocado aberto: ha alteracoes por guardar? Devolve
+  // false se e para ficar.
+  if (!porGuardar()) return true;
+  if (pedidoProvado !== null && pedidoProvado === ultimoPedido) {
+    if (confirm("Tens alterações por guardar.\n\nOK: guardo-as agora.\nCancelar: saio sem as guardar (perdem-se).")) {
+      return await guardarAlteracoes();
+    }
+    return true;
+  }
+  return confirm("O que escreveste ainda não está a funcionar no jogo, por isso não dá para guardar.\n\n"
+    + "OK: saio na mesma (perde-se).\nCancelar: fico aqui a corrigir.");
+}
+
 async function enviar(mudarNome) {
   let resposta;
   try {
@@ -740,9 +796,18 @@ async function enviar(mudarNome) {
   if (resposta.ok) {
     ultimoPedido = resposta.id;
     marcarLinha(null);
-    if (resposta.titulo) $("titulo").textContent = resposta.titulo;     // o nome foi mudado em todo o lado
+    if (resposta.titulo) {
+      // O nome foi mudado em todo o lado (isso ja ficou no ficheiro). O
+      // resto do que se escreveu ainda esta por guardar.
+      $("titulo").textContent = resposta.titulo;
+      codigoGuardado = null;
+    }
+    pedidoProvado = null;
+    verGuardar();
     dizer("espera", (resposta.aviso ? resposta.aviso + " " : "") + "A experimentar no jogo…");
   } else if (resposta.nome) {
+    pedidoProvado = null;
+    verGuardar();
     // O nome da coisa foi mudado no codigo. Espera-se que acabem de o
     // escrever (se escreverem mais, este temporizador e apagado) e so entao
     // se muda o nome em todos os sitios onde ela e usada.
@@ -753,6 +818,8 @@ async function enviar(mudarNome) {
     espera = setTimeout(() => enviar(true), 1300);
   } else {
     ultimoPedido = Infinity;     // nada do que o jogo disser agora interessa
+    pedidoProvado = null;
+    verGuardar();
     mostrarErro(resposta.erro);
   }
 }
@@ -760,7 +827,19 @@ async function enviar(mudarNome) {
 function mostrarErro(erro) {
   marcarLinha(erro.linha);
   const onde = erro.linha ? "Linha " + erro.linha + ": " : "";
-  dizer("mal", onde + erro.texto, [elemento("small", erro.detalhe)]);
+  const extras = [elemento("small", erro.detalhe)];
+  if (erro.onde) {
+    // O erro esta noutra coisa do jogo, e nao no bocado aberto: diz-se
+    // qual, com um botao para ir la corrigi-la.
+    const outra = elemento("p", "O erro não está neste bocado. Está em «" + erro.onde.titulo + "» ("
+      + erro.onde.grupo + "): abre essa coisa e corrige-a, ou carrega lá em «Repor o original». ", "noutro-sitio");
+    const ir = elemento("button", "Ir para lá");
+    ir.type = "button";
+    ir.onclick = async () => { if (await podeSair()) abrir(jogoAberto, erro.onde.escolha); };
+    outra.append(ir);
+    extras.push(outra);
+  }
+  dizer("mal", onde + erro.texto, extras);
 }
 
 async function verEstado() {
@@ -783,13 +862,22 @@ async function verEstado() {
         const aviso = $("aviso-jogo");
         aviso.hidden = false;
         aviso.textContent = "O jogo parou com um erro: " + m.texto;
+        if (m.onde) aviso.append(" O erro está em «" + m.onde.titulo + "» (" + m.onde.grupo + ").");
         aviso.append(elemento("small", m.detalhe));
       }
     } else if (m.id === ultimoPedido || (m.tipo === "erro" && m.id == null)) {
       if (m.tipo === "aplicado" || m.tipo === "estavel") {
-        const guardado = m.tipo === "estavel" ? " Ficou guardado." : "";
+        if (m.tipo === "estavel") {
+          pedidoProvado = m.id;      // correu sem rebentar: ja se pode guardar
+          verGuardar();
+        }
+        const guardado = m.tipo === "estavel" && porGuardar() ? " Falta guardar: carrega em «Guardar alterações»." : "";
         const extras = m.avisos && m.avisos.length ? [lista(m.avisos, "avisos")] : [];
-        if (m.tipo === "estavel" && $("estado").querySelector(".avisos")) continue;
+        if (m.tipo === "estavel" && $("estado").querySelector(".avisos")) {
+          // (Os avisos ficam a vista; so se junta que falta guardar.)
+          if (guardado && !$("estado").querySelector(".falta")) $("estado").append(elemento("p", guardado.trim(), "falta"));
+          continue;
+        }
         dizer("bem", "Está no jogo." + guardado, extras);
       } else if (m.tipo === "problemas") {
         dizer("aviso", "Ainda não entrou no jogo:", [lista(m.problemas)]);
@@ -977,6 +1065,8 @@ function escrever(texto) {
 
 codigo.addEventListener("input", () => {
   pintar();
+  pedidoProvado = null;      // o que esta escrito agora ainda nao foi experimentado
+  verGuardar();
   clearTimeout(espera);
   espera = setTimeout(enviar, 350);
 });
@@ -1793,7 +1883,10 @@ async function jogarTudo(jogoId, voltar) {
   aVer = setInterval(verEstado, 350);
 }
 
-$("jogar-tudo").onclick = () => jogarTudo(jogoAberto, escolhaAberta);
+$("jogar-tudo").onclick = async () => { if (await podeSair()) jogarTudo(jogoAberto, escolhaAberta); };
+$("guardar-alteracoes").onclick = guardarAlteracoes;
+// Fechar ou recarregar a pagina com alteracoes por guardar: o browser pergunta.
+window.addEventListener("beforeunload", evento => { if (porGuardar()) { evento.preventDefault(); evento.returnValue = ""; } });
 $("jogar-outra").onclick = async () => {
   $("jogar-outra").hidden = true;
   $("aviso-jogo").hidden = true;
@@ -1802,6 +1895,7 @@ $("jogar-outra").onclick = async () => {
 };
 
 $("voltar").onclick = async () => {
+  if (!(await podeSair())) return;
   clearTimeout(espera);
   try { await pedir("/api/fechar", {}); } catch (erro) {}
   if (aJogarTudo && voltarPara) {
@@ -1822,7 +1916,7 @@ $("repor").onclick = async () => {
     alert(erro.message);
   }
 };
-$("guardar").onclick = () => guardarJogo(jogoAberto);
+$("guardar").onclick = async () => { if (await podeSair()) guardarJogo(jogoAberto); };   // o zip leva o que esta guardado
 $("apagar").onclick = apagarCoisa;
 $("renomear").onclick = mudarNome;
 $("barra-caixas").onmouseenter = () => { if (!document.activeElement || document.activeElement.type !== "checkbox") mostrarCaixas(haCaixas); };

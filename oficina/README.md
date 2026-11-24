@@ -4,8 +4,8 @@ Escolhe-se um jogo e **uma coisa** dele (um inimigo, uma torre, o mapa).
 De um lado fica só o código dessa coisa; do outro, o jogo a correr, a
 mudar enquanto se escreve.
 
-Abre cinco jogos: **FADO//NEON** (s10), **Bicharada** (s12), **Bicharada à
-Solta** (s15, a Bicharada com um mapa por onde se anda), **O Cerco** (s13) e
+Abre quatro jogos: **FADO//NEON** (s10), **Bicharada à Solta** (s15,
+batalhas por turnos com um mundo por onde se anda), **O Cerco** (s13) e
 **Mãos ao Ar!** (s14, aqui jogado só com o teclado, sem câmara).
 
 ## Correr
@@ -38,12 +38,11 @@ perceber o que se lhe pode pedir (`SUGESTOES`, no `jogos/o_cerco.py`).
 
 ## Regras do jogo
 
-Além dos dados, os cinco jogos abrem **regras**. N'O Cerco são quatro: quem
+Além dos dados, os quatro jogos abrem **regras**. N'O Cerco são quatro: quem
 a torre ataca, o que a torre faz ao disparar, o que acontece a um inimigo
 atingido e como anda um inimigo. Nos outros: como saem os tiros e o que faz
 cada carta (FADO//NEON), quanto magoa um ataque e quem ataca primeiro
-(Bicharada; a Bicharada à Solta junta onde se pode andar e que bicho salta da
-erva), como salta o Faísca e como se mexe um inimigo (Mãos ao Ar!).
+e onde se pode andar e que bicho salta da erva (Bicharada à Solta), como salta o Faísca e como se mexe um inimigo (Mãos ao Ar!).
 Cada uma é uma função pequena do jogo; mudá-la muda a maneira como o jogo se
 comporta. É aqui que se escreve um `if` a sério.
 
@@ -62,7 +61,7 @@ no `jogos/o_cerco.py`).
 
 ## Acontecimentos, desenhos e coisas novas
 
-Nos cinco jogos:
+Nos quatro jogos:
 
 - **Acontecimentos**: funções que vêm vazias e que o jogo chama em certos
   momentos (n'O Cerco: quando começa uma onda, cai um inimigo, um inimigo
@@ -80,7 +79,7 @@ Nos cinco jogos:
   d'O Cerco entra na primeira onda), e o aviso diz onde. (No ficheiro do
   jogo em `oficina/jogos/`: `CRIAVEIS` e `novo()`.)
 
-Apagar, escolher de uma lista, marcar caixas e mudar nomes existem nos cinco
+Apagar, escolher de uma lista, marcar caixas e mudar nomes existem nos quatro
 jogos, cada um à sua medida. O que cada jogo oferece está no ficheiro dele em
 `oficina/jogos/` (`CRIAVEIS`, `apagar()`, `lista()`, `caixas()`,
 `renomear()`):
@@ -88,8 +87,7 @@ jogos, cada um à sua medida. O que cada jogo oferece está no ficheiro dele em
 | Jogo | Cria-se e apaga-se | Listas e caixas |
 |---|---|---|
 | FADO//NEON | inimigos, cartas, ondas especiais, frases | os ataques e os invocados do chefe, os inimigos de uma onda; caixas no arranque do jogo, nos inimigos e nas cartas |
-| Bicharada | bichos, ataques, treinadores, tipos | os bichos de um treinador, os ataques de um bicho |
-| Bicharada à Solta | o mesmo, e zonas e edifícios | o mesmo, e a caixa «dá a rede no início» |
+| Bicharada à Solta | bichos, ataques, treinadores, tipos, zonas, edifícios | os bichos de um treinador, os ataques de um bicho; a caixa «dá a rede no início» |
 | O Cerco | inimigos, torres, ondas | os inimigos de uma onda |
 | Mãos ao Ar! | inimigos, mundos, níveis | o jeito de um inimigo; caixas nos inimigos, nos mundos e nos níveis |
 
@@ -100,7 +98,7 @@ jogos, cada um à sua medida. O que cada jogo oferece está no ficheiro dele em
   nome no próprio código: quando a criança pára de escrever, a Oficina dá
   pela mudança e faz o mesmo que o botão.
 
-Nas duas Bicharadas:
+Na Bicharada à Solta:
 
 - **Apagar** (o botão vermelho, com a coisa aberta) tira do jogo um bicho,
   um ataque ou um treinador, e também dos sítios onde era usado: o bicho sai
@@ -118,12 +116,9 @@ Nas duas Bicharadas:
   Um **ataque novo** nasce sem dono: é por aqui que se dá a um bicho.
 - Cada **tipo** abre sozinho (a cor dele), com **+ Novo tipo** e **Apagar
   este tipo**: os bichos e os ataques de um tipo apagado passam para o tipo
-  que todos podem aprender. Na Bicharada à Solta esse tipo escolhe-se
-  (`TIPO_NORMAL`); na Bicharada é sempre o que se chama `normal`.
+  que todos podem aprender, que se escolhe em `TIPO_NORMAL`.
   (No ficheiro do jogo em `oficina/jogos/`: `apagar()` e `lista()`, e as
   chaves `"apagar"` e `"lista"` que a `regiao` devolve.)
-
-Só na Bicharada à Solta:
 
 - Com um treinador aberto há a caixa **Dá a rede no início**: é ela que diz
   quem dá a primeira rede a quem começa sem bichos. (`caixas()` e a chave
@@ -229,8 +224,13 @@ início de `oficina/ajudante.py`.
 
 - A Oficina mexe no **ficheiro verdadeiro** do jogo. O que a criança muda
   fica no `o-cerco.py` dela, e o jogo corre-se depois como sempre.
-- Só é guardado código que **funcionou**: correu no jogo uns instantes sem
-  rebentar. Código com erros fica só no editor, com o erro explicado.
+- O que se escreve vai logo para o jogo que está a correr, mas só fica no
+  ficheiro quando se carrega em **Guardar alterações**. O botão aparece logo
+  que há alterações, e só se pode carregar nele depois de o jogo ter corrido
+  uns instantes com esse código sem rebentar: código com erros não se
+  guarda. Quem sai de um bocado com alterações por guardar é avisado.
+- Se o jogo parar por causa de um erro que está noutra coisa (e não no
+  bocado aberto), o aviso diz em qual, com um botão para ir lá.
 - **Guardar o meu jogo** descarrega um zip (`o-cerco.zip`) com o ficheiro do
   jogo e as imagens e os sons que ele usa. **Abrir um jogo guardado** recebe
   esse zip tal como está: troca o jogo da Oficina pelo que lá vem (o que lá

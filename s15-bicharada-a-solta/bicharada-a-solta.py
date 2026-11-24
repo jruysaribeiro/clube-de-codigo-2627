@@ -1,5 +1,6 @@
 # S15 — BICHARADA A SOLTA
-# A Bicharada (s12) com um mundo por onde se anda. O mundo e feito de zonas,
+# Batalhas por turnos, a moda do Pokemon, com bichos muito portugueses e um
+# mundo por onde se anda. O mundo e feito de zonas,
 # cada uma do tamanho do ecra: quando sais por um lado de uma, entras na do
 # lado. Ha edificios onde se entra pela porta. Na erva alta saltam bichos a
 # solta, os treinadores estao espalhados pelas zonas, e a casa da avo cura a
@@ -1878,6 +1879,22 @@ def continuar():
     fim_do_turno()
 
 
+def mexer_barras():
+    # Corre a cada frame: as barras de vida descem (ou sobem) devagar ate a
+    # vida verdadeira, e os bichos deixam de tremer.
+    # (Esta numa funcao, e nao solto no ciclo do jogo, para o "bicho" daqui
+    # nao ficar a existir no resto do ficheiro: quem escrevesse "bicho" numa
+    # funcao sua, por engano, ficava com um bicho qualquer em vez de um erro.)
+    for bicho in minha_equipa + equipa_inimiga:
+        passo = bicho["vida_max"] / 50
+        if bicho["vida_mostrada"] > bicho["vida"]:
+            bicho["vida_mostrada"] = max(bicho["vida"], bicho["vida_mostrada"] - passo)
+        if bicho["vida_mostrada"] < bicho["vida"]:
+            bicho["vida_mostrada"] = min(bicho["vida"], bicho["vida_mostrada"] + passo)
+        if bicho["tremor"] > 0:
+            bicho["tremor"] = bicho["tremor"] - 1
+
+
 def barras_paradas():
     # Enquanto alguma barra de vida esta a descer, nao passamos o texto.
     for bicho in minha_equipa + equipa_inimiga:
@@ -2597,15 +2614,7 @@ while a_correr:
     if estado == "mundo":
         a_cada_frame()
 
-    # As barras de vida descem devagar ate a vida verdadeira.
-    for bicho in minha_equipa + equipa_inimiga:
-        passo = bicho["vida_max"] / 50
-        if bicho["vida_mostrada"] > bicho["vida"]:
-            bicho["vida_mostrada"] = max(bicho["vida"], bicho["vida_mostrada"] - passo)
-        if bicho["vida_mostrada"] < bicho["vida"]:
-            bicho["vida_mostrada"] = min(bicho["vida"], bicho["vida_mostrada"] + passo)
-        if bicho["tremor"] > 0:
-            bicho["tremor"] = bicho["tremor"] - 1
+    mexer_barras()
 
     # ------------------------ 3. DESENHAR -------------------------
     if estado == "menu":

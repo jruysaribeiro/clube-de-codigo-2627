@@ -173,6 +173,10 @@ class Sessao:
         self.contador = 0            # numero da ultima mensagem
         self.numero = 0              # numero do ultimo pedido de codigo
         self.pedidos = {}            # numero -> (inicio, fim, fonte)
+        # O ultimo codigo que correu no jogo sem rebentar e ainda nao foi
+        # guardado: (o numero do pedido, o ficheiro inteiro). So vai para o
+        # ficheiro quando a crianca carrega em "Guardar alteracoes".
+        self.provado = None
         self.a_provar = None         # (numero, hora) do codigo que o jogo esta a experimentar
         # A imagem do jogo: o palco liga-se a esta porta e manda os frames.
         self.quadro = None
@@ -277,8 +281,9 @@ class Sessao:
             if self.a_provar is not None and mensagem.get("id") in (None, self.a_provar[0]):
                 self.a_provar = None
         if mensagem["tipo"] == "estavel" and pedido is not None:
-            # Correu uns frames sem rebentar: agora sim, vai para o ficheiro.
-            escrever(caminho_do_jogo(self.config), pedido[2], self.fim_de_linha)
+            # Correu uns frames sem rebentar: ja pode ser guardado. (Guardar
+            # e com o botao: ve guardar, mais abaixo.)
+            self.provado = (mensagem["id"], pedido[2])
             self.ver_imagem(pedido[2])       # o nome da imagem pode ter mudado
             for numero in [n for n in self.pedidos if n <= mensagem["id"]]:
                 del self.pedidos[numero]
@@ -290,10 +295,36 @@ class Sessao:
                 dentro = [l for l in mensagem.get("linhas", []) if pedido[0] <= l <= pedido[1]]
                 if dentro:
                     mensagem["linha"] = dentro[-1] - pedido[0] + 1
+            if mensagem["linha"] is None and mensagem.get("linhas"):
+                # O erro nao esta no bocado aberto: diz-se em que coisa esta,
+                # para se poder ir la corrigi-la.
+                mensagem["onde"] = self.onde_fica(mensagem["linhas"][-1], pedido[2] if pedido is not None else None)
         self.mensagens.append(mensagem)
         del self.mensagens[:-200]
         self.contador = self.contador + 1
         mensagem["n"] = self.contador
+
+    def onde_fica(self, linha, fonte=None):
+        # A coisa da Oficina (um bicho, uma funcao...) onde esta uma linha do
+        # ficheiro do jogo: {"escolha", "titulo", "grupo"}, ou None se essa
+        # linha nao e de nenhuma. Havendo varias (uma onda, e as ondas
+        # todas), fica a mais pequena.
+        try:
+            if fonte is None:
+                fonte, _ = ler(caminho_do_jogo(self.config))
+            melhor = None
+            for escolha in self.config.escolhas(fonte):
+                regiao = self.config.regiao(fonte, escolha["id"])
+                if regiao is None or not regiao["inicio"] <= linha <= regiao["fim"]:
+                    continue
+                tamanho = regiao["fim"] - regiao["inicio"]
+                if melhor is None or tamanho < melhor[0]:
+                    melhor = (tamanho, {"escolha": escolha["id"], "titulo": escolha["titulo"], "grupo": escolha["grupo"]})
+            if melhor is None or melhor[1]["escolha"] == self.escolha:
+                return None
+            return melhor[1]
+        except Exception:
+            return None          # e so uma ajuda: se nao se descobrir, o erro mostra-se como dantes
 
     # --- O que o editor pede ---
 
@@ -342,6 +373,7 @@ class Sessao:
             self.acertar_imagem(regiao)
             self.som = regiao.get("som")
             self.pedidos = {}
+            self.provado = None
             self.mensagens = []
             self.a_provar = None
             self.lancar()
@@ -374,6 +406,7 @@ class Sessao:
             self.acertar_imagem(None)
             self.som = None
             self.pedidos = {}
+            self.provado = None
             self.mensagens = []
             self.a_provar = None
             self.lancar()
@@ -418,6 +451,7 @@ class Sessao:
         self.depois = linhas[regiao["fim"]:]
         self.titulo = regiao["titulo"]
         self.pedidos = {}
+        self.provado = None
         self.a_provar = None
         self.lancar()
         return aviso, None
@@ -463,6 +497,20 @@ class Sessao:
             if aviso_do_nome is not None:
                 return {"ok": True, "id": self.numero, "titulo": self.titulo, "aviso": aviso_do_nome}
             return {"ok": True, "id": self.numero}
+
+    def guardar(self, numero):
+        # O botao "Guardar alteracoes": o codigo que esta a correr no jogo
+        # sem erros vai para o ficheiro. "numero" e o pedido que a pagina
+        # julga estar provado: se entretanto se escreveu mais, ainda nao da.
+        with self.tranca:
+            if self.config is None or self.escolha == JOGAR:
+                raise Falha("Ainda não escolheste nada.")
+            if self.provado is None or self.provado[0] != numero:
+                raise Falha("Ainda não dá para guardar: o jogo ainda está a experimentar o que escreveste, "
+                            "ou há um erro. Espera um bocadinho e tenta outra vez.")
+            escrever(caminho_do_jogo(self.config), self.provado[1], self.fim_de_linha)
+            self.provado = None
+            return {"ok": True}
 
     def original(self):
         with self.tranca:
@@ -1049,6 +1097,8 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(lambda: sessao.jogar(dados.get("jogo")))
         elif caminho == "/api/codigo":
             self.tratar(lambda: sessao.codigo(str(dados.get("codigo", "")), dados.get("mudar_nome") is True))
+        elif caminho == "/api/guardar":
+            self.tratar(lambda: sessao.guardar(dados.get("id")))
         elif caminho == "/api/original":
             self.tratar(sessao.original)
         elif caminho == "/api/entrada":

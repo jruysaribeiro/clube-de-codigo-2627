@@ -1,5 +1,6 @@
-# A Bicharada a Solta na Oficina. O jogo e a Bicharada (s12) com um mundo por
-# onde se anda, por isso quase tudo vem do bicharada.py aqui ao lado: os
+# A Bicharada a Solta na Oficina. O jogo sao batalhas por turnos com um mundo
+# por onde se anda. Quase tudo o que e da batalha vem do bicharada.py aqui ao
+# lado (que era o de um jogo so de batalhas, e ficou como base deste): os
 # bichos, os ataques, os treinadores, os tipos e as funcoes da batalha
 # abrem-se da mesma maneira, no mesmo palco (ja dentro de uma batalha).
 #
@@ -347,7 +348,7 @@ def _interiores(arvore):
 
 def escolhas(fonte):
     arvore = ast.parse(fonte)
-    # Sem ZONAS nao e este jogo (e a Bicharada do s12, por exemplo).
+    # Sem ZONAS nao e este jogo.
     if blocos.instrucao(arvore, "ZONAS") is None or blocos.instrucao(arvore, "MUNDO") is None:
         return []
     interiores = _interiores(arvore)
@@ -1340,6 +1341,11 @@ class Palco(base.Palco):
             self.passeio(ns, None)
         else:
             ns["memoria"].clear()      # como se o jogo recomecasse
+            # Uma funcao do mapa so corre no mapa: se o boneco estava a meio
+            # de uma batalha ou de uma conversa, volta ja para la. Senao, o
+            # codigo novo era dado por bom sem nunca ter corrido.
+            if ns["estado"] != "mundo" and self.regra not in COM_REDE and self.regra != "ao_responder":
+                ns["voltar_ao_mundo"]()
             self.redesenhar = True
 
     def arrumar(self, ns):

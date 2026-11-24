@@ -1,11 +1,10 @@
 # Sessão 15 — Bicharada à Solta
 
-**É a Bicharada do s12 com um mundo por onde se anda.** Os bichos, os ataques,
-os tipos e a batalha são os mesmos; o que muda é tudo o que há à volta:
-um mundo de **zonas**, **edifícios** onde se entra, **treinadores** que
-falam, bichos que se **apanham** com redes, e uma **loja**.
-Como o s12, é uma **base** para os alunos tornarem sua, e foi feito para ser
-mexido na Oficina (`python3 oficina/oficina.py`).
+**Batalhas por turnos, à moda do Pokémon, com bichos muito portugueses e um
+mundo por onde se anda.** Um mundo de **zonas**, **edifícios** onde se entra,
+**treinadores** que falam, bichos que se **apanham** com redes, e uma **loja**.
+É uma **base** para os alunos tornarem sua, e foi feito para ser mexido na
+Oficina (`python3 oficina/oficina.py`).
 
 ```
 python3 bicharada-a-solta.py
@@ -39,20 +38,6 @@ serra    montado   feira
 aldeia   ribeira   pinhal
 horta    praia     farol
 ```
-
-## O que muda em relação ao s12
-
-| No s12 | Aqui |
-|---|---|
-| Escolhes três bichos à entrada | Começas sem nenhum, e apanha-los |
-| Quatro treinadores, um atrás do outro | Os treinadores estão nas zonas (as letras `1` a `9`), e falam |
-| A equipa é curada antes de cada batalha | Só a casa da avó (`H`) cura |
-| Três sopas por batalha | As sopas e as redes levam-se na mochila, e compram-se |
-| Perder é recomeçar do início | Acordas onde descansaste pela última vez |
-| Só há batalhas contra treinadores | Há bichos à solta na erva alta (`e`): luta-se, foge-se ou apanham-se |
-| Um bicho, uma imagem | Uma de frente e uma de costas (a do teu, na batalha) |
-
-O s12 continua como estava: quem já lá tem um jogo seu não perde nada.
 
 ## O que há para mudar
 
@@ -160,7 +145,7 @@ apanha um bicho com menos de metade da vida; os treinadores pagarem o dobro.
 
 ## Equilíbrio
 
-Não foi afinado como o s12: só foi jogado de ponta a ponta por um robô, que
+Não foi afinado a sério: só foi jogado de ponta a ponta por um robô, que
 apanha o primeiro bicho, compra uma rede, apanha um segundo, treina na erva
 até ao nível 9 e só depois desafia os treinadores (ganhou em cerca de 400
 passos, com uma derrota pelo caminho). Os números a mexer são

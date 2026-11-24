@@ -1,9 +1,14 @@
-# A Bicharada na Oficina: que coisas se podem escolher, onde esta o codigo
-# de cada uma, e o "palco" que mostra so essa coisa a funcionar.
+# As batalhas da Bicharada na Oficina: os bichos, os ataques, os treinadores
+# e os tipos. Que coisas se podem escolher, onde esta o codigo de cada uma,
+# e o "palco" que mostra so essa coisa a funcionar.
 #
-# O palco nao e um jogo a parte: e a Bicharada verdadeira, ja dentro de uma
-# batalha (sem menu e sem ecra de escolha), com a equipa que interessa para
-# ver a coisa escolhida. Quando a batalha acaba, comeca outra igual.
+# ESTE FICHEIRO JA NAO E UM JOGO DA OFICINA. Era o da Bicharada (s12), que
+# saiu do repositorio. Ficou porque a Bicharada a Solta (bicharada_a_solta.py,
+# aqui ao lado) e feita em cima dele: tudo o que e da batalha vem daqui.
+#
+# O palco nao e um jogo a parte: e o jogo verdadeiro, ja dentro de uma
+# batalha (sem menu e sem mapa), com a equipa que interessa para ver a coisa
+# escolhida. Quando a batalha acaba, comeca outra igual.
 #
 # Nas regras, nos acontecimentos e nos desenhos (que sao funcoes do jogo) a
 # batalha joga-se sozinha, turno atras de turno, para se ver logo o que a
@@ -17,9 +22,6 @@ import re
 
 import blocos
 
-NOME = "Bicharada"
-FICHEIRO = "s12-bicharada/bicharada.py"
-DESCRICAO = "Batalhas por turnos, com bichos muito portugueses."
 
 # Uma frase por grupo, para a pagina do jogo dizer o que la ha.
 SOBRE_OS_GRUPOS = {
@@ -697,8 +699,8 @@ def apagar(fonte, escolha):
             aviso = aviso + " Saiu também dos ataques de " + _e_de(donos) + "."
         return _aplicar(linhas, cortes, trocas), aviso
 
-    # (Na Bicharada escolhe-se uma equipa a entrada: tem de haver bichos que
-    # cheguem. Num jogo sem TAMANHO_EQUIPA basta ficar um.)
+    # (Num jogo em que se escolhe uma equipa a entrada, com TAMANHO_EQUIPA,
+    # tem de haver bichos que cheguem. Sem isso basta ficar um.)
     minimo = 1
     no = blocos.instrucao(arvore, "TAMANHO_EQUIPA")
     if no is not None and isinstance(no.value, ast.Constant) and isinstance(no.value.value, int):
