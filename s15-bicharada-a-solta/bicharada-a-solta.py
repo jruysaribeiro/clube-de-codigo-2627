@@ -77,16 +77,13 @@ PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 
 # --- As zonas ---
 # O mundo e feito de zonas. Cada zona enche o ecra: 20 letras em cada linha,
-# e 14 linhas. Cada letra e um quadrado:
+# e 14 linhas. Cada letra e um quadrado. CA FORA, as letras sao estas:
 #   .   relva: anda-se a vontade
 #   e   erva alta: anda-se, e de vez em quando salta de la um bicho a solta
 #   A   arvore: nao se passa
 #   ~   agua: nao se passa
-#   #   parede: nao se passa. Serve para os edificios, por fora e por dentro
-#   _   soalho: o chao dentro de um edificio. Anda-se a vontade
-#       (um espaco) nada: fica preto, e nao se passa
+#   #   parede: nao se passa. Com ela se fazem as casas, vistas de fora
 #   H   uma casa da avo: anda contra ela para curar a equipa e encher as sopas
-#   $   o balcao de uma loja: anda contra ele para comprares (ve a LOJA)
 #   P   a partida: onde comecas (so um, no mundo todo)
 #   1 a 9   um treinador: o 1 e o primeiro da lista TREINADORES, o 2 e o
 #           segundo, e por ai fora. Anda contra ele para o desafiares.
@@ -96,6 +93,26 @@ PASTA_ASSETS = Path(__file__).parent.parent / "comum" / "assets"
 # (ou erva) na borda das duas, no mesmo sitio. Aqui as saidas para os lados
 # estao nas linhas 7 e 8 (a contar de cima), e as de cima e de baixo nas duas
 # colunas do meio.
+
+# --- Os interiores ---
+# O interior de um edificio tambem e uma zona, com 20 letras em cada linha e
+# 14 linhas. LA DENTRO as letras sao outras:
+#   _   soalho: o chao. Anda-se a vontade
+#   t   tapete: anda-se por cima
+#   #   parede: nao se passa
+#   j   janela: uma parede com vidro. Nao se passa
+#   m   mesa: nao se passa
+#   b   banco: nao se passa
+#   l   estante com livros: nao se passa
+#   c   cama: nao se passa
+#   v   vaso com uma planta: nao se passa
+#   $   o balcao de uma loja: anda contra ele para comprares (ve a LOJA)
+#       (um espaco) nada: fica preto, e nao se passa. E o que ha a volta da sala
+#   1 a 9   um treinador: anda contra ele para falares com ele
+#   M, ou outra letra que esteja em PORTAS: a porta por onde se sai
+# Para uma coisa nova (um piano, uma lareira) escolhe uma letra que ainda nao
+# uses: desenha-a em desenhar_quadrado e, se nao for para passar por cima,
+# junta-a ao pode_andar.
 ZONAS = {
     "serra": [
         "AAAAAAAAAAAAAAAAAAAA",
@@ -245,13 +262,13 @@ ZONAS = {
         "                    ",
         "                    ",
         "                    ",
-        "     ##########     ",
-        "     #________#     ",
+        "     ##j####j##     ",
+        "     #lll___vl#     ",
         "     #___2____#     ",
         "     #_##$#___#     ",
         "     #________#     ",
-        "     #________#     ",
-        "     #________#     ",
+        "     #_m____b_#     ",
+        "     #___tt___#     ",
         "     ####M#####     ",
         "                    ",
         "                    ",
@@ -1116,13 +1133,16 @@ def passar_a_porta(letra):
 # ONDE SE PODE ANDAR
 # Recebe a letra de um quadrado do mapa e devolve True se da para andar para
 # la, ou False se nao da. Como esta: nao se passa nas arvores (A), na agua
-# (~), nas paredes (#) nem no nada (um espaco). (A casa da avo, o balcao da
+# (~), nas paredes (#), no nada (um espaco) nem, dentro dos edificios, nas
+# janelas (j), mesas (m), bancos (b), estantes (l), camas (c) e vasos (v). (A casa da avo, o balcao da
 # loja e os treinadores nao passam por aqui: contra eles vai-se sempre de
 # encontro. E na erva alta so se entra com um bicho ou uma rede.)
 # Ideias: nadar, isto e, passar na agua se levares na equipa um bicho do tipo
 # "agua"; uma letra nova para uma cerca; uma ponte "=" por cima da agua.
 def pode_andar(letra):
     if letra == "A" or letra == "~" or letra == "#" or letra == " ":
+        return False
+    if letra in "jmblcv":
         return False
     return True
 
@@ -2111,15 +2131,20 @@ def desenhar_barra_vida(bicho, x, y, largura):
 
 
 # UM QUADRADO DO MAPA
-# letra: a letra desse quadrado, na zona. Primeiro pinta-se relva em todos, e
-# depois, por cima, o que a letra disser: erva alta, uma arvore, agua, a casa
-# da avo, uma parede, soalho, uma porta ou nada. (Tu e os treinadores sao
-# desenhados depois, por outras funcoes.)
+# letra: a letra desse quadrado, na zona. Primeiro pinta-se o chao (relva, ou
+# soalho por baixo das coisas de dentro de um edificio) e depois, por cima, o
+# que a letra disser: erva alta, uma arvore, agua, a casa da avo, uma parede,
+# uma porta, uma mesa, uma estante... (Tu e os treinadores sao desenhados
+# depois, por outras funcoes.)
 # Ideias: outras cores (um mapa de neve, ou de deserto); flores na relva; o
 # desenho de uma letra nova que tenhas inventado (if letra == "s").
 def desenhar_quadrado(letra, x, y):
     meio = x + QUADRADO // 2
     pygame.draw.rect(ecra, RELVA, (x, y, QUADRADO, QUADRADO))
+    if letra in "_tmblcv$":
+        # O que esta dentro de um edificio tem soalho por baixo.
+        pygame.draw.rect(ecra, SOALHO, (x, y, QUADRADO, QUADRADO))
+        pygame.draw.line(ecra, escurecer(SOALHO, 0.85), (x, y + 20), (x + QUADRADO, y + 20), 1)
     if letra == "e":
         pygame.draw.rect(ecra, ERVA_ALTA, (x, y, QUADRADO, QUADRADO))
         # Tres tufos, cada um com duas folhas.
@@ -2144,13 +2169,43 @@ def desenhar_quadrado(letra, x, y):
         pygame.draw.rect(ecra, PAREDE, (x, y, QUADRADO, QUADRADO))
         pygame.draw.rect(ecra, escurecer(PAREDE, 0.7), (x, y, QUADRADO, QUADRADO), 2)
         pygame.draw.line(ecra, escurecer(PAREDE, 0.7), (x, y + 20), (x + QUADRADO, y + 20), 2)
-    elif letra == "_":
-        pygame.draw.rect(ecra, SOALHO, (x, y, QUADRADO, QUADRADO))
-        pygame.draw.line(ecra, escurecer(SOALHO, 0.85), (x, y + 20), (x + QUADRADO, y + 20), 1)
+    elif letra == "t":
+        pygame.draw.rect(ecra, TELHADO, (x + 2, y + 2, 36, 36), border_radius=4)
+        pygame.draw.rect(ecra, AMARELO, (x + 6, y + 6, 28, 28), 2, border_radius=3)
+    elif letra == "j":
+        pygame.draw.rect(ecra, PAREDE, (x, y, QUADRADO, QUADRADO))
+        pygame.draw.rect(ecra, escurecer(PAREDE, 0.7), (x, y, QUADRADO, QUADRADO), 2)
+        pygame.draw.rect(ecra, AGUA, (x + 8, y + 8, 24, 22))
+        pygame.draw.line(ecra, BRANCO, (meio, y + 8), (meio, y + 29), 2)
+        pygame.draw.line(ecra, BRANCO, (x + 8, y + 19), (x + 31, y + 19), 2)
+    elif letra == "m":
+        pygame.draw.rect(ecra, escurecer(TRONCO, 0.7), (x + 6, y + 28, 4, 9))
+        pygame.draw.rect(ecra, escurecer(TRONCO, 0.7), (x + 30, y + 28, 4, 9))
+        pygame.draw.rect(ecra, TRONCO, (x + 3, y + 8, 34, 22), border_radius=4)
+        pygame.draw.rect(ecra, escurecer(TRONCO, 0.7), (x + 3, y + 8, 34, 22), 2, border_radius=4)
+    elif letra == "b":
+        pygame.draw.rect(ecra, escurecer(TRONCO, 0.7), (x + 13, y + 22, 3, 12))
+        pygame.draw.rect(ecra, escurecer(TRONCO, 0.7), (x + 24, y + 22, 3, 12))
+        pygame.draw.ellipse(ecra, TRONCO, (x + 9, y + 12, 22, 14))
+        pygame.draw.ellipse(ecra, escurecer(TRONCO, 0.7), (x + 9, y + 12, 22, 14), 2)
+    elif letra == "l":
+        pygame.draw.rect(ecra, escurecer(TRONCO, 0.75), (x + 2, y + 2, 36, 36))
+        # Duas prateleiras, cada uma com cinco livros de cores diferentes.
+        for prateleira in [y + 5, y + 21]:
+            cores = [VERMELHO, AGUA, AMARELO, VERDE, PAREDE]
+            for numero in range(5):
+                pygame.draw.rect(ecra, cores[numero], (x + 5 + numero * 6, prateleira, 5, 13))
+    elif letra == "c":
+        pygame.draw.rect(ecra, TRONCO, (x + 4, y + 2, 32, 36), border_radius=4)
+        pygame.draw.rect(ecra, AGUA, (x + 6, y + 14, 28, 22), border_radius=3)
+        pygame.draw.rect(ecra, BRANCO, (x + 9, y + 4, 22, 9), border_radius=3)
+    elif letra == "v":
+        pygame.draw.circle(ecra, COPA, (meio, y + 13), 10)
+        pygame.draw.circle(ecra, ERVA_ALTA, (meio - 4, y + 10), 5)
+        pygame.draw.polygon(ecra, TELHADO, [(x + 11, y + 22), (x + 29, y + 22), (x + 26, y + 37), (x + 14, y + 37)])
     elif letra == " ":
         pygame.draw.rect(ecra, PRETO, (x, y, QUADRADO, QUADRADO))
     elif letra == "$":
-        pygame.draw.rect(ecra, SOALHO, (x, y, QUADRADO, QUADRADO))
         pygame.draw.rect(ecra, TRONCO, (x, y + 6, QUADRADO, 28))
         pygame.draw.circle(ecra, AMARELO, (meio, y + 20), 9)
         pygame.draw.circle(ecra, escurecer(AMARELO, 0.6), (meio, y + 20), 9, 2)

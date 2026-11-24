@@ -134,6 +134,9 @@ DICAS = {
     "zona": "Cada letra é um quadrado: muda uma letra e vê a zona mudar. A faixa de baixo diz o que é"
             " cada letra. Para experimentares, clica no jogo e anda com as setas: se saíres por um lado,"
             " entras na zona do lado.",
+    "interior": "É o interior de um edifício. Cada letra é um quadrado: muda uma letra e vê a sala mudar."
+                " A faixa de baixo diz as letras que há cá dentro (lá fora são outras). Sai-se pela porta."
+                " Para experimentares, clica no jogo e anda com as setas.",
     "mundo": "Estás a ver o mundo todo, em ponto pequeno: cada retângulo é uma zona. Troca dois nomes de"
              " sítio e vê as zonas mudarem. O ponto amarelo és tu: clica no jogo e anda com as setas.",
     "portas": "Estás a ver o mundo todo, em ponto pequeno, e os edifícios por baixo. Cada porta é uma"
@@ -159,8 +162,15 @@ DICAS = {
     "desenho": "Isto é o desenho: muda-o e vês logo, na zona toda." + SOZINHO,
 }
 
-LEGENDA = "A árvore  ~ água  e erva alta  . relva  # parede  _ soalho  H avó  $ loja  P partida  1-9 treinadores"
-CONHECIDAS = ".eA~HP#_ $123456789"
+# As letras de ca de fora e as de dentro de um edificio nao sao as mesmas:
+# la dentro nao ha arvores nem erva, e ca fora nao ha mesas nem estantes.
+LEGENDA = "A árvore  ~ água  e erva alta  . relva  # parede  H avó  P partida  1-9 treinadores"
+LEGENDA_DE_DENTRO = "_ soalho  t tapete  # parede  j janela  m mesa  b banco  l estante  c cama  v vaso  $ loja  1-9 treinadores"
+SO_DE_FORA = ".eA~H"
+SO_DE_DENTRO = "_tjmblcv"
+CONHECIDAS = ".eA~HP#_ $123456789" + SO_DE_DENTRO
+INICIO_DOS_INTERIORES = "# --- Os interiores ---"
+INICIO_DAS_ZONAS = "# --- As zonas ---"
 ZONA = (20, 14)          # quantas letras tem uma zona: por linha, e linhas
 PASSOS = ((0, 1), (0, -1), (1, 0), (-1, 0))      # a ordem e a do passar_a_porta do jogo
 
@@ -168,8 +178,9 @@ PASSOS = ((0, 1), (0, -1), (1, 0), (-1, 0))      # a ordem e a do passar_a_porta
 ZONA_NOVA = (["AAAAAAAAA..AAAAAAAAA"] + ["A..................A"] * 5 + ["...................."] * 2
              + ["A..................A"] * 5 + ["AAAAAAAAA..AAAAAAAAA"])
 # O interior de um edificio novo: uma sala, com a porta (o ?) na parede de baixo.
-SALA_NOVA = ([" " * 20] * 3 + ["     ##########     "] + ["     #________#     "] * 6
-             + ["     ####?#####     "] + [" " * 20] * 3)
+SALA_NOVA = ([" " * 20] * 3 + ["     ##j####j##     ", "     #l______v#     ", "     #________#     ",
+                               "     #___mb___#     ", "     #________#     ", "     #________#     ",
+                               "     #___tt___#     ", "     ####?#####     "] + [" " * 20] * 3)
 LETRAS_DE_PORTA = "BCDFGIJKLMNOQRSTUVWXYZ"
 
 
@@ -189,7 +200,7 @@ class Mundo:
         self.portas = portas
         self.treinadores = treinadores      # quantos ha
         # A regra de andar: a original, ou a que o jogo tiver agora.
-        self.pode = pode or (lambda letra: letra not in "A~# ")
+        self.pode = pode or (lambda letra: letra not in "A~# jmblcv")
 
     def letra(self, nome, coluna, linha):
         zona = self.zonas.get(nome)
@@ -407,8 +418,10 @@ def regiao(fonte, escolha):
             return None
         nome, inicio, fim = partes[int(numero)]
         dentro = nome in _interiores(arvore)
+        # A explicacao das letras e a de dentro ou a de fora, conforme a zona.
+        ajuda = blocos.comentarios_a_partir_de(linhas, INICIO_DOS_INTERIORES if dentro else INICIO_DAS_ZONAS)
         return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": None, "som": None,
-                "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS["zona"],
+                "ajuda": ajuda or blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS["interior" if dentro else "zona"],
                 "sugestoes": SUGESTOES["interior" if dentro else "zona"],
                 "apagar": "Apagar este edifício" if dentro else "Apagar esta zona", "renomear": "Mudar o nome"}
 
@@ -965,7 +978,8 @@ def _ver_funcoes(ns, problemas):
                                  "A primeira linha tem de ser: " + como)
 
 
-def _ver_mundo(ns, treinadores, aberto, problemas, avisos):
+def _ver_mundo(ns, treinadores, aberto, problemas, avisos, zona_aberta=False):
+    # zona_aberta: e uma zona (e nao o MUNDO ou as PORTAS) que esta aberta.
     # aberto: e uma zona, o MUNDO ou as PORTAS que estao abertos no editor?
     # So nesse caso se dao os avisos, para nao aparecerem cada vez que se
     # muda outra coisa.
@@ -1008,6 +1022,16 @@ def _ver_mundo(ns, treinadores, aberto, problemas, avisos):
     interiores = [nome for nome in portas.values() if nome in zonas]
     tudo = "".join("".join(zonas[nome]) for nome in zonas)
 
+    # Com uma zona aberta, um nome que o MUNDO ou as PORTAS usam e que
+    # deixou de existir quer dizer que lhe mudaram o nome a mao: nao entra, e
+    # diz-se como se faz.
+    orfas = [nome for fila in mundo for nome in fila if nome != "" and nome not in zonas]
+    orfas += [nome for nome in portas.values() if nome not in zonas and nome not in orfas]
+    if zona_aberta and orfas:
+        problemas.append('O MUNDO ou as PORTAS ainda falam de "' + orfas[0] + '", que deixou de existir. Se lhe '
+                         "querias mudar o nome, deixa o nome antigo no código e usa o botão «Mudar o nome», que o "
+                         "muda em todo o lado.")
+        return
     for fila in mundo:
         for nome in fila:
             if nome != "" and nome not in zonas:
@@ -1068,6 +1092,22 @@ def _ver_mundo(ns, treinadores, aberto, problemas, avisos):
             avisos.append("O " + str(numero) + " não é nenhum treinador (só há " + str(quantos) + "): fica relva.")
     if "H" in tudo and "H" not in chega_se:
         avisos.append("Não se chega a pé a nenhuma casa da avó (H).")
+    if "$" in tudo and "$" not in chega_se:
+        avisos.append("Não se chega a pé ao balcão da loja ($): há uma parede ou um móvel à frente dele.")
+    # As letras de fora la dentro, e as de dentro ca fora.
+    for nome in zonas:
+        letras = set("".join(zonas[nome]))
+        if nome in interiores:
+            erradas = sorted(letras & set(SO_DE_FORA))
+            if erradas:
+                avisos.append('Dentro de "' + nome + '" há letras de lá de fora (' + " ".join(erradas) + "): relva, "
+                              "erva, árvores, água e a casa da avó são para as zonas ao ar livre. Cá dentro usa "
+                              "soalho (_), tapete, mesa, estante...")
+        else:
+            erradas = sorted(letras & set(SO_DE_DENTRO))
+            if erradas:
+                avisos.append('Na zona "' + nome + '" há letras de dentro dos edifícios (' + " ".join(erradas)
+                              + "): soalho, tapete, mesas e estantes são para os interiores.")
     novas = sorted(set(tudo) - set(CONHECIDAS) - set(portas))
     if novas:
         avisos.append("Letras novas: " + " ".join(novas) + ". O jogo trata-as como relva, até lhes dares "
@@ -1208,7 +1248,7 @@ def _e_um_bicho(ns, valor):
 def _experimentar(ns, regra, problemas):
     # Uma regra tem de devolver uma resposta que o jogo perceba.
     if regra == "pode_andar":
-        for letra in ".eA~#_ ":
+        for letra in ".eA~#_ " + SO_DE_DENTRO:
             _sem_deixar_marcas(ns, lambda: ns["pode_andar"](letra))
     elif regra == "ha_batalha_na_erva":
         _sem_deixar_marcas(ns, ns["ha_batalha_na_erva"])
@@ -1255,7 +1295,8 @@ class Palco(base.Palco):
     def verificar(self, ns):
         problemas, avisos = super().verificar(ns)
         _ver_funcoes(ns, problemas)
-        _ver_mundo(ns, self.ler(ns, "TREINADORES"), self.tipo in ("zona", "mundo", "portas"), problemas, avisos)
+        _ver_mundo(ns, self.ler(ns, "TREINADORES"), self.tipo in ("zona", "mundo", "portas"), problemas, avisos,
+                   self.tipo == "zona")
         _ver_conversas(ns, self.ler(ns, "TREINADORES"), self.falador, problemas, avisos)
         _ver_aprende(ns, self.ler(ns, "BICHOS"), self.tipo == "bicho", problemas, avisos)
         _ver_loja_e_jogador(ns, problemas, avisos)
@@ -1582,7 +1623,7 @@ class Palco(base.Palco):
         linhas = []
         if self.regra == "pode_andar":
             letras = []
-            for letra in ".eA~#_" + "".join("".join(filas) for filas in ns["ZONAS"].values()):
+            for letra in ".eA~#_" + SO_DE_DENTRO + "".join("".join(filas) for filas in ns["ZONAS"].values()):
                 if letra not in letras and letra not in " HP123456789" and letra not in ns["PORTAS"]:
                     letras.append(letra)
             sim = [letra for letra in letras if _sem_deixar_marcas(ns, lambda: ns["pode_andar"](letra))]
@@ -1694,7 +1735,8 @@ class Palco(base.Palco):
 
     def cor_da_letra(self, ns, letra):
         cores = {"A": ns["COPA"], "~": ns["AGUA"], "e": ns["ERVA_ALTA"], "H": ns["TELHADO"], "P": ns["AMARELO"],
-                 "$": ns["AMARELO"],
+                 "$": ns["AMARELO"], "t": ns["TELHADO"], "j": ns["AGUA"], "m": ns["TRONCO"], "b": ns["TRONCO"],
+                 "l": ns["TRONCO"], "c": ns["AGUA"], "v": ns["COPA"],
                  "#": ns["PAREDE"], "_": ns["SOALHO"], " ": ns["PRETO"]}
         if letra in ns["PORTAS"]:
             return ns["TRONCO"]
@@ -1765,7 +1807,9 @@ class Palco(base.Palco):
     def desenhar_no_mapa(self, ns, pygame):
         ecra = ns["ecra"]
         if self.tipo == "zona":
-            texto = LEGENDA
+            nomes = list(ns["ZONAS"])
+            dentro = nomes[min(self.numero, len(nomes) - 1)] in ns["PORTAS"].values()
+            texto = LEGENDA_DE_DENTRO if dentro else LEGENDA
             if len(ns["PORTAS"]) > 0:
                 texto = texto + "  " + " ".join(ns["PORTAS"]) + " porta"
         elif self.tipo == "mundo":

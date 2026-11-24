@@ -96,8 +96,9 @@ jogos, cada um à sua medida. O que cada jogo oferece está no ficheiro dele em
 - **Mudar o nome** (com a coisa aberta) troca o nome em todos os sítios onde
   ela é usada: um ataque nas fichas dos bichos, um bicho nas equipas dos
   treinadores, um tipo nos bichos, nos ataques e na tabela de quem é forte
-  contra quem, uma zona no `MUNDO` e nas `PORTAS`. Mudar o nome à mão, no
-  código, deixava os outros a chamar pelo antigo.
+  contra quem, uma zona no `MUNDO` e nas `PORTAS`. Também se pode mudar o
+  nome no próprio código: quando a criança pára de escrever, a Oficina dá
+  pela mudança e faz o mesmo que o botão.
 
 Nas duas Bicharadas:
 

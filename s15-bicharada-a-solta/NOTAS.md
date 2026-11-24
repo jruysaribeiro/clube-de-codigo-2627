@@ -61,6 +61,7 @@ O s12 continua como estava: quem já lá tem um jogo seu não perde nada.
 | Cada zona, desenhada com letras (20 por linha, 14 linhas) | `ZONAS` |
 | Como as zonas se juntam | `MUNDO` |
 | Os edifícios: que letra é a porta de que interior | `PORTAS` |
+| O que há dentro de um edifício: tapete, mesa, banco, estante, cama, vaso, janela | as letras `t m b l c v j`, em `ZONAS` |
 | O que se vende, e por quanto | `LOJA` |
 | O teu boneco: a cor e as três imagens | `JOGADOR` |
 | As falas, as perguntas e quem dá a rede | `TREINADORES` (`falas`, `falas_depois`, `falas_rede`, `da_rede`) |
@@ -107,6 +108,10 @@ moedas), é o acontecimento `ao_responder()`.
 ## Na Oficina
 
 - cada **zona** abre sozinha, com o boneco lá dentro, e anda só a criança;
+- as letras de **dentro** de um edifício não são as de **fora**: lá dentro há
+  soalho, tapete, mesa, banco, estante, cama, vaso e janela; cá fora há relva,
+  erva alta, árvores, água e a casa da avó. A Oficina mostra só as que
+  servem para a zona aberta, e avisa quando uma está no sítio errado;
 - **O mundo** e **As portas** mostram o mundo todo visto de cima;
 - **+ Nova zona**, **+ Novo edifício**, **+ Novo treinador**, **+ Novo
   bicho**, **+ Novo ataque**, **+ Novo tipo** criam, e o botão vermelho
@@ -172,6 +177,7 @@ preços da `LOJA`, os níveis em `TREINADORES`, e as contas de
 | O boneco começa num sítio estranho | «Onde está o `P`? Há só um, no mundo todo?» |
 | Não se passa de uma zona para a do lado | «Há relva na borda das duas, na mesma linha? E no `MUNDO`, estão mesmo lado a lado?» |
 | Uma zona aparece toda desalinhada | «Falta uma vírgula no fim de uma linha?» (Sem ela, o Python cola duas linhas numa.) |
+| A porta de um edifício deixou de funcionar depois de lhe mudarem o nome | «Mudaste o nome no código, ou com o botão **Mudar o nome**?» (Só o botão acerta o `MUNDO` e as `PORTAS`.) |
 | Entra-se na porta e não acontece nada | «A letra está em `PORTAS`? E está escrita lá dentro, na parede do interior?» |
 | Compra-se uma coisa nova e não acontece nada | «O `receber_compra()` sabe o que fazer com esse nome? Está escrito igual ao da `LOJA`?» |
 | Uma pergunta dá erro ao abrir | «Tem `"pergunta"` e `"respostas"`? As respostas estão entre `{ }`, cada uma com o que ele diz?» |

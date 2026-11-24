@@ -379,11 +379,66 @@ class Sessao:
             self.lancar()
             return {"jogo": config.NOME, "desde": self.contador}
 
-    def codigo(self, texto):
+    def nome_escrito(self, bloco):
+        # Se a crianca mudou, no codigo, o nome da coisa aberta (e essa coisa
+        # tem "Mudar o nome"), devolve o nome novo. Senao, None.
+        if not hasattr(self.config, "renomear"):
+            return None
+        fonte = "\n".join(self.antes + blocos.por_margem(bloco, self.margem) + self.depois)
+        try:
+            regiao = self.config.regiao(fonte, self.escolha)
+        except (SyntaxError, ValueError):
+            return None
+        if not regiao or not regiao.get("renomear"):
+            return None
+        novo = regiao.get("titulo")
+        if not isinstance(novo, str) or novo == self.titulo or novo == self.escolha:
+            return None
+        return novo
+
+    def mudar_nome_escrito(self, novo):
+        # Muda o nome no ficheiro, em todos os sitios onde a coisa e usada
+        # (como o botao "Mudar o nome"), e abre o jogo outra vez ja com ele:
+        # o resto do que a crianca escreveu segue depois, pelo caminho de
+        # sempre. Devolve (a frase a contar o que se fez, None) ou (None, o
+        # motivo por que nao deu).
+        caminho = caminho_do_jogo(self.config)
+        fonte, fim_de_linha = ler(caminho)
+        try:
+            nova, _, aviso = self.config.renomear(fonte, self.escolha, novo)
+            compile(nova, self.config.FICHEIRO, "exec")
+            regiao = self.config.regiao(nova, self.escolha)
+            if regiao is None:
+                raise ValueError("deixei de encontrar a coisa com o nome novo")
+        except (SyntaxError, ValueError) as erro:
+            return None, str(erro)
+        escrever(caminho, nova, fim_de_linha)
+        linhas = nova.split("\n")
+        self.antes = linhas[:regiao["inicio"] - 1]
+        self.depois = linhas[regiao["fim"]:]
+        self.titulo = regiao["titulo"]
+        self.pedidos = {}
+        self.a_provar = None
+        self.lancar()
+        return aviso, None
+
+    def codigo(self, texto, mudar_nome=False):
         with self.tranca:
             if self.config is None or self.escolha == JOGAR:
                 raise Falha("Ainda não escolheste nada.")
             bloco = texto.replace("\r\n", "\n").rstrip().split("\n")
+            # O nome da coisa foi mudado no codigo? Da primeira vez so se
+            # avisa a pagina, que espera que a crianca acabe de o escrever e
+            # volta a mandar o codigo com "mudar_nome".
+            aviso_do_nome = None
+            nome = self.nome_escrito(bloco)
+            if nome is not None:
+                if not mudar_nome:
+                    return {"ok": False, "nome": {"antigo": self.titulo, "novo": nome}}
+                aviso_do_nome, motivo = self.mudar_nome_escrito(nome)
+                if motivo is not None:
+                    return {"ok": False, "erro": {"linha": 1, "texto": "Não deu para mudar o nome: " + motivo,
+                                                  "detalhe": "O nome antigo era \"" + str(self.titulo) + "\"."}}
             inicio = len(self.antes) + 1
             fim = inicio + len(bloco) - 1
             fonte = "\n".join(self.antes + blocos.por_margem(bloco, self.margem) + self.depois)
@@ -405,6 +460,8 @@ class Sessao:
             self.pedidos[self.numero] = (inicio, fim, fonte)
             self.a_provar = (self.numero, time.time())
             self.dizer({"tipo": "codigo", "id": self.numero, "fonte": fonte, "inicio": inicio, "fim": fim})
+            if aviso_do_nome is not None:
+                return {"ok": True, "id": self.numero, "titulo": self.titulo, "aviso": aviso_do_nome}
             return {"ok": True, "id": self.numero}
 
     def original(self):
@@ -991,7 +1048,7 @@ class Pedido(BaseHTTPRequestHandler):
         elif caminho == "/api/jogar":
             self.tratar(lambda: sessao.jogar(dados.get("jogo")))
         elif caminho == "/api/codigo":
-            self.tratar(lambda: sessao.codigo(str(dados.get("codigo", ""))))
+            self.tratar(lambda: sessao.codigo(str(dados.get("codigo", "")), dados.get("mudar_nome") is True))
         elif caminho == "/api/original":
             self.tratar(sessao.original)
         elif caminho == "/api/entrada":

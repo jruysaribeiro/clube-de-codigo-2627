@@ -729,10 +729,10 @@ function lista(frases, classe) {
   return ul;
 }
 
-async function enviar() {
+async function enviar(mudarNome) {
   let resposta;
   try {
-    resposta = await pedir("/api/codigo", {codigo: codigo.value});
+    resposta = await pedir("/api/codigo", {codigo: codigo.value, mudar_nome: mudarNome === true});
   } catch (erro) {
     dizer("mal", erro.message);
     return;
@@ -740,7 +740,17 @@ async function enviar() {
   if (resposta.ok) {
     ultimoPedido = resposta.id;
     marcarLinha(null);
-    dizer("espera", "A experimentar no jogo…");
+    if (resposta.titulo) $("titulo").textContent = resposta.titulo;     // o nome foi mudado em todo o lado
+    dizer("espera", (resposta.aviso ? resposta.aviso + " " : "") + "A experimentar no jogo…");
+  } else if (resposta.nome) {
+    // O nome da coisa foi mudado no codigo. Espera-se que acabem de o
+    // escrever (se escreverem mais, este temporizador e apagado) e so entao
+    // se muda o nome em todos os sitios onde ela e usada.
+    ultimoPedido = Infinity;
+    dizer("espera", 'Quando acabares de escrever, mudo o nome de "' + resposta.nome.antigo + '" para "'
+      + resposta.nome.novo + '" em todo o lado.');
+    clearTimeout(espera);
+    espera = setTimeout(() => enviar(true), 1300);
   } else {
     ultimoPedido = Infinity;     // nada do que o jogo disser agora interessa
     mostrarErro(resposta.erro);
