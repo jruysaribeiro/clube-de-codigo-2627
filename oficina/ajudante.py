@@ -292,7 +292,7 @@ def responder(pedacos, codigo):
 
 def mensagens_do_desenho(pedido):
     return [{"role": "system", "content": INSTRUCOES_DO_DESENHO},
-            {"role": "user", "content": cortar(pedido, 300)}]
+            {"role": "user", "content": cortar(pedido, 600)}]
 
 
 def desenho(resposta):

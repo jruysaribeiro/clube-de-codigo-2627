@@ -150,7 +150,7 @@
   #cor-livre { width: 44px; height: 32px; padding: 0; border: 1px solid var(--linha); border-radius: 6px; background: none; }
   #desenho .fim { margin-top: auto; display: flex; gap: 8px; }
   #guardar-desenho { border-color: var(--verde); color: var(--verde); font-weight: 600; }
-  #pedido-desenho { flex: 1; min-width: 150px; font-size: 14px; padding: 6px 8px; background: var(--fundo, #14141f); color: inherit; border: 1px solid var(--linha); border-radius: 6px; }
+  #pedido-desenho { flex-basis: 100%; box-sizing: border-box; width: 100%; resize: vertical; font: inherit; font-size: 14px; line-height: 1.4; padding: 6px 8px; background: var(--fundo, #14141f); color: inherit; border: 1px solid var(--linha); border-radius: 6px; }
   #fala-desenho { margin: 0; font-size: 13px; color: var(--fraco); }
   .coisas button.novo { border-style: dashed; color: var(--amarelo); }
 
@@ -349,7 +349,7 @@
       </div>
       <div class="ferramentas" id="copiar-de" hidden></div>
       <form class="ferramentas" id="pedir-desenho" hidden>
-        <input id="pedido-desenho" maxlength="200" autocomplete="off" placeholder="Descreve o boneco: «um galo vermelho»" aria-label="O que o ajudante deve desenhar">
+        <textarea id="pedido-desenho" rows="3" maxlength="600" placeholder="Descreve o boneco: «um galo vermelho, visto de frente, com a crista amarela»" aria-label="O que o ajudante deve desenhar"></textarea>
         <button id="fazer-desenho">Pedir ao ajudante</button>
       </form>
       <p id="fala-desenho" hidden></p>
