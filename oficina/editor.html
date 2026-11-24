@@ -132,7 +132,9 @@
   #opcoes-lista button b { color: var(--amarelo); margin-right: 6px; }
   #lista .fim { display: flex; gap: 8px; }
   #guardar-lista { border-color: var(--verde); color: var(--verde); font-weight: 600; }
-  #apagar { margin-left: auto; color: var(--vermelho); }
+  #renomear { margin-left: auto; }
+  #renomear[hidden] + #apagar { margin-left: auto; }
+  #apagar { color: var(--vermelho); }
   #apagar:hover { border-color: var(--vermelho); }
 
   /* ---------- desenhar uma imagem ---------- */
@@ -150,6 +152,12 @@
   #cor-livre { width: 44px; height: 32px; padding: 0; border: 1px solid var(--linha); border-radius: 6px; background: none; }
   #desenho .fim { margin-top: auto; display: flex; gap: 8px; }
   #guardar-desenho { border-color: var(--verde); color: var(--verde); font-weight: 600; }
+  #os-modelos { font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+  #lista-de-modelos { display: flex; flex-wrap: wrap; gap: 4px; max-height: 104px; overflow-y: auto; }
+  #lista-de-modelos button { padding: 2px; line-height: 0; background: #2c2c44; }
+  #lista-de-modelos button.escolhida { border-color: var(--amarelo); box-shadow: 0 0 0 2px var(--amarelo); }
+  #lista-de-modelos img { width: 40px; height: 40px; image-rendering: pixelated; }
+  #usar-modelo { border-color: var(--verde); color: var(--verde); }
   #pedido-desenho { flex-basis: 100%; box-sizing: border-box; width: 100%; resize: vertical; font: inherit; font-size: 14px; line-height: 1.4; padding: 6px 8px; background: var(--fundo, #14141f); color: inherit; border: 1px solid var(--linha); border-radius: 6px; }
   #fala-desenho { margin: 0; font-size: 13px; color: var(--fraco); }
   .coisas button.novo { border-style: dashed; color: var(--amarelo); }
@@ -258,6 +266,7 @@
     <img id="miniatura" alt="" hidden>
     <span id="quais-imagens" hidden></span>
     <span id="texto-imagem"></span>
+    <button type="button" id="usar-modelo" hidden title="Põe no jogo o desenho que a Oficina já traz para esta imagem">Usar o modelo</button>
     <button type="button" id="desenhar-imagem">Desenhar</button>
     <button type="button" id="por-imagem">Escolher uma imagem</button>
     <button type="button" id="tirar-imagem" hidden>Tirar a imagem</button>
@@ -301,6 +310,7 @@
     <button id="guardar">Guardar o meu jogo</button>
     <button id="reabrir" hidden>Pôr o jogo a correr outra vez</button>
     <button id="pedir-ajuda" hidden><span class="luz" id="luz-do-botao"></span><span id="texto-do-botao">Pedir ao ajudante</span></button>
+    <button id="renomear" hidden></button>
     <button id="apagar" hidden></button>
   </div>
   </section>
@@ -348,6 +358,10 @@
         <button type="button" id="grelha-32">32×32</button>
       </div>
       <div class="ferramentas" id="copiar-de" hidden></div>
+      <div id="os-modelos" hidden>
+        <span>Começar por um modelo:</span>
+        <div id="lista-de-modelos"></div>
+      </div>
       <form class="ferramentas" id="pedir-desenho" hidden>
         <textarea id="pedido-desenho" rows="3" maxlength="600" placeholder="Descreve o boneco: «um galo vermelho, visto de frente, com a crista amarela»" aria-label="O que o ajudante deve desenhar"></textarea>
         <button id="fazer-desenho">Pedir ao ajudante</button>
@@ -582,6 +596,22 @@ async function guardarLista() {
   }
 }
 
+async function mudarNome() {
+  // Muda o nome a coisa aberta em todos os sitios onde ela e usada (um
+  // ataque, nas fichas dos bichos que o sabem), e volta a abri-la.
+  const antigo = $("titulo").textContent;
+  const nome = prompt('Que nome novo queres dar a "' + antigo + '"?', antigo);
+  if (nome === null || nome.trim() === "" || nome.trim() === antigo) return;
+  let dados;
+  try {
+    dados = await pedir("/api/renomear", {nome});
+  } catch (erro) {
+    alert(erro.message);
+    return;
+  }
+  abrir(jogoAberto, dados.escolha, dados.aviso);
+}
+
 async function apagarCoisa() {
   const nome = $("titulo").textContent;
   if (!confirm('Apagar "' + nome + '" do jogo?\n\nSai do jogo e de todos os sítios onde era usado.')) return;
@@ -666,6 +696,8 @@ async function abrir(jogo, escolha, recado) {
   haCaixas = Boolean(dados.caixas);
   $("barra-lista").hidden = !dados.lista;
   $("abrir-lista").textContent = dados.lista || "";
+  $("renomear").hidden = !dados.renomear;
+  $("renomear").textContent = dados.renomear || "";
   $("apagar").hidden = !dados.apagar;
   $("apagar").textContent = dados.apagar || "";
   $("lista").hidden = true;
@@ -979,6 +1011,7 @@ function mostrarImagem(imagem) {
   }
   $("miniatura").hidden = !imagem.ha;
   if (imagem.ha) $("miniatura").src = "/api/imagem?v=" + imagem.versao;
+  $("usar-modelo").hidden = !imagem.modelo;
   $("por-imagem").hidden = Boolean(imagem.erro);
   $("desenhar-imagem").hidden = Boolean(imagem.erro);
   $("desenhar-imagem").textContent = imagem.ha ? "Retocar" : "Desenhar";
@@ -1078,6 +1111,20 @@ $("escolher-imagem").onchange = async () => {
   }
   try {
     mostrarImagem((await pedir("/api/imagem", {dados})).imagem);
+  } catch (erro) {
+    alert(erro.message);
+  }
+};
+$("usar-modelo").onclick = async () => {
+  // O modelo que a Oficina traz para esta imagem vai para o jogo tal como
+  // esta, pelo mesmo caminho de uma imagem escolhida do computador.
+  if (imagemAtual && imagemAtual.ha
+      && !confirm("Usar o modelo?\n\nA imagem que está agora no jogo é trocada por ele.")) return;
+  try {
+    const bytes = new Uint8Array(await (await fetch("/api/modelo?nome=" + encodeURIComponent(imagemAtual.nome))).arrayBuffer());
+    let texto = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) texto += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    mostrarImagem((await pedir("/api/imagem", {dados: btoa(texto)})).imagem);
   } catch (erro) {
     alert(erro.message);
   }
@@ -1258,10 +1305,47 @@ async function abrirDesenho() {
     copiar.append(botao);
   });
   copiar.hidden = copiar.children.length === 0;
+  mostrarModelos();
   $("pedir-desenho").hidden = !haAjudante;
   $("fala-desenho").hidden = true;
   desenharGrelha();
   $("desenho").hidden = false;
+}
+
+async function mostrarModelos() {
+  // Os modelos de pixel art da Oficina, para se comecar por um deles em vez
+  // de comecar do zero. O desta imagem (se houver) vem primeiro, e marcado.
+  const caixa = $("lista-de-modelos");
+  caixa.replaceChildren();
+  $("os-modelos").hidden = true;
+  let dados;
+  try {
+    dados = await pedir("/api/modelos");
+  } catch (erro) {
+    return;
+  }
+  for (const nome of dados.modelos) {
+    const botao = elemento("button", "", nome === dados.meu ? "escolhida" : "");
+    botao.type = "button";
+    botao.title = nome.replace(/\.png$/, "") + (nome === dados.meu ? " (o modelo desta imagem)" : "");
+    const imagem = document.createElement("img");
+    imagem.src = "/api/modelo?nome=" + encodeURIComponent(nome);
+    imagem.alt = botao.title;
+    imagem.loading = "lazy";
+    botao.append(imagem);
+    botao.onclick = async () => {
+      if (pixeis.some(cor => cor !== null)
+          && !confirm("Começar por este modelo?\n\nO que está na grelha é trocado por ele.")) return;
+      try {
+        await porNaGrelha("/api/modelo?nome=" + encodeURIComponent(nome));
+        desenharGrelha();
+      } catch (erro) {
+        alert("Não consegui abrir esse modelo.");
+      }
+    };
+    caixa.append(botao);
+  }
+  $("os-modelos").hidden = dados.modelos.length === 0;
 }
 
 async function pedirDesenho(ev) {
@@ -1730,6 +1814,7 @@ $("repor").onclick = async () => {
 };
 $("guardar").onclick = () => guardarJogo(jogoAberto);
 $("apagar").onclick = apagarCoisa;
+$("renomear").onclick = mudarNome;
 $("barra-caixas").onmouseenter = () => { if (!document.activeElement || document.activeElement.type !== "checkbox") mostrarCaixas(haCaixas); };
 $("abrir-lista").onclick = abrirLista;
 $("guardar-lista").onclick = guardarLista;

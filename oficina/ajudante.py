@@ -207,12 +207,17 @@ def grelha(codigo):
         acerto = LINHA_DE_MAPA.match(linha)
         if acerto:
             filas.append((numero, acerto.group(1), acerto.group(2), acerto.group(3)))
+    # (Um nivel do Maos ao Ar! traz o nome e a dica antes do mapa: basta que
+    # as linhas do mapa sejam a maior parte do bocado.)
     com_texto = [linha for linha in linhas if linha.strip() != ""]
-    if len(filas) < 3 or len(filas) < len(com_texto) - 3:
+    if len(filas) < 3 or len(filas) * 2 < len(com_texto):
         return []
-    for _, _, letras, _ in filas:
-        if len(letras) < 4 or re.search(r"[A-Za-zÀ-ÿ]{2,} [A-Za-zÀ-ÿ]{2,}", letras.strip()):
-            return []
+    # As linhas que sao frases (o nome e a dica de um nivel) nao sao do
+    # mapa: ficam de fora. Tem de sobrar um mapa com pelo menos 3 linhas.
+    filas = [fila for fila in filas
+             if len(fila[2]) >= 4 and not re.search(r"[A-Za-zÀ-ÿ]{2,} [A-Za-zÀ-ÿ]{2,}", fila[2].strip())]
+    if len(filas) < 3 or len(filas) * 2 < len(com_texto):
+        return []
     return filas
 
 

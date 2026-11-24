@@ -210,8 +210,8 @@ INIMIGOS = {
 }
 
 # --- As ondas ---
-# Cada linha [ ... ] e uma onda. Ha 10 linhas, ha 10 ondas: acrescenta uma
-# e passa a haver 11.
+# Cada [ ... ] e uma onda. Ha 10, ha 10 ondas: acrescenta uma e passa a
+# haver 11. Cada onda comeca numa linha nova.
 # Dentro de cada onda ha grupos { ... }. Um grupo diz:
 #   inimigo:    que inimigo (escrito igual ao nome em INIMIGOS, com acentos)
 #   quantos:    quantos vem
@@ -426,8 +426,7 @@ def comecar_onda():
 
 
 def criar_inimigo(nome):
-    dados = INIMIGOS[nome]
-    vida = int(dados["vida"] * (1 + VIDA_EXTRA_POR_ONDA * (numero_onda - 1)))
+    vida = vida_do_inimigo(nome, numero_onda)
     inicio = CAMINHO_PONTOS[0]
     return {
         "nome": nome,
@@ -445,7 +444,7 @@ def criar_inimigo(nome):
 
 def construir(coluna, linha):
     global ouro, torre_escolhida
-    if letra_do_mapa(coluna, linha) != ".":
+    if not pode_construir(coluna, linha):
         return
     for torre in torres:
         if torre["coluna"] == coluna and torre["linha"] == linha:
@@ -472,21 +471,6 @@ def construir(coluna, linha):
     ao_construir(torres[len(torres) - 1])
 
 
-def valor_da_torre(torre, chave):
-    # Cada nivel a mais soma DANO_EXTRA_POR_NIVEL ao dano e
-    # ALCANCE_EXTRA_POR_NIVEL ao alcance (os numeros estao la em cima).
-    base = TORRES[torre["tipo"]][chave]
-    if chave == "dano":
-        return base * (1 + DANO_EXTRA_POR_NIVEL * (torre["nivel"] - 1))
-    if chave == "alcance":
-        return base * (1 + ALCANCE_EXTRA_POR_NIVEL * (torre["nivel"] - 1))
-    return base
-
-
-def custo_melhoria(torre):
-    return TORRES[torre["tipo"]]["custo"] * torre["nivel"]
-
-
 def melhorar():
     global ouro
     if torre_escolhida is None or torre_escolhida["nivel"] >= NIVEL_MAXIMO:
@@ -499,17 +483,20 @@ def melhorar():
     torre_escolhida["gasto"] = torre_escolhida["gasto"] + custo
     torre_escolhida["nivel"] = torre_escolhida["nivel"] + 1
     efeitos.append(circulo_a_crescer(torre_escolhida["x"], torre_escolhida["y"], AMARELO, 30))
+    ao_melhorar(torre_escolhida)
 
 
 def vender():
     global ouro, torre_escolhida
     if torre_escolhida is None:
         return
-    ganho = int(torre_escolhida["gasto"] * VENDA)
+    vendida = torre_escolhida
+    ganho = valor_de_venda(vendida)
     ouro = ouro + ganho
-    efeitos.append(texto_a_voar("+" + str(ganho), torre_escolhida["x"] - 15, torre_escolhida["y"], AMARELO))
-    torres.remove(torre_escolhida)
+    efeitos.append(texto_a_voar("+" + str(ganho), vendida["x"] - 15, vendida["y"], AMARELO))
+    torres.remove(vendida)
     torre_escolhida = None
+    ao_vender(vendida)
 
 
 # --- Efeitos: sao so dicionarios com um tempo de vida ---
@@ -598,19 +585,57 @@ def a_cada_frame():
     pass
 
 
+# QUANDO ACABA UMA ONDA
+# numero: a onda que acabou (1 na primeira). Corre quando o ultimo inimigo
+# dela cai ou chega ao castelo, ja com o premio da onda no ouro. Tambem corre
+# na ultima onda, quando ganhas o jogo.
+# Ideias: recuperar uma vida por cada onda vencida; um premio a dobrar se
+# nenhum inimigo chegou ao castelo nessa onda (conta-os na memoria, em
+# ao_chegar_ao_castelo); avisar com um texto_a_voar o que vem a seguir.
+def ao_acabar_onda(numero):
+    pass
+
+
+# QUANDO SE MELHORA UMA TORRE
+# torre: a que acabou de subir de nivel (tecla U). torre["nivel"] ja e o
+# nivel novo, e o ouro ja foi gasto.
+# Ideias: a torre disparar logo a seguir (torre["recarga"] = 0); devolver
+# metade do ouro quando ela chega ao ultimo nivel; um texto_a_voar a festejar.
+def ao_melhorar(torre):
+    pass
+
+
+# QUANDO SE VENDE UMA TORRE
+# torre: a que acabou de ser vendida (tecla V). Ja saiu do mapa e o ouro da
+# venda ja entrou. torre["x"], torre["y"] dizem onde estava.
+# Ideias: rebentar ao sair e magoar os inimigos que estao perto; contar na
+# memoria quantas ja vendeste; um circulo_a_crescer no sitio onde estava.
+def ao_vender(torre):
+    pass
+
+
 # =====================================================================
 #                          A LOGICA, UM PASSO
 # =====================================================================
 
 # --- As regras do jogo ---
-# As quatro funcoes que se seguem sao as REGRAS: quem as torres atacam, o que
-# fazem ao disparar, o que acontece a um inimigo atingido e como anda um
-# inimigo. Mudar uma delas muda a maneira como o jogo se comporta.
+# Ha dez funcoes neste ficheiro que sao as REGRAS. Quatro sao do combate: quem
+# as torres atacam (escolher_alvo), o que fazem ao disparar (disparar), o que
+# acontece a um inimigo atingido (magoar) e como anda um inimigo
+# (mover_inimigo). Seis sao das contas: quanta vida tem um inimigo
+# (vida_do_inimigo), o que vale uma torre em cada nivel (valor_da_torre),
+# quanto custa melhora-la (custo_melhoria), quanto se recebe ao vende-la
+# (valor_de_venda), quanto ouro da acabar uma onda (premio_da_onda) e onde se
+# pode construir (pode_construir). Mudar uma delas muda a maneira como o jogo
+# se comporta.
 #
 # Dentro delas podes usar tudo o que o jogo tem:
 #   inimigos, torres, projeteis, efeitos    as listas do que esta no ecra
 #   distancia(x1, y1, x2, y2)               quantos pixeis vao de um ponto a outro
 #   valor_da_torre(torre, "dano")           o dano (ou o "alcance") ja com o nivel
+#   TORRES[torre["tipo"]]                   a ficha dessa torre ("nome", "custo"...)
+#   torre["nivel"], torre["gasto"]          o nivel dela, e o ouro que ja la foi gasto
+#   letra_do_mapa(coluna, linha)            a letra desse quadrado do MAPA
 #   random.random()                         um numero ao calhas entre 0 e 1
 # Para aparecer um efeito no ecra tem de se por na lista efeitos:
 #   efeitos.append(texto_a_voar("ola", x, y, cor))        um texto que sobe e some
@@ -692,6 +717,73 @@ def disparar(torre, alvo):
     elif modelo["efeito"] == "golpe":
         magoar(alvo, dano)
         efeitos.append(circulo_a_crescer(alvo["x"], alvo["y"], BRANCO, 18))
+
+
+# QUANTA VIDA TEM UM INIMIGO
+# Corre quando um inimigo nasce. Recebe o nome dele (como esta em INIMIGOS) e
+# o numero da onda (1 na primeira), e devolve a vida com que ele nasce. Como
+# esta: a "vida" da ficha dele, mais VIDA_EXTRA_POR_ONDA por cada onda que ja
+# passou. Tem de devolver pelo menos 1.
+# Ideias: os inimigos nao ficarem mais rijos com as ondas; a vida dobrar de 5
+# em 5 ondas; os Cavaleiros nascerem com a vida ao calhas.
+def vida_do_inimigo(nome, onda):
+    return int(INIMIGOS[nome]["vida"] * (1 + VIDA_EXTRA_POR_ONDA * (onda - 1)))
+
+
+# O QUE VALE UMA TORRE EM CADA NIVEL
+# Recebe uma torre e o nome de uma coisa da ficha dela ("dano", "alcance"...)
+# e devolve quanto isso vale para ESTA torre, ja com o nivel dela. Como esta:
+# cada nivel a mais soma DANO_EXTRA_POR_NIVEL ao dano e
+# ALCANCE_EXTRA_POR_NIVEL ao alcance (os numeros estao la em cima); o resto
+# fica como na ficha.
+# Ideias: o alcance nao crescer com o nivel; no ultimo nivel o dano triplicar;
+# o Besteiro ganhar mais alcance do que os outros.
+def valor_da_torre(torre, chave):
+    base = TORRES[torre["tipo"]][chave]
+    if chave == "dano":
+        return base * (1 + DANO_EXTRA_POR_NIVEL * (torre["nivel"] - 1))
+    if chave == "alcance":
+        return base * (1 + ALCANCE_EXTRA_POR_NIVEL * (torre["nivel"] - 1))
+    return base
+
+
+# QUANTO CUSTA MELHORAR UMA TORRE
+# Recebe uma torre e devolve o ouro que custa subi-la um nivel (tecla U).
+# Como esta: o custo da ficha dela, vezes o nivel em que esta. Um Besteiro
+# (50) custa 50 para o nivel 2 e 100 para o nivel 3.
+# Ideias: custar sempre o mesmo; a primeira melhoria ser de borla; ficar mais
+# caro quantas mais torres tiveres (len(torres)).
+def custo_melhoria(torre):
+    return TORRES[torre["tipo"]]["custo"] * torre["nivel"]
+
+
+# QUANTO SE RECEBE AO VENDER UMA TORRE
+# Recebe uma torre e devolve o ouro que ela da ao ser vendida (tecla V). Como
+# esta: uma parte (VENDA, la em cima) de todo o ouro que ja se gastou nela.
+# Ideias: devolver tudo; devolver menos enquanto ha uma onda a decorrer
+# (onda_a_decorrer); as torres no nivel maximo valerem o dobro.
+def valor_de_venda(torre):
+    return int(torre["gasto"] * VENDA)
+
+
+# QUANTO OURO DA ACABAR UMA ONDA
+# Recebe o numero da onda que acabou (1 na primeira) e devolve o ouro de
+# premio. Como esta: sempre BONUS_POR_ONDA. (Na ultima onda nao ha premio:
+# ganhaste o jogo.)
+# Ideias: cada onda dar mais do que a anterior; um premio grande de 5 em 5
+# ondas; dar mais ouro a quem ainda tem as vidas todas.
+def premio_da_onda(numero):
+    return BONUS_POR_ONDA
+
+
+# ONDE SE PODE CONSTRUIR
+# Recebe a coluna e a linha de um quadrado do mapa (0, 0 e o canto de cima, a
+# esquerda) e devolve True se da para construir la uma torre, ou False se
+# nao da. Como esta: so na relva (a letra "." do MAPA).
+# Ideias: tambem por cima das arvores (a letra "T"); so nos quadrados colados
+# ao caminho; nunca na primeira linha do mapa.
+def pode_construir(coluna, linha):
+    return letra_do_mapa(coluna, linha) == "."
 
 
 def atualizar_torres():
@@ -815,8 +907,10 @@ def atualizar_ondas():
         if numero_onda >= len(ONDAS):
             estado = "vitoria"
         else:
-            ouro = ouro + BONUS_POR_ONDA
-            efeitos.append(texto_a_voar("Onda vencida! +" + str(BONUS_POR_ONDA), LARGURA // 2 - 90, ALTURA // 2, AMARELO))
+            premio = premio_da_onda(numero_onda)
+            ouro = ouro + premio
+            efeitos.append(texto_a_voar("Onda vencida! +" + str(premio), LARGURA // 2 - 90, ALTURA // 2, AMARELO))
+        ao_acabar_onda(numero_onda)
 
 
 def atualizar_efeitos():
@@ -852,35 +946,19 @@ def desenhar_mapa():
     while linha < len(MAPA):
         coluna = 0
         while coluna < len(MAPA[linha]):
-            letra = MAPA[linha][coluna]
-            quadrado = pygame.Rect(coluna * TILE, TOPO + linha * TILE, TILE, TILE)
-            cor = RELVA
-            if (coluna + linha) % 2 == 0:
-                cor = RELVA_ESCURA
-            pygame.draw.rect(ecra, cor, quadrado)
-            if letra == "#" or letra == "E" or letra == "C":
-                pygame.draw.rect(ecra, CAMINHO, quadrado)
-            if letra == "T":
-                pygame.draw.circle(ecra, ARVORE, quadrado.center, 16)
-                pygame.draw.circle(ecra, escurecer(ARVORE, 0.7), quadrado.center, 16, 3)
+            desenhar_quadrado(MAPA[linha][coluna], coluna, linha)
             coluna = coluna + 1
         linha = linha + 1
 
     # O castelo, por cima do C.
     fim = CAMINHO_PONTOS[len(CAMINHO_PONTOS) - 1]
-    muralha = pygame.Rect(0, 0, 56, 44)
-    muralha.midbottom = (fim[0], fim[1] + 20)
-    pygame.draw.rect(ecra, (150, 145, 140), muralha)
-    for dente in [0, 2, 4, 6]:
-        pygame.draw.rect(ecra, (150, 145, 140), (muralha.x + dente * 8, muralha.y - 8, 8, 8))
-    pygame.draw.rect(ecra, (60, 40, 30), (muralha.centerx - 7, muralha.bottom - 18, 14, 18))
-    pygame.draw.line(ecra, (90, 80, 70), (muralha.centerx, muralha.y - 8), (muralha.centerx, muralha.y - 30), 2)
-    pygame.draw.polygon(ecra, (40, 90, 200), [(muralha.centerx, muralha.y - 30), (muralha.centerx + 16, muralha.y - 24), (muralha.centerx, muralha.y - 18)])
+    desenhar_castelo(fim[0], fim[1])
 
 
 # --- Os desenhos ---
-# As duas funcoes que se seguem desenham uma torre e um inimigo. Desenha-se
-# com formas do pygame, sempre no "ecra":
+# As funcoes que se seguem desenham uma torre, um inimigo, um quadrado do
+# mapa, o castelo e um projetil. Desenha-se com formas do pygame, sempre no
+# "ecra":
 #   pygame.draw.circle(ecra, cor, (x, y), raio)
 #   pygame.draw.rect(ecra, cor, (x, y, largura, altura))
 #   pygame.draw.line(ecra, cor, (x1, y1), (x2, y2), grossura)
@@ -959,6 +1037,66 @@ def desenhar_inimigo(inimigo):
         pygame.draw.rect(ecra, VERDE, (x - largura // 2, y - tamanho // 2 - 9, int(largura * fracao), 5))
 
 
+# UM QUADRADO DO MAPA
+# letra: a letra desse quadrado no MAPA ("." relva, "#" caminho, "T" arvore,
+# "E" entrada, "C" castelo). coluna, linha: onde ele fica no mapa (0, 0 e o
+# canto de cima, a esquerda).
+#   quadrado          o retangulo desse quadrado no ecra: quadrado.center e o
+#                     meio, quadrado.x e quadrado.y o canto de cima
+# Como esta: relva aos quadrados (um claro, um escuro), o caminho por cima, e
+# as arvores sao um circulo.
+# Ideias: flores na relva; um caminho de pedras; arvores com tronco; uma
+# letra nova, por exemplo "A" para agua (if letra == "A").
+def desenhar_quadrado(letra, coluna, linha):
+    quadrado = pygame.Rect(coluna * TILE, TOPO + linha * TILE, TILE, TILE)
+    cor = RELVA
+    if (coluna + linha) % 2 == 0:
+        cor = RELVA_ESCURA
+    pygame.draw.rect(ecra, cor, quadrado)
+    if letra == "#" or letra == "E" or letra == "C":
+        pygame.draw.rect(ecra, CAMINHO, quadrado)
+    if letra == "T":
+        pygame.draw.circle(ecra, ARVORE, quadrado.center, 16)
+        pygame.draw.circle(ecra, escurecer(ARVORE, 0.7), quadrado.center, 16, 3)
+
+
+# O CASTELO
+# x, y: o meio do quadrado do C, onde acaba o caminho. Como esta: uma
+# muralha com quatro ameias, uma porta e uma bandeira azul.
+#   muralha    o retangulo da muralha: muralha.x, muralha.y, muralha.centerx,
+#              muralha.bottom
+#   vidas      as vidas que te restam (VIDAS_INICIAIS sao as do inicio)
+# Ideias: outra cor de bandeira; duas torres dos lados; o castelo ficar mais
+# escuro quando ja tens poucas vidas.
+def desenhar_castelo(x, y):
+    muralha = pygame.Rect(0, 0, 56, 44)
+    muralha.midbottom = (x, y + 20)
+    pygame.draw.rect(ecra, (150, 145, 140), muralha)
+    for dente in [0, 2, 4, 6]:
+        pygame.draw.rect(ecra, (150, 145, 140), (muralha.x + dente * 8, muralha.y - 8, 8, 8))
+    pygame.draw.rect(ecra, (60, 40, 30), (muralha.centerx - 7, muralha.bottom - 18, 14, 18))
+    pygame.draw.line(ecra, (90, 80, 70), (muralha.centerx, muralha.y - 8), (muralha.centerx, muralha.y - 30), 2)
+    pygame.draw.polygon(ecra, (40, 90, 200), [(muralha.centerx, muralha.y - 30), (muralha.centerx + 16, muralha.y - 24), (muralha.centerx, muralha.y - 18)])
+
+
+# UM PROJETIL
+# projetil: uma seta ou uma pedra a voar.
+#   projetil["x"], projetil["y"]    onde vai agora
+#   projetil["raio"]                maior que 0 se rebenta ao chegar (a pedra
+#                                   do Trabuco); 0 se e uma seta
+#   projetil["cor"]                 a cor da torre que o disparou
+# Como esta: uma bolinha da cor da torre com um contorno preto, maior se for
+# das que rebentam.
+# Ideias: uma seta comprida em vez de uma bolinha; a pedra ser cinzenta;
+# brilhar a amarelo.
+def desenhar_projetil(projetil):
+    tamanho = 4
+    if projetil["raio"] > 0:
+        tamanho = 7
+    pygame.draw.circle(ecra, PRETO, (int(projetil["x"]), int(projetil["y"])), tamanho + 1)
+    pygame.draw.circle(ecra, projetil["cor"], (int(projetil["x"]), int(projetil["y"])), tamanho)
+
+
 def desenhar_alcance(x, y, raio, cor):
     camada_transparente.fill((0, 0, 0, 0))
     pygame.draw.circle(camada_transparente, (cor[0], cor[1], cor[2], 50), (int(x), int(y)), int(raio))
@@ -1003,7 +1141,7 @@ def desenhar_barra_baixo():
             mostrar_texto("U melhorar (" + str(custo_melhoria(torre_escolhida)) + ")", 380, y + 10, VERDE, fonte)
         else:
             mostrar_texto("nível máximo", 380, y + 10, CINZA, fonte)
-        mostrar_texto("V vender (+" + str(int(torre_escolhida["gasto"] * VENDA)) + ")", 590, y + 10, AMARELO, fonte)
+        mostrar_texto("V vender (+" + str(valor_de_venda(torre_escolhida)) + ")", 590, y + 10, AMARELO, fonte)
         return
 
     x = 10
@@ -1036,7 +1174,7 @@ def desenhar_jogo():
         for torre in torres:
             if torre["coluna"] == quadrado[0] and torre["linha"] == quadrado[1]:
                 ocupado = True
-        if letra_do_mapa(quadrado[0], quadrado[1]) == "." and not ocupado:
+        if pode_construir(quadrado[0], quadrado[1]) and not ocupado:
             cor = VERDE
             if ouro < modelo["custo"]:
                 cor = VERMELHO
@@ -1050,11 +1188,7 @@ def desenhar_jogo():
     for inimigo in inimigos:
         desenhar_inimigo(inimigo)
     for projetil in projeteis:
-        tamanho = 4
-        if projetil["raio"] > 0:
-            tamanho = 7
-        pygame.draw.circle(ecra, PRETO, (int(projetil["x"]), int(projetil["y"])), tamanho + 1)
-        pygame.draw.circle(ecra, projetil["cor"], (int(projetil["x"]), int(projetil["y"])), tamanho)
+        desenhar_projetil(projetil)
     desenhar_efeitos()
 
     desenhar_barra_cima()

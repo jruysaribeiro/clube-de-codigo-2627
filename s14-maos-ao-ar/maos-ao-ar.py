@@ -126,6 +126,8 @@ COR_ESPINHO = (210, 215, 225)
 
 # --- Os mundos ---
 # Os niveis 1 a 5 passam-se no primeiro mundo, os 6 a 10 no segundo, etc.
+# (Quem decide isso e a regra mundo_do_nivel, mais abaixo.)
+#   estrelas:  True se o ceu desse mundo tem estrelas
 MUNDOS = [
     {"nome": "O Prado", "ceu_cima": (95, 175, 240), "ceu_baixo": (195, 230, 250),
      "terra": (140, 95, 60), "relva": (95, 190, 85), "montes": (120, 200, 150),
@@ -1266,7 +1268,7 @@ def carregar_nivel(indice):
 
     nivel["total_moedas"] = len(nivel["moedas"])
     nivel["ponto"] = inicio          # onde se volta a nascer
-    numero_mundo = (numero_do_nivel(indice) - 1) // 5
+    numero_mundo = mundo_do_nivel(numero_do_nivel(indice))     # uma regra do jogo
     if numero_mundo < 0:
         numero_mundo = 0
     if numero_mundo >= len(MUNDOS):
@@ -1289,6 +1291,7 @@ def carregar_nivel(indice):
     heroi["invencivel"] = 0
     jogo["indice"] = indice
     jogo["tremor"] = 0
+    ao_comecar_nivel()
 
 
 # =====================================================================
@@ -1376,15 +1379,69 @@ def a_cada_frame():
     pass
 
 
+# QUANDO UM NIVEL COMECA
+# Corre no inicio de cada nivel, com tudo ja no sitio (e tambem quando se
+# tenta outra vez). A memoria esta vazia. nivel["nome"] diz qual e, e
+# jogo["indice"] a posicao dele na lista NIVEIS (0 e o primeiro).
+# Ideias: comecar com menos um coracao nos niveis dificeis; comecar com o
+# turbo ligado; por uma moeda de premio mesmo a frente do Faisca.
+def ao_comecar_nivel():
+    pass
+
+
+# QUANDO SE ACABA UM NIVEL
+# Corre quando o Faisca chega a saida. estrelas: quantas ganhou (0 a 3).
+# nivel["apanhadas"] sao as moedas que apanhou, e jogo["moedas"] as de todos
+# os niveis ja acabados (com as deste).
+# Ideias: 10 moedas de premio por cada nivel com 3 estrelas; um fogo de
+# artificio de faiscas; dizer acao("PERFEITO!") quando sao 3 estrelas.
+def ao_acabar_nivel(estrelas):
+    pass
+
+
+# QUANDO O FAISCA APANHA UM CORACAO
+# x, y: o sitio onde o coracao estava, em pixeis do nivel.
+# heroi["vidas"] ja conta com este coracao. (Um coracao so se apanha quando
+# falta algum: com os coracoes todos, fica la.)
+# Ideias: cada coracao dar tambem 5 moedas (nivel["apanhadas"]); ficar um
+# bocadinho invencivel; soltar faiscas vermelhas.
+def ao_apanhar_coracao(x, y):
+    pass
+
+
+# QUANDO O FAISCA DISPARA
+# tiro: o tiro que acabou de sair. tiro["x"], tiro["y"] dizem onde esta,
+# tiro["vx"] a velocidade dele (negativa: vai para a esquerda) e tiro["vida"]
+# os frames que ainda dura. Podes muda-los.
+#   nivel["tiros"].append({"x": ..., "y": ..., "vx": ..., "vida": ...})
+#                       poe mais um tiro no ar
+# Ideias: um tiro triplo (mais dois tiros, um mais acima e outro mais
+# abaixo); tiros que vao mais longe; o Faisca dar um passo para tras com o
+# coice (heroi["x"] menos 6 * heroi["virado"]).
+def ao_disparar(tiro):
+    pass
+
+
+# QUANDO UM CAIXOTE SE PARTE
+# coluna, linha: o quadrado do mapa onde o caixote estava. O meio dele, em
+# pixeis, e (coluna * TILE + 24, linha * TILE + 24).
+# Ideias: sair uma moeda de dentro de cada caixote; de vez em quando sair um
+# coracao (nivel["coracoes"].append(pygame.Rect(x, y, 24, 24))); contar os
+# caixotes partidos na memoria.
+def ao_partir_caixote(coluna, linha):
+    pass
+
+
 # =====================================================================
 # AS REGRAS DO JOGO
 # =====================================================================
 
 # --- As regras do jogo ---
-# As cinco funcoes que se seguem sao as REGRAS: como o Faisca salta, o que
-# acontece quando ele toca num inimigo, o que faz um tiro que acerta, e como
-# se mexem os inimigos que saltam e os que voam. Mudar uma delas muda a
-# maneira como o jogo se comporta.
+# As dez funcoes que se seguem sao as REGRAS: como o Faisca salta, o que
+# acontece quando ele toca num inimigo, o que faz um tiro que acerta, como
+# se mexem os inimigos que saltam, os que voam, os que carregam e os canhoes,
+# o que faz uma mola, quantas estrelas da um nivel e em que mundo ele se
+# passa. Mudar uma delas muda a maneira como o jogo se comporta.
 #
 # Dentro delas podes usar tudo o que o jogo tem:
 #   heroi["x"], heroi["y"]    onde esta o Faisca, em pixeis. O x cresce para
@@ -1505,6 +1562,116 @@ def mexer_voador(inimigo, velocidade):
     inimigo["x"] = inimigo["x0"] + math.sin(inimigo["t"] * velocidade) * 150
     inimigo["y"] = inimigo["y0"] + math.sin(inimigo["t"] * 0.06) * 34
     inimigo["dir"] = sinal(inimigo["x"] - antes)
+
+
+# COMO SE MEXE UM INIMIGO QUE CARREGA (o Javali)
+# Corre a cada frame para cada inimigo com o jeito "carregar".
+# velocidade: a "velocidade" da ficha dele em INIMIGOS (a de quando passeia).
+#   inimigo["furia"]    os frames que ainda vai a correr contra o Faisca
+#   inimigo["tonto"]    os frames que fica parado, tonto, depois da corrida
+#   andar_no_chao(inimigo, velocidade)    anda para onde esta virado, da meia
+#                       volta nas paredes e nos buracos, e devolve True quando
+#                       a da
+# Como esta: passeia devagar. Se ve o Faisca a menos de 7 quadrados e a
+# mesma altura, corre contra ele (a 4.4) durante 90 frames, ou ate bater; a
+# seguir fica tonto 70 frames.
+# Ideias: ver o Faisca de mais longe; correr mais depressa; nunca ficar
+# tonto; fugir do Faisca em vez de o atacar.
+def mexer_carregador(inimigo, velocidade):
+    dx = heroi["x"] - inimigo["x"]      # positivo: o Faisca esta a direita
+    dy = (heroi["y"] + heroi["a"]) - (inimigo["y"] + inimigo["a"])
+    if inimigo["tonto"] > 0:
+        inimigo["tonto"] -= 1
+        andar_no_chao(inimigo, 0)
+    elif inimigo["furia"] > 0:
+        inimigo["furia"] -= 1
+        virou = andar_no_chao(inimigo, 4.4)
+        if virou or inimigo["furia"] == 0:
+            inimigo["furia"] = 0
+            inimigo["tonto"] = 70
+    else:
+        andar_no_chao(inimigo, velocidade)
+        if abs(dx) < 7 * TILE and abs(dy) < TILE:
+            inimigo["dir"] = sinal(dx)
+            inimigo["furia"] = 90
+
+
+# COMO DISPARA UM CANHAO
+# Corre a cada frame para cada inimigo com o jeito "canhao".
+# velocidade: a "velocidade" da ficha dele em INIMIGOS. Aqui e a velocidade
+# das bolas que ele dispara.
+#   inimigo["espera"]   os frames que faltam para o proximo disparo
+#   disparar_bala(x, y, vx, vy)    poe uma bola no ar, nesse sitio e com essa
+#                       velocidade (vy negativo: sobe)
+# Como esta: vira-se para o Faisca e, se ele estiver a menos de 11 quadrados
+# e mais ou menos a mesma altura, dispara uma bola a direito de 115 em 115
+# frames.
+# Ideias: disparar mais vezes; disparar duas bolas, uma mais para cima;
+# so disparar quando o Faisca esta de costas.
+def mexer_canhao(inimigo, velocidade):
+    dx = heroi["x"] - inimigo["x"]      # positivo: o Faisca esta a direita
+    dy = (heroi["y"] + heroi["a"]) - (inimigo["y"] + inimigo["a"])
+    andar_no_chao(inimigo, 0)
+    inimigo["dir"] = sinal(dx)
+    if inimigo["espera"] > 0:
+        inimigo["espera"] -= 1
+    elif abs(dx) < 11 * TILE and abs(dy) < 3 * TILE:
+        disparar_bala(inimigo["x"] + 20 + inimigo["dir"] * 26, inimigo["y"] + 14,
+                      inimigo["dir"] * velocidade, 0)
+        inimigo["espera"] = 115
+        tocar("canhao")
+
+
+# O QUE FAZ UMA MOLA
+# Corre quando o Faisca cai em cima de uma mola (a letra M).
+# Como esta: atira-o para cima com a FORCA_MOLA.
+# Ideias: uma mola mais fraca quando ele vai a correr; uma mola que so
+# funciona de 2 em 2 vezes (conta na memoria); dar uma moeda de cada vez
+# (nivel["apanhadas"]).
+def tocar_na_mola():
+    heroi["vy"] = -FORCA_MOLA
+    heroi["no_chao"] = False
+    heroi["coiote"] = 0
+    tocar("mola")
+    acao("BOING!")
+
+
+# QUANTAS ESTRELAS DA UM NIVEL
+# Corre quando o Faisca chega a saida. Devolve as estrelas que ele ganha: um
+# numero inteiro, de 0 a 3 (o ecra so tem lugar para 3).
+#   nivel["apanhadas"], nivel["total_moedas"]    as moedas que apanhou, e as
+#                                                que o nivel tinha
+#   nivel["sem_falhas"]    True se nao perdeu nenhum coracao
+#   nivel["tempo"]         os frames que demorou (60 = um segundo)
+#   heroi["vidas"]         os coracoes com que chegou ao fim
+# Como esta: 1 estrela por chegar, mais 1 por todas as moedas, mais 1 por
+# nao perder coracoes. (No recreio nunca ha estrelas.)
+# Ideias: uma estrela por acabar em menos de 30 segundos; a das moedas
+# bastar com metade delas; so dar 3 estrelas a quem chegar com os coracoes
+# todos.
+def contar_estrelas():
+    estrelas = 1
+    if nivel["apanhadas"] >= nivel["total_moedas"]:
+        estrelas += 1
+    if nivel["sem_falhas"]:
+        estrelas += 1
+    return estrelas
+
+
+# EM QUE MUNDO SE PASSA CADA NIVEL
+# numero: o numero do nivel, como aparece no ecra (o primeiro a serio e o 1;
+# o recreio e o 0). Devolve a posicao do mundo na lista MUNDOS: 0 e o
+# primeiro mundo, 1 o segundo... (Se der um numero de um mundo que nao ha, o
+# jogo usa o primeiro ou o ultimo.)
+#   numero // 5      a divisao inteira: quantas vezes o 5 cabe no numero
+#   numero % 5       o resto dessa divisao
+#   len(MUNDOS)      quantos mundos ha
+# Como esta: cinco niveis em cada mundo, por ordem.
+# Ideias: tres niveis por mundo; os mundos a rodar (um nivel em cada um, e
+# volta ao primeiro: usa o resto da divisao); o ultimo nivel passar-se
+# sempre no ultimo mundo.
+def mundo_do_nivel(numero):
+    return (numero - 1) // 5
 
 
 # =====================================================================
@@ -1637,15 +1804,17 @@ def atualizar_heroi(comando):
     if comando["disparar"] and heroi["recarga"] == 0:
         heroi["recarga"] = TEMPO_ENTRE_TIROS
         heroi["recuo"] = 8
-        nivel["tiros"].append({
+        tiro = {
             "x": heroi["x"] + 15 + heroi["virado"] * 18,
             "y": heroi["y"] + 22,
             "vx": VEL_TIRO * heroi["virado"],
             "vida": ALCANCE_TIRO,
-        })
+        }
+        nivel["tiros"].append(tiro)
         if not tocar_som(SOM_DO_TIRO):
             tocar("tiro")
         acao("FOGO!")
+        ao_disparar(tiro)
 
 
 def perder_vida(voltar_atras):
@@ -1675,11 +1844,7 @@ def perder_vida(voltar_atras):
 
 def concluir_nivel():
     indice = jogo["indice"]
-    estrelas = 1
-    if nivel["apanhadas"] >= nivel["total_moedas"]:
-        estrelas += 1
-    if nivel["sem_falhas"]:
-        estrelas += 1
+    estrelas = contar_estrelas()    # uma regra do jogo
     if nivel["treino"]:
         estrelas = 0                # o recreio nao da estrelas nem moedas
     else:
@@ -1692,6 +1857,7 @@ def concluir_nivel():
     jogo["fase"] = "nivel_feito"
     jogo["espera"] = 50
     tocar("vitoria")
+    ao_acabar_nivel(estrelas)
 
 
 def tocar_no_mapa():
@@ -1714,11 +1880,7 @@ def tocar_no_mapa():
             y = linha * TILE
             if letra == "M":
                 if heroi["vy"] >= 0 and eu.bottom >= y + 20:
-                    heroi["vy"] = -FORCA_MOLA
-                    heroi["no_chao"] = False
-                    heroi["coiote"] = 0
-                    tocar("mola")
-                    acao("BOING!")
+                    tocar_na_mola()         # uma regra do jogo
             elif letra == "^":
                 if eu.colliderect(pygame.Rect(x + 8, y + 22, TILE - 16, 26)):
                     perder_vida(True)
@@ -1752,6 +1914,7 @@ def tocar_no_mapa():
             heroi["vidas"] += 1
             tocar("moeda")
             particulas(coracao.centerx, coracao.centery, VERMELHO, 10, 3)
+            ao_apanhar_coracao(coracao.centerx, coracao.centery)
         else:
             restantes.append(coracao)
     nivel["coracoes"] = restantes
@@ -1827,6 +1990,7 @@ def atualizar_tiros():
                 nivel["grelha"][linha][coluna] = "."
                 particulas(coluna * TILE + 24, linha * TILE + 24, COR_MADEIRA, 12, 5)
                 tocar("caixote")
+                ao_partir_caixote(coluna, linha)
             else:
                 particulas(tiro["x"], tiro["y"], COR_TIRO, 3, 2)
             continue
@@ -1915,7 +2079,6 @@ def mexer_inimigo(inimigo):
     jeito = tipo["jeito"]
     velocidade = tipo["velocidade"]
     dx = heroi["x"] - inimigo["x"]
-    dy = (heroi["y"] + heroi["a"]) - (inimigo["y"] + inimigo["a"])
 
     if jeito == "andar":
         andar_no_chao(inimigo, velocidade)
@@ -1927,31 +2090,10 @@ def mexer_inimigo(inimigo):
         mexer_voador(inimigo, velocidade)       # outra
 
     elif jeito == "carregar":
-        if inimigo["tonto"] > 0:
-            inimigo["tonto"] -= 1
-            andar_no_chao(inimigo, 0)
-        elif inimigo["furia"] > 0:
-            inimigo["furia"] -= 1
-            virou = andar_no_chao(inimigo, 4.4)
-            if virou or inimigo["furia"] == 0:
-                inimigo["furia"] = 0
-                inimigo["tonto"] = 70
-        else:
-            andar_no_chao(inimigo, velocidade)
-            if abs(dx) < 7 * TILE and abs(dy) < TILE:
-                inimigo["dir"] = sinal(dx)
-                inimigo["furia"] = 90
+        mexer_carregador(inimigo, velocidade)   # e mais outra
 
     elif jeito == "canhao":
-        andar_no_chao(inimigo, 0)
-        inimigo["dir"] = sinal(dx)
-        if inimigo["espera"] > 0:
-            inimigo["espera"] -= 1
-        elif abs(dx) < 11 * TILE and abs(dy) < 3 * TILE:
-            disparar_bala(inimigo["x"] + 20 + inimigo["dir"] * 26, inimigo["y"] + 14,
-                          inimigo["dir"] * velocidade, 0)
-            inimigo["espera"] = 115
-            tocar("canhao")
+        mexer_canhao(inimigo, velocidade)       # e outra
 
     elif jeito == "chefe":
         zangado = inimigo["vida"] <= tipo["vida"] / 2
@@ -2195,6 +2337,18 @@ def desenhar_fundo(camara_x):
         pygame.draw.circle(ecra, mundo["montes"], centro, raio)
 
 
+# OS QUADRADOS DO MAPA
+# Desenha um quadrado do nivel: o chao, uma plataforma, uma ponte podre, um
+# caixote, os espinhos, a lava ou uma mola. (O ar nao se desenha.)
+#   letra           a letra desse quadrado no mapa: # = % B ^ ~ M
+#   coluna, linha   o sitio dele no mapa, a contar do 0
+#   x, y            o canto de cima, do lado esquerdo, no ecra. O quadrado
+#                   tem TILE (48) de lado.
+#   mundo           o mundo onde o nivel se passa: mundo["terra"] e
+#                   mundo["relva"] sao as cores do chao
+#   jogo["frame"]   os frames que ja passaram: serve para as coisas mexerem
+# Ideias: flores na relva; caixotes de outra cor; lava verde, que borbulha;
+# espinhos mais altos.
 def desenhar_quadrado(letra, coluna, linha, x, y):
     ecra = janela["ecra"]
     mundo = nivel["mundo"]
@@ -2253,6 +2407,15 @@ def desenhar_mapa(camara_x):
                                   int(coluna * TILE - camara_x), linha * TILE)
 
 
+# UM CORACAO
+# Os coracoes que estao no nivel para apanhar e os do canto do ecra (as
+# vidas do Faisca) sao todos desenhados aqui.
+#   x, y      o canto de cima, do lado esquerdo
+#   tamanho   o lado do quadrado onde ele cabe (24 no nivel, 28 no canto)
+#   cor       vermelho, ou escuro para um coracao que ja se perdeu
+# Como esta: dois circulos e um triangulo por baixo.
+# Ideias: um brilho branco num dos lados; um contorno; trocar os coracoes
+# por pilhas (o Faisca e um robot).
 def desenhar_coracao(x, y, tamanho, cor):
     ecra = janela["ecra"]
     raio = tamanho // 4
@@ -2271,6 +2434,33 @@ def desenhar_estrela(x, y, raio, cor):
             r = raio * 0.45
         pontos.append((x + math.cos(angulo) * r, y + math.sin(angulo) * r))
     pygame.draw.polygon(janela["ecra"], cor, pontos)
+
+
+# UMA MOEDA
+#   x, y     o MEIO da moeda, no ecra
+#   atraso   um numero diferente para cada moeda, para nao rodarem todas ao
+#            mesmo tempo
+# Como esta: a moeda "roda": e uma elipse que encolhe e estica, com um
+# brilho mais claro la dentro.
+# Ideias: moedas quadradas; um risco no meio; moedas que sobem e descem em
+# vez de rodar.
+def desenhar_moeda(x, y, atraso):
+    ecra = janela["ecra"]
+    largura = abs(math.sin(jogo["frame"] * 0.07 + atraso)) * 8 + 3
+    pygame.draw.ellipse(ecra, COR_MOEDA, (x - largura, y - 11, largura * 2, 22))
+    pygame.draw.ellipse(ecra, (255, 240, 170), (x - largura / 2, y - 7, largura, 10))
+
+
+# UM TIRO DO FAISCA
+#   tiro     o tiro: tiro["vx"] diz para que lado vai (positivo: direita) e
+#            tiro["vida"] os frames que ainda dura
+#   x, y     o MEIO do tiro, no ecra
+# Como esta: um retangulo pequeno, com os cantos redondos, da COR_TIRO.
+# Ideias: uma bola em vez de um risco; um rasto atras do tiro (do lado
+# contrario ao de tiro["vx"]); ficar mais pequeno quando esta a acabar.
+def desenhar_tiro(tiro, x, y):
+    ecra = janela["ecra"]
+    pygame.draw.rect(ecra, COR_TIRO, (x - 8, y - 3, 16, 6), border_radius=3)
 
 
 def desenhar_coisas(camara_x):
@@ -2315,11 +2505,7 @@ def desenhar_coisas(camara_x):
                 pygame.draw.circle(ecra, BRANCO, (x + 10 + i * 10, r.bottom - 6 - altura), 2)
 
     for moeda in nivel["moedas"]:
-        # a moeda "roda": a largura encolhe e estica
-        largura = abs(math.sin(frame * 0.07 + moeda.x * 0.01)) * 8 + 3
-        centro = (moeda.centerx - camara_x, moeda.centery)
-        pygame.draw.ellipse(ecra, COR_MOEDA, (centro[0] - largura, centro[1] - 11, largura * 2, 22))
-        pygame.draw.ellipse(ecra, (255, 240, 170), (centro[0] - largura / 2, centro[1] - 7, largura, 10))
+        desenhar_moeda(moeda.centerx - camara_x, moeda.centery, moeda.x * 0.01)
 
     for coracao in nivel["coracoes"]:
         salto = int(math.sin(frame * 0.1) * 3)
@@ -2328,7 +2514,9 @@ def desenhar_coisas(camara_x):
 
 # --- Os desenhos ---
 # Os desenhos que se podem mudar: a Lesma (desenhar_lesma), um inimigo
-# inventado por ti (desenhar_inimigo_novo) e o Faisca (desenhar_robot).
+# inventado por ti (desenhar_inimigo_novo), o Faisca (desenhar_robot), os
+# quadrados do mapa (desenhar_quadrado), uma moeda (desenhar_moeda), um
+# coracao (desenhar_coracao) e um tiro (desenhar_tiro).
 # Desenha-se com formas do pygame, sempre no "ecra":
 #   pygame.draw.circle(ecra, cor, (x, y), raio)
 #   pygame.draw.rect(ecra, cor, (x, y, largura, altura))
@@ -2680,7 +2868,7 @@ def desenhar_jogo(m, comando):
     if jogo["fase"] != "perdeu":
         desenhar_heroi(camara_x)
     for tiro in nivel["tiros"]:
-        pygame.draw.rect(ecra, COR_TIRO, (tiro["x"] - camara_x - 8, tiro["y"] - 3, 16, 6), border_radius=3)
+        desenhar_tiro(tiro, tiro["x"] - camara_x, tiro["y"])
     for bala in nivel["balas"]:
         pygame.draw.circle(ecra, LARANJA, (int(bala["x"] - camara_x), int(bala["y"])), 8)
         pygame.draw.circle(ecra, AMARELO, (int(bala["x"] - camara_x), int(bala["y"])), 4)
@@ -2824,7 +3012,7 @@ def desenhar_titulo(m):
         estrelas += jogo["estrelas"][indice]
     escolhido = jogo["escolhido"]
     numero = numero_do_nivel(escolhido)
-    mundo = MUNDOS[max(0, min((numero - 1) // 5, len(MUNDOS) - 1))]
+    mundo = MUNDOS[max(0, min(mundo_do_nivel(numero), len(MUNDOS) - 1))]
     escrever("Nível " + str(numero) + " de " + str(total_de_niveis()) + ":  " + NIVEIS[escolhido]["nome"],
              "m", BRANCO, LARGURA // 2, 230, "centro")
     if NIVEIS[escolhido].get("treino", False):

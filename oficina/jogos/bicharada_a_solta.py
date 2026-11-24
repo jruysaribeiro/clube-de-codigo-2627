@@ -32,7 +32,7 @@ SOBRE_OS_GRUPOS = {
     "Bichos": "Tipo, vida, ataque, forma, cor. Podes pôr uma imagem tua.",
     "Ataques": "O poder, a precisão e o efeito de cada ataque.",
     "Treinadores": "Quem encontras no mapa: as falas e as perguntas deles, e que bichos levam.",
-    "Tipos": "As cores dos tipos, e quem é forte contra quem.",
+    "Tipos": "Cada tipo e a cor dele, quem é forte contra quem, e o tipo que todos podem aprender.",
     "Regras do jogo": "Aqui mudas a maneira como o jogo se comporta, na batalha e no mapa: é programar a sério.",
     "Acontecimentos": "Estão vazios: o que lá escreveres passa a acontecer nesse momento. É aqui que se inventa.",
     "Desenhos": "Como se desenha um bicho, um quadrado do mapa, tu e os treinadores.",
@@ -141,6 +141,7 @@ DICAS = {
     "jogador": "És tu, no mapa: clica no jogo e anda com as setas para te veres de frente, de costas e de lado."
                " Por cima do código escolhes qual das três imagens queres desenhar ou trocar.",
     "bicho": "O teu bicho é o de baixo, visto de costas; lá em cima vês-o de frente, na ficha."
+             " «Escolher os ataques» mostra os ataques que existem; os de «aprende» só aparecem a partir desse nível."
              " Por cima do código escolhes se desenhas a imagem de frente ou a de costas."
              " Muda um número e vê a ficha lá em cima. Setas e Enter para jogar, Esc para voltar atrás.",
     "desenho_da_batalha": "Isto é o desenho: muda-o e vês logo, na batalha e em todos os bichos lá em cima."
@@ -409,7 +410,7 @@ def regiao(fonte, escolha):
         return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": None, "som": None,
                 "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS["zona"],
                 "sugestoes": SUGESTOES["interior" if dentro else "zona"],
-                "apagar": "Apagar este edifício" if dentro else "Apagar esta zona"}
+                "apagar": "Apagar este edifício" if dentro else "Apagar esta zona", "renomear": "Mudar o nome"}
 
     if tipo in FUNCOES and numero in FUNCOES[tipo]:
         no = blocos.funcao(arvore, numero)
@@ -426,6 +427,8 @@ def regiao(fonte, escolha):
 
     resposta = base.regiao(fonte, escolha)
     if resposta is not None and tipo == "bicho" and numero.isdigit():
+        resposta["sugestoes"] = ["Faz com que só aprenda o ataque mais forte ao nível 10",
+                                 "Põe-no mais rápido mas com menos vida", "O que quer dizer o «aprende»?"]
         # Cada bicho tem duas imagens: de frente e de costas.
         ficha = base._fichas(blocos.instrucao(arvore, "BICHOS"))[int(numero)][1]
         _juntar_imagens(resposta, ficha, [("imagem", "De frente"), ("imagem_costas", "De costas")])
@@ -864,10 +867,79 @@ def _apagar_zona(fonte, escolha):
     return base._aplicar(linhas, cortes, trocas), aviso
 
 
+class _Bocado:
+    # Um bocado de uma linha do codigo, do inicio de uma coisa ao fim de outra.
+    def __init__(self, inicio, fim):
+        self.lineno, self.col_offset = inicio.lineno, inicio.col_offset
+        self.end_lineno, self.end_col_offset = fim.end_lineno, fim.end_col_offset
+
+
+def _apagar_ataque(fonte, escolha):
+    # Como na Bicharada, e o ataque sai tambem do "aprende" dos bichos.
+    arvore = ast.parse(fonte)
+    partes = base._fichas(blocos.instrucao(arvore, "ATAQUES"))
+    numero = escolha.partition(":")[2]
+    if not numero.isdigit() or int(numero) >= len(partes):
+        return base.apagar(fonte, escolha)
+    nome = partes[int(numero)][0]
+    linhas = fonte.split("\n")
+    cortes, trocas, donos = [], [], []
+    for bicho, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "BICHOS")):
+        aprende = base._no_da_chave(ficha, "aprende") if isinstance(ficha, ast.Dict) else None
+        if not isinstance(aprende, ast.Dict):
+            continue
+        for chave, valor in zip(aprende.keys, aprende.values):
+            if blocos.texto_constante(chave) == nome and base._tirar_da_lista(linhas, _Bocado(chave, valor), cortes, trocas):
+                donos.append(str(bicho))
+    nova, aviso = base.apagar(base._aplicar(linhas, cortes, trocas), escolha)
+    if donos:
+        nomes = donos[0] if len(donos) == 1 else ", ".join(donos[:-1]) + " e " + donos[-1]
+        aviso = aviso + " Também deixou de estar no «aprende» de: " + nomes + "."
+    return nova, aviso
+
+
+def renomear(fonte, escolha, nome):
+    # Como na Bicharada, mais as zonas: o nome muda nas ZONAS, no MUNDO e nas
+    # PORTAS que davam para ela.
+    tipo, _, numero = escolha.partition(":")
+    if tipo != "zona":
+        return base.renomear(fonte, escolha, nome)
+    arvore = ast.parse(fonte)
+    partes = _zonas_escritas(arvore)
+    if not numero.isdigit() or int(numero) >= len(partes):
+        raise ValueError("a isso não se pode mudar o nome.")
+    antigo = partes[int(numero)][0]
+    nome = base._nome_escrito(nome)
+    if nome == antigo:
+        raise ValueError("esse já é o nome dela.")
+    if nome in [parte[0] for parte in partes]:
+        raise ValueError('já há outra zona com o nome "' + nome + '".')
+    linhas = fonte.split("\n")
+    trocas = []
+    base._trocar_no(linhas, blocos.instrucao(arvore, "ZONAS").value.keys[int(numero)], '"' + nome + '"', trocas)
+    onde = []
+    for fila in blocos.instrucao(arvore, "MUNDO").value.elts:
+        for este in fila.elts if isinstance(fila, ast.List) else []:
+            if blocos.texto_constante(este) == antigo and este.lineno == este.end_lineno:
+                base._trocar_no(linhas, este, '"' + nome + '"', trocas)
+                onde = ["no MUNDO"]
+    portas = blocos.instrucao(arvore, "PORTAS")
+    for valor in portas.value.values if portas is not None and isinstance(portas.value, ast.Dict) else []:
+        if blocos.texto_constante(valor) == antigo and valor.lineno == valor.end_lineno:
+            base._trocar_no(linhas, valor, '"' + nome + '"', trocas)
+            onde.append("nas PORTAS")
+    aviso = '"' + str(antigo) + '" passou a chamar-se "' + nome + '".'
+    if onde:
+        aviso = aviso + " Mudei o nome também " + " e ".join(onde) + "."
+    return base._aplicar(linhas, [], trocas), escolha, aviso
+
+
 def apagar(fonte, escolha):
     tipo = escolha.partition(":")[0]
     if tipo == "zona":
         return _apagar_zona(fonte, escolha)
+    if tipo == "ataque":
+        return _apagar_ataque(fonte, escolha)
     if tipo == "treinador":
         return _apagar_treinador(fonte, escolha)
     return base.apagar(fonte, escolha)
@@ -1045,6 +1117,31 @@ def _ver_conversas(ns, treinadores, aberto, problemas, avisos):
                       "e o jogo não anda. Marca a caixa num deles.")
 
 
+def _ver_aprende(ns, bichos, aberto, problemas, avisos):
+    # aberto: e a ficha de um bicho que esta aberta no editor? "bichos" e o
+    # que esta escrito no ficheiro.
+    ataques = ns.get("ATAQUES") if isinstance(ns.get("ATAQUES"), dict) else {}
+    for nome, ficha in bichos.items() if isinstance(bichos, dict) else []:
+        if not isinstance(ficha, dict) or "aprende" not in ficha:
+            continue
+        aprende = ficha["aprende"]
+        if not isinstance(aprende, dict):
+            problemas.append(str(nome) + ': o "aprende" é assim: {"Estalido": 9} (o ataque, e o nível em que o aprende).')
+            continue
+        for ataque, nivel in aprende.items():
+            if not isinstance(nivel, int) or isinstance(nivel, bool) or nivel < 1 or nivel > 99:
+                problemas.append(str(nome) + ': em "aprende", o nível de "' + str(ataque) + '" é um número inteiro, de 1 a 99.')
+            elif ataque not in ataques:
+                if aberto:
+                    problemas.append(str(nome) + ': o ataque "' + str(ataque) + '", em "aprende", não existe em ATAQUES.'
+                                     + base._parecido(str(ataque), list(ataques)))
+                else:
+                    avisos.append(str(nome) + ' ainda aprende o ataque "' + str(ataque) + '", que já não existe. '
+                                  "Muda o nome também na ficha desse bicho, senão o jogo pára.")
+        # (Tambem os que se aprendem tem de ser do tipo do bicho, ou normais.)
+        base._ver_tipo_dos_ataques(str(nome), ficha, list(aprende), ' em "aprende"', ns, aberto, problemas, avisos)
+
+
 def _ver_loja_e_jogador(ns, problemas, avisos):
     loja = ns.get("LOJA")
     if not isinstance(loja, dict):
@@ -1160,9 +1257,11 @@ class Palco(base.Palco):
         _ver_funcoes(ns, problemas)
         _ver_mundo(ns, self.ler(ns, "TREINADORES"), self.tipo in ("zona", "mundo", "portas"), problemas, avisos)
         _ver_conversas(ns, self.ler(ns, "TREINADORES"), self.falador, problemas, avisos)
+        _ver_aprende(ns, self.ler(ns, "BICHOS"), self.tipo == "bicho", problemas, avisos)
         _ver_loja_e_jogador(ns, problemas, avisos)
         if self.regra in REGRAS and self.preparado and not problemas:
             _experimentar(ns, self.regra, problemas)
+        base._resumir_avisos_de_tipo(avisos)
         return problemas, avisos
 
     # --- Preparar e voltar a preparar ---
@@ -1204,6 +1303,12 @@ class Palco(base.Palco):
 
     def arrumar(self, ns):
         super().arrumar(ns)
+        # (Na versao dos BICHOS que o palco poe no jogo, o "aprende" fica so
+        # com os ataques que existem: um nome antigo fazia o jogo parar.)
+        for ficha in ns["BICHOS"].values():
+            if isinstance(ficha.get("aprende"), dict):
+                ficha["aprende"] = {ataque: nivel for ataque, nivel in ficha["aprende"].items()
+                                    if ataque in ns["ATAQUES"] and isinstance(nivel, int)}
         if not self.no_mapa and not self.falador:
             return
         # O palco das batalhas fica so com um treinador. No mapa estao todos,

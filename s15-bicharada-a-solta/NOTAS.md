@@ -64,6 +64,7 @@ O s12 continua como estava: quem já lá tem um jogo seu não perde nada.
 | O que se vende, e por quanto | `LOJA` |
 | O teu boneco: a cor e as três imagens | `JOGADOR` |
 | As falas, as perguntas e quem dá a rede | `TREINADORES` (`falas`, `falas_depois`, `falas_rede`, `da_rede`) |
+| Os ataques que um bicho sabe, e os que aprende a um certo nível | `BICHOS` (`ataques`, `aprende`), `ataques_de()` |
 | Onde se pode andar | `pode_andar()` |
 | Quando salta um bicho da erva, e qual | `ha_batalha_na_erva()`, `escolher_bicho_selvagem()` |
 | Quando se consegue apanhar um bicho | `consegue_apanhar()` |
@@ -75,6 +76,17 @@ O s12 continua como estava: quem já lá tem um jogo seu não perde nada.
 Não há limite para as zonas nem para os edifícios: são mais entradas em
 `ZONAS`. Os limites são outros: nove treinadores no mapa (um algarismo cada),
 um `P` no mundo todo, uma letra livre para cada porta, e seis bichos na equipa.
+
+### Os ataques que se aprendem
+
+```python
+"ataques": ["Bicada", "Cocoricó"],
+"aprende": {"Crista em Brasa": 6, "Estalido": 9},
+```
+
+Os de `ataques` sabe-os desde o início; os de `aprende` passam a aparecer no
+menu quando o bicho chega a esse nível (e o jogo avisa: «aprendeu Estalido!»).
+Um bicho só sabe ataques do tipo dele ou do tipo normal.
 
 ### As falas
 
@@ -97,11 +109,18 @@ moedas), é o acontecimento `ao_responder()`.
 - cada **zona** abre sozinha, com o boneco lá dentro, e anda só a criança;
 - **O mundo** e **As portas** mostram o mundo todo visto de cima;
 - **+ Nova zona**, **+ Novo edifício**, **+ Novo treinador**, **+ Novo
-  bicho**, **+ Novo ataque** criam, e o botão vermelho **Apagar** tira (e
-  acerta o resto: o `MUNDO`, as `PORTAS`, os números no mapa, as equipas);
+  bicho**, **+ Novo ataque**, **+ Novo tipo** criam, e o botão vermelho
+  **Apagar** tira (e acerta o resto: o `MUNDO`, as `PORTAS`, os números no
+  mapa, as equipas);
+- **Mudar o nome** troca o nome de uma zona, um bicho, um ataque ou um tipo
+  em todos os sítios onde é usado;
 - um **treinador** aberto mostra-se em cenas: a dar a rede (se for ele), as
   falas e a luta, e as falas de depois. Tem a caixa **Dá a rede no início**
   e a lista **Escolher os bichos**;
+- um **bicho** tem a lista **Escolher os ataques** (só os do tipo dele e os
+  normais), e um ataque novo nasce sem dono;
+- a Oficina traz **modelos** de pixel art para todos os bichos (de frente e
+  de costas) e para o teu boneco: usam-se como estão, ou serve de começo;
 - um **bicho** tem as imagens **De frente** e **De costas**, e o **teu
   boneco** três (de frente, de costas, de lado): os botões por cima do código
   escolhem qual se desenha ou se troca. Quem não tiver imagem é desenhado

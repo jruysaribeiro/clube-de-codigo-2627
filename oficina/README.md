@@ -80,6 +80,25 @@ Nos cinco jogos:
   d'O Cerco entra na primeira onda), e o aviso diz onde. (No ficheiro do
   jogo em `oficina/jogos/`: `CRIAVEIS` e `novo()`.)
 
+Apagar, escolher de uma lista, marcar caixas e mudar nomes existem nos cinco
+jogos, cada um à sua medida. O que cada jogo oferece está no ficheiro dele em
+`oficina/jogos/` (`CRIAVEIS`, `apagar()`, `lista()`, `caixas()`,
+`renomear()`):
+
+| Jogo | Cria-se e apaga-se | Listas e caixas |
+|---|---|---|
+| FADO//NEON | inimigos, cartas, ondas especiais, frases | os ataques e os invocados do chefe, os inimigos de uma onda; caixas no arranque do jogo, nos inimigos e nas cartas |
+| Bicharada | bichos, ataques, treinadores, tipos | os bichos de um treinador, os ataques de um bicho |
+| Bicharada à Solta | o mesmo, e zonas e edifícios | o mesmo, e a caixa «dá a rede no início» |
+| O Cerco | inimigos, torres, ondas | os inimigos de uma onda |
+| Mãos ao Ar! | inimigos, mundos, níveis | o jeito de um inimigo; caixas nos inimigos, nos mundos e nos níveis |
+
+- **Mudar o nome** (com a coisa aberta) troca o nome em todos os sítios onde
+  ela é usada: um ataque nas fichas dos bichos, um bicho nas equipas dos
+  treinadores, um tipo nos bichos, nos ataques e na tabela de quem é forte
+  contra quem, uma zona no `MUNDO` e nas `PORTAS`. Mudar o nome à mão, no
+  código, deixava os outros a chamar pelo antigo.
+
 Nas duas Bicharadas:
 
 - **Apagar** (o botão vermelho, com a coisa aberta) tira do jogo um bicho,
@@ -92,6 +111,14 @@ Nas duas Bicharadas:
 - **Escolher os bichos** (com um treinador aberto) mostra os bichos que
   existem, para se carregar nos que ele leva, pela ordem em que entram. Abre
   sozinho quando se cria um treinador novo, e pode-se voltar lá depois.
+- **Escolher os ataques** (com um bicho aberto) faz o mesmo com os ataques
+  dele, até quatro. Só aparecem os do tipo do bicho e os normais: um bicho
+  de fogo não sabe ataques de água, e a Oficina recusa uma ficha que o diga.
+  Um **ataque novo** nasce sem dono: é por aqui que se dá a um bicho.
+- Cada **tipo** abre sozinho (a cor dele), com **+ Novo tipo** e **Apagar
+  este tipo**: os bichos e os ataques de um tipo apagado passam para o tipo
+  que todos podem aprender. Na Bicharada à Solta esse tipo escolhe-se
+  (`TIPO_NORMAL`); na Bicharada é sempre o que se chama `normal`.
   (No ficheiro do jogo em `oficina/jogos/`: `apagar()` e `lista()`, e as
   chaves `"apagar"` e `"lista"` que a `regiao` devolve.)
 
@@ -123,6 +150,12 @@ microfone, até 3 segundos; o browser pede autorização da primeira vez). Os
 sons ficam em `comum/assets/sons/`, e o jogo guarda os que já leu em
 `sons_carregados`, como faz com as imagens.
 
+- A Oficina traz **modelos** de pixel art para todas as imagens dos jogos
+  (`oficina/modelos/`, um PNG com o nome de cada imagem). **Usar o modelo**
+  põe-no no jogo tal como está; no **Desenhar**, a fila **Começar por um
+  modelo** põe qualquer um deles na grelha, para se mudar. Quem os desenha é
+  o `oficina/modelos/fazer_modelos.py`: muda-se lá um desenho e corre-se
+  outra vez.
 - No **Desenhar** há ainda: a grelha de **16×16** ou de **32×32**
   (passa-se de uma para a outra sem perder o desenho); **Espelhar**, que o
   vira da esquerda para a direita; **Trocar cor**, que muda de uma vez todos

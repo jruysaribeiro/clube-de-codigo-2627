@@ -72,6 +72,21 @@ ONDA_DO_CHEFE = 5
 # O Saudosista aparece de tantas em tantas ondas (5 = nas ondas 5, 10, 15...).
 #   Experimenta: 1 (so chefes!) ou 100 (nunca aparece)
 
+# --- Como o jogo arranca ---
+# Sao coisas de ligar e desligar: escrevem-se True (ligado) ou False
+# (desligado), sem aspas. Todas tem uma tecla que as troca a meio do jogo.
+TIRO_AUTOMATICO = False
+# True -> comecas ja a disparar sozinho contra o inimigo mais perto (tecla T).
+
+MUSICA_LIGADA = True
+# False -> o jogo arranca calado (tecla M).
+
+BRILHO_NEON = True
+# O brilho a volta de tudo (tecla B).   False -> o jogo corre mais leve.
+
+ECRA_ANTIGO = True
+# As riscas de televisao antiga por cima da imagem (tecla C).
+
 # --- Tu ---
 VIDAS_JOGADOR = 5
 # Coracoes no inicio.   MAIS -> mais facil.   Experimenta: 1 (modo saudade)
@@ -137,9 +152,33 @@ VELOCIDADE_EXTRA_MAXIMA = 1.6
 # Cada onda, os inimigos andam mais 2.5% depressa, ate ao maximo de 1.6
 # vezes a velocidade normal (1.6 = 60% mais rapidos, e nao passam disso).
 
+# --- As ondas especiais ---
+# Uma onda que esteja aqui nao compra inimigos com o orcamento: traz
+# exatamente os que disseres. Cada linha e o numero da onda e a ficha dela:
+#   3: {"inimigos": ["corredor", "atirador"], "de_cada": 4},
+# inimigos:  os nomes dos que vem (tem de estar em PERFIS, la em baixo)
+# de_cada:   quantos vem de cada um deles
+# Vem vazio: sem ondas especiais, todas as ondas sao as do orcamento. Numa
+# onda do Saudosista (ver ONDA_DO_CHEFE) vem ele, e a onda especial nao conta.
+ONDAS_ESPECIAIS = {
+}
+
 VIDA_CHEFE = 1100
 # A vida do Saudosista na primeira vez que aparece. Da segunda tem mais 70%.
 #   Experimenta: 50 (cai num instante e ves os creditos)
+
+# Os ataques do Saudosista, pela ordem em que os faz (chega ao fim e volta
+# ao principio). Ha cinco, e so estes nomes e que ele conhece:
+#   "espiral"  bracos de balas a rodar       "farol"    raios que varrem a arena
+#   "aneis"    circulos de balas             "rajada"   um leque apontado a ti
+#   "invocar"  chama inimigos para o ajudar
+# Podes tirar alguns, trocar a ordem ou repetir um. Tem de ficar pelo menos um.
+PADROES_DO_CHEFE = ["espiral", "farol", "aneis", "rajada", "invocar"]
+
+# Quem o Saudosista chama quando faz o ataque "invocar": tira um nome ao
+# calhas desta lista para cada inimigo que chama. Um nome repetido sai mais
+# vezes. Os nomes sao os dos inimigos de PERFIS, la em baixo.
+INVOCADOS_PELO_CHEFE = ["corredor", "corredor", "investida"]
 
 # --- Os inimigos, um a um ---
 # raio:        o tamanho (e a area onde as balas lhes acertam)
@@ -155,7 +194,9 @@ VIDA_CHEFE = 1100
 #              o inimigo aparece com essa imagem; se nao, fica a forma.
 # som:         o nome de um WAV. Se ele existir em comum/assets/sons/, e
 #              esse som que toca quando o inimigo rebenta.
-# O comportamento (o corredor corre para ti, o atirador foge e dispara...)
+# dispara:     (so se quiseres) True = de vez em quando dispara contra ti,
+#              como o atirador. Sem isto, ou com False, nao dispara.
+# A maneira de andar (o corredor corre para ti, o atirador anda de lado...)
 # depende do nome: esta na funcao mover_inimigo(), nas regras do jogo. Um
 # inimigo com um nome novo corre para ti, como o corredor.
 PERFIS = {
@@ -163,7 +204,7 @@ PERFIS = {
                  "pontos": 10, "custo": 1, "desde_onda": 1,
                  "imagem": "corredor.png", "som": "corredor.wav"},
     "atirador": {"raio": 15, "vida": 34, "velocidade": 90, "cor": LARANJA, "lados": 4,
-                 "pontos": 20, "custo": 2, "desde_onda": 2,
+                 "pontos": 20, "custo": 2, "desde_onda": 2, "dispara": True,
                  "imagem": "atirador.png", "som": "atirador.wav"},
     "divisor": {"raio": 24, "vida": 60, "velocidade": 60, "cor": VERDE, "lados": 6,
                 "pontos": 25, "custo": 3, "desde_onda": 3,
@@ -686,6 +727,7 @@ class Inimigo:
         self.valor = perfil["pontos"]
         self.imagem = perfil.get("imagem")  # pode nao haver: fica a forma
         self.som = perfil.get("som")        # pode nao haver: fica o som do jogo
+        self.dispara = perfil.get("dispara", False)
         self.ang = random.uniform(0, TAU)
         self.t = random.uniform(0, 5)
         self.flash = 0.0
@@ -712,15 +754,12 @@ class Inimigo:
         mov = mover_inimigo(self, dirc, dist, dt)
         if mov is None:
             mov = Vector2()      # a regra nao devolveu nada: fica parado
-        if self.tipo == "atirador":
+        if self.dispara:
             self.cd_tiro -= dt
             if self.cd_tiro <= 0:
                 self.cd_tiro = random.uniform(1.6, 2.4)
-                quantas = 1 if self.onda < 6 else 3
-                for k in range(quantas):
-                    a = dirc.rotate((k - (quantas - 1) / 2) * 14)
-                    jogo.bala_inimiga(self.pos + a * self.raio, a * 210, LARANJA)
-                tocar("inimigo_tiro", 0.4)
+                # As balas que saem sao uma regra do jogo (disparo_do_inimigo).
+                disparo_do_inimigo(self, dirc)
         self.pos += (mov + self.empurrao) * dt
         self.empurrao *= 0.002 ** dt
         self.pos.x = max(self.raio, min(LARGURA - self.raio, self.pos.x))
@@ -755,7 +794,7 @@ class Inimigo:
             fim = p + self.direcao * 640 * 0.45
             if int(self.t * 20) % 2:
                 pygame.draw.line(surf, (120, 40, 70), p, fim, 2)
-        if self.tipo == "atirador" and self.cd_tiro < 0.35:
+        if self.dispara and self.cd_tiro < 0.35:
             pygame.draw.circle(surf, AMARELO, p, (0.35 - self.cd_tiro) * 22, 2)
         imagem = None
         if self.imagem:
@@ -772,10 +811,9 @@ class Inimigo:
 
 
 class Chefe(Inimigo):
-    PADROES = ["espiral", "farol", "aneis", "rajada", "invocar"]
-
     def __init__(self, onda):
         super().__init__("corredor", (LARGURA / 2, -90), onda)
+        self.dispara = False       # o Saudosista dispara a maneira dele
         self.chefe = True
         self.tipo = "chefe"
         self.raio = 44
@@ -817,7 +855,7 @@ class Chefe(Inimigo):
         mira = para.normalize() if para.length() > 0 else Vector2(0, 1)
         if self.padrao_t <= 0:
             if self.padrao == "espera":
-                self.padrao = self.PADROES[self.ordem % len(self.PADROES)]
+                self.padrao = PADROES_DO_CHEFE[self.ordem % len(PADROES_DO_CHEFE)]
                 self.ordem += 1
                 self.padrao_t = 3.6
                 self.cd = 0
@@ -833,7 +871,7 @@ class Chefe(Inimigo):
                         pos = self.pos + a * 120
                         pos.x = max(30, min(LARGURA - 30, pos.x))
                         pos.y = max(30, min(ALTURA - 30, pos.y))
-                        jogo.avisos.append(Aviso(pos, random.choice(["corredor", "corredor", "investida"])))
+                        jogo.avisos.append(Aviso(pos, random.choice(INVOCADOS_PELO_CHEFE)))
             else:
                 self.padrao = "espera"
                 self.padrao_t = 0.9 if f2 else 1.3
@@ -1006,11 +1044,53 @@ def a_cada_frame(dt):
     pass
 
 
+# QUANDO ESCOLHES UMA CARTA
+# carta: o id da carta que escolheste ("guitarra", "cafe"...). O efeito dela
+# ja foi dado (ver aplicar_carta, nas regras). jogo.jogador.melhorias diz
+# quantas tens de cada: jogo.jogador.melhorias.get("cafe", 0).
+# Ideias: cada carta dar tambem 100 pontos; a terceira carta dar um coracao
+# de premio (conta-as na memoria); escrever o nome dela por cima de ti.
+def ao_escolher_carta(carta):
+    pass
+
+
+# QUANDO ACABA UMA ONDA
+# Corre quando o ultimo inimigo da onda rebenta, antes de virem as cartas.
+# numero: a onda que acabou. jogo.jogador.vida diz com quantos coracoes
+# chegaste ao fim.
+# Ideias: um premio de 50 pontos por cada coracao que te resta; um coracao
+# se acabaste a onda sem perder nenhum (guarda na memoria, no inicio da onda,
+# quantos tinhas); encher o laser para a onda seguinte (jogo.farol = 1).
+def ao_acabar_onda(numero):
+    pass
+
+
+# QUANDO INVESTES
+# Corre cada vez que investes (Espaco). jogo.jogador.dash_dir e a seta para
+# onde vais, e jogo.jogador.pos o sitio de onde partes.
+# Ideias: deixar uma explosao no sitio de onde saiste; disparar para tras ao
+# investir (disparar_balas); de 5 em 5 investidas, o laser encher.
+def ao_investir():
+    pass
+
+
+# QUANDO LIGAS O LASER
+# Corre quando o laser comeca (a tecla E, com a barra cheia).
+# jogo.laser_t diz quantos segundos ele ainda dura.
+# Ideias: ficares uns segundos sem levar dano (jogo.jogador.invulneravel = 2);
+# todos os inimigos levarem logo 20 de dano; o laser durar o dobro
+# (jogo.laser_t = jogo.laser_t * 2).
+def ao_disparar_laser():
+    pass
+
+
 # --- As regras do jogo ---
-# As cinco funcoes que se seguem sao as REGRAS: como anda cada inimigo, o que
+# As dez funcoes que se seguem sao as REGRAS: como anda cada inimigo, o que
 # acontece a um inimigo atingido, como saem os teus tiros, o que um inimigo
-# deixa ao rebentar e o que cada carta faz. Mudar uma delas muda a maneira
-# como o jogo se comporta.
+# deixa ao rebentar, o que cada carta faz, que inimigos vem em cada onda,
+# como dispara um inimigo, quantos pontos vale, o que te da o que apanhas do
+# chao e que cartas aparecem. Mudar uma delas muda a maneira como o jogo se
+# comporta.
 #
 # Dentro delas podes usar tudo o que o jogo tem. O "jogo" e o jogo inteiro:
 #   jogo.jogador                 tu: .pos (onde estas), .vida, .vida_max,
@@ -1211,9 +1291,116 @@ def aplicar_carta(carta, jogador):
         jogador.farol_ganho *= 1.3
 
 
+# QUE INIMIGOS VEM EM CADA ONDA
+# Corre no inicio de cada onda (menos nas do Saudosista). numero: a onda que
+# vai comecar. Devolve a lista dos nomes dos inimigos que vao entrar, pela
+# ordem em que entram: ["corredor", "corredor", "atirador"].
+# Como esta: se a onda estiver em ONDAS_ESPECIAIS, vem os que la estao. Se
+# nao, a onda "compra" inimigos ao calhas ate gastar o orcamento (ver
+# ORCAMENTO_BASE): so entram os que ja podem aparecer nessa onda
+# ("desde_onda") e que ainda cabem no que sobra ("custo").
+# Ideias: as ondas pares so de atiradores; a onda 1 com um unico divisor; o
+# dobro dos inimigos de 3 em 3 ondas.
+def inimigos_da_onda(numero):
+    if numero in ONDAS_ESPECIAIS:
+        especial = ONDAS_ESPECIAIS[numero]
+        nomes = []
+        for _ in range(especial["de_cada"]):
+            for nome in especial["inimigos"]:
+                nomes.append(nome)
+        return nomes
+    nomes = []
+    orcamento = ORCAMENTO_BASE + numero * ORCAMENTO_POR_ONDA
+    while orcamento > 0:
+        possiveis = [nome for nome, p in PERFIS.items()
+                     if p["desde_onda"] is not None and p["desde_onda"] <= numero
+                     and 0 < p["custo"] <= orcamento]
+        if not possiveis:
+            break
+        nome = random.choice(possiveis)
+        nomes.append(nome)
+        orcamento -= PERFIS[nome]["custo"]
+    return nomes
+
+
+# COMO DISPARA UM INIMIGO
+# Corre cada vez que chega a hora de um inimigo disparar (os que tem
+# "dispara": True na ficha, como o atirador). Como esta: uma bala apontada a
+# ti; da onda 6 em diante, um leque de tres.
+#   direcao          uma seta de comprimento 1 que aponta dele para ti
+#   inimigo.pos, inimigo.raio, inimigo.onda (a onda em que nasceu)
+#   jogo.bala_inimiga(sitio, velocidade, cor)    poe uma bala inimiga no jogo
+#   direcao.rotate(20)   a mesma seta, rodada 20 graus
+#   direcao * 210        a seta com velocidade: 210 pixeis por segundo
+# Ideias: balas mais lentas mas em circulo, para todos os lados; uma bala
+# muito rapida; cada inimigo disparar da cor dele (inimigo.cor).
+def disparo_do_inimigo(inimigo, direcao):
+    quantas = 1
+    if inimigo.onda >= 6:
+        quantas = 3
+    for k in range(quantas):
+        a = direcao.rotate((k - (quantas - 1) / 2) * 14)
+        jogo.bala_inimiga(inimigo.pos + a * inimigo.raio, a * 210, LARANJA)
+    tocar("inimigo_tiro", 0.4)
+
+
+# QUANTOS PONTOS VALE UM INIMIGO
+# Corre quando um inimigo rebenta, e devolve os pontos que ganhas. Como
+# esta: os "pontos" da ficha dele, a dobrar, a triplicar... conforme o combo
+# (de 5 em 5 mortes seguidas sobe um).
+#   inimigo.valor    os "pontos" da ficha dele (o Saudosista vale 1000)
+#   jogo.combo       quantos inimigos seguidos ja mataste sem levar dano
+#   inimigo.tipo, inimigo.chefe, inimigo.onda
+# Ideias: o combo valer muito mais; pontos a dobrar nas ondas a seguir a
+# quinta; os atiradores valerem 100.
+def pontos_por_morte(inimigo):
+    return inimigo.valor * (1 + jogo.combo // 5)
+
+
+# O QUE TE DA O QUE APANHAS DO CHAO
+# Corre quando tocas numa nota ou num coracao que um inimigo deixou.
+# recompensa.tipo e "nota" ou "coracao". Como esta: uma nota da 10 pontos
+# (mais com combo) e um coracao da um coracao, se nao os tiveres todos.
+#   jogo.pontos, jogo.combo, jogo.farol (a barra do laser, de 0 a 1)
+#   jogo.jogador.vida, jogo.jogador.vida_max
+# Ideias: as notas tambem encherem um bocadinho o laser; um coracao a mais
+# valer 200 pontos quando ja os tens todos; uma nota em cada dez dar um
+# coracao (conta-as na memoria).
+def apanhar_recompensa(recompensa):
+    j = jogo.jogador
+    if recompensa.tipo == "nota":
+        jogo.pontos += 10 * (1 + jogo.combo // 5)
+        tocar("nota", 0.3)
+    elif j.vida < j.vida_max:
+        j.vida += 1
+        jogo.texto(j.pos + Vector2(0, -24), "+1", VERMELHO, 28)
+        tocar("melhoria", 0.5)
+
+
+# QUE CARTAS APARECEM
+# Corre no fim de cada onda, e devolve a lista das cartas que te sao
+# oferecidas (cada uma e uma linha inteira de MELHORIAS). Como esta: tres
+# cartas diferentes, ao calhas, com as raras e as lendarias a sair menos
+# (ver PESOS_RARIDADE); uma carta "unica" que ja tenhas nao volta a sair.
+#   jogador.melhorias    as cartas que ja tens: {"cafe": 2, "nata": 1}
+#   carta[0] e o id, carta[1] o nome, carta[3] a raridade, carta[4] se e unica
+# Devolve entre uma e tres cartas (no ecra so cabem tres).
+# Ideias: so duas cartas para escolher; nunca oferecer uma carta que ja
+# tenhas; a primeira carta ser sempre o Pastel de Nata quando tens 1 coracao.
+def escolher_cartas(jogador):
+    pool = [m for m in MELHORIAS if not (m[4] and m[0] in jogador.melhorias)]
+    escolhidas = []
+    while len(escolhidas) < 3 and pool:
+        m = random.choices(pool, weights=[PESOS_RARIDADE[x[3]] for x in pool])[0]
+        pool.remove(m)
+        escolhidas.append(m)
+    return escolhidas
+
+
 # --- Os desenhos ---
-# As tres funcoes que se seguem desenham um inimigo, a tua nave e uma bala
-# tua. Desenha-se com formas do pygame, sempre na "cena":
+# As seis funcoes que se seguem desenham um inimigo, a tua nave, uma bala
+# tua, uma bala inimiga, o que os inimigos deixam no chao e o aviso de que
+# vem ai um inimigo. Desenha-se com formas do pygame, sempre na "cena":
 #   pygame.draw.circle(cena, cor, p, raio)
 #   pygame.draw.circle(cena, cor, p, raio, 2)     so o contorno, com 2 de grossura
 #   pygame.draw.line(cena, cor, p, p + Vector2(20, 0), grossura)
@@ -1283,6 +1470,51 @@ def desenhar_bala(cena, bala, p):
     pygame.draw.circle(cena, BRANCO, p, bala.raio * 0.7)
 
 
+# O DESENHO DE UMA BALA INIMIGA
+# bala.cor         a cor de quem a disparou (LARANJA nas do atirador; as do
+#                  Saudosista sao da cor dele)
+# bala.raio        o tamanho dela (5)
+# bala.vel         a velocidade (um Vector2)
+# Sao estas que tens de ver bem para fugir delas.
+# Ideias: balas quadradas; maiores e mais faceis de ver; com uma cauda, como
+# as tuas.
+def desenhar_bala_inimiga(cena, bala, p):
+    pygame.draw.circle(cena, bala.cor, p, bala.raio + 2)
+    pygame.draw.circle(cena, BRANCO, p, bala.raio - 1)
+
+
+# O DESENHO DO QUE OS INIMIGOS DEIXAM
+# recompensa.tipo  "nota" (vale pontos) ou "coracao"
+# recompensa.ang   um angulo que esta sempre a crescer: da para rodar a nota
+#                  e para fazer o coracao bater (com o math.sin)
+# recompensa.vida  os segundos que faltam para desaparecer
+# coracao(cena, (x, y), tamanho, cor, True)    desenha um coracao cheio
+# Ideias: notas redondas; notas maiores; coracoes cor-de-rosa; uma estrela
+# em vez do losango.
+def desenhar_recompensa(cena, recompensa, p):
+    if recompensa.tipo == "nota":
+        pygame.draw.polygon(cena, AMARELO, poligono(p, 5, 4, recompensa.ang), 0)
+    else:
+        coracao(cena, (p.x, p.y - 2), 9 + math.sin(recompensa.ang * 2) * 1.5, VERMELHO, True)
+
+
+# O DESENHO DO AVISO DE QUE VEM AI UM INIMIGO
+# Um inimigo nunca aparece sem avisar: quase um segundo antes, o sitio onde
+# ele vai nascer fica marcado.
+# aviso.tipo       o nome do inimigo que vem ("corredor", "divisor"...)
+# aviso.t          os segundos que faltam para ele nascer (comeca em 0.9)
+# PERFIS[aviso.tipo]["cor"]    a cor desse inimigo
+# Ideias: um aviso maior; um quadrado em vez da cruz; escrever o nome do
+# inimigo que vem.
+def desenhar_aviso(cena, aviso, p):
+    cor = PERFIS[aviso.tipo]["cor"]
+    raio = 8 + aviso.t * 30
+    if int(aviso.t * 12) % 2:
+        pygame.draw.circle(cena, cor, p, raio, 2)
+    pygame.draw.line(cena, cor, p + Vector2(-6, -6), p + Vector2(6, 6), 2)
+    pygame.draw.line(cena, cor, p + Vector2(-6, 6), p + Vector2(6, -6), 2)
+
+
 # ======================================================================
 #  O JOGO
 # ======================================================================
@@ -1293,12 +1525,12 @@ class Jogo:
         self.relogio = pygame.time.Clock()
         self.estado = "titulo"
         self.sair = False
-        self.bloom = True
-        self.crt = True
+        self.bloom = BRILHO_NEON
+        self.crt = ECRA_ANTIGO
         self.ver_fps = False
-        self.auto = False
+        self.auto = TIRO_AUTOMATICO
         self.usar_rato = False
-        self.musica_ligada = True
+        self.musica_ligada = MUSICA_LIGADA
         self.canal_musica = None
         self.tempo_real = 0.0
         self.recorde = 0
@@ -1459,17 +1691,9 @@ class Jogo:
             tocar("rugido")
             self.trauma = max(self.trauma, 0.5)
         else:
-            # A onda "compra" inimigos ao calhas ate gastar o orcamento.
-            orcamento = ORCAMENTO_BASE + self.onda * ORCAMENTO_POR_ONDA
-            while orcamento > 0:
-                possiveis = [nome for nome, p in PERFIS.items()
-                             if p["desde_onda"] is not None and p["desde_onda"] <= self.onda
-                             and 0 < p["custo"] <= orcamento]
-                if not possiveis:
-                    break
-                nome = random.choice(possiveis)
+            # Quem vem nesta onda e uma regra do jogo (inimigos_da_onda).
+            for nome in inimigos_da_onda(self.onda) or []:
                 self.fila.append(nome)
-                orcamento -= PERFIS[nome]["custo"]
             tocar("onda")
         ao_comecar_onda(self.onda)
 
@@ -1540,8 +1764,8 @@ class Jogo:
         self.combo_t = 2.5
         self.combo_max = max(self.combo_max, self.combo)
         self.farol = min(1.0, self.farol + CARGA_LASER_POR_MORTE * self.jogador.farol_ganho)
-        mult = 1 + self.combo // 5
-        self.pontos += inimigo.valor * mult
+        # Quanto vale e uma regra do jogo (pontos_por_morte).
+        self.pontos += pontos_por_morte(inimigo) or 0
         self.desbloquear("sangue")
         if self.combo >= 10:
             self.desbloquear("combo10")
@@ -1636,6 +1860,7 @@ class Jogo:
         self.trauma = max(self.trauma, 0.6)
         self.desbloquear("laser")
         tocar("laser")
+        ao_disparar_laser()
 
     def atualizar_laser(self, dt):
         j = self.jogador
@@ -1682,6 +1907,7 @@ class Jogo:
         for _ in range(12):
             self.particula(j.pos, -j.dash_dir.rotate(random.uniform(-40, 40)) * random.uniform(100, 300), 0.35, CIANO, 2)
         tocar("dash", 0.6)
+        ao_investir()
 
     def fim_de_investida(self):
         j = self.jogador
@@ -1697,13 +1923,8 @@ class Jogo:
 
     # ---------------------------------------------------------- melhorias
     def sortear_cartas(self):
-        j = self.jogador
-        pool = [m for m in MELHORIAS if not (m[4] and m[0] in j.melhorias)]
-        escolhidas = []
-        while len(escolhidas) < 3 and pool:
-            m = random.choices(pool, weights=[PESOS_RARIDADE[x[3]] for x in pool])[0]
-            pool.remove(m)
-            escolhidas.append(m)
+        # Que cartas aparecem e uma regra do jogo (escolher_cartas).
+        escolhidas = list(escolher_cartas(self.jogador) or [])[:3]
         self.cartas = [[m, 0.0] for m in escolhidas]
         self.carta_rato = len(self.cartas) // 2
         self.estado = "melhoria"
@@ -1725,6 +1946,7 @@ class Jogo:
         self.flash_t = 0.12
         self.grelha.impulso(j.pos, 600, 400)
         self.estado = "jogo"
+        ao_escolher_carta(mid)
         self.proxima_onda()
 
     # ---------------------------------------------------------- entrada
@@ -2048,13 +2270,8 @@ class Jogo:
             r.pos += r.vel * dt
             if dist < j.raio + 10:
                 r.vida = 0
-                if r.tipo == "nota":
-                    self.pontos += 10 * (1 + self.combo // 5)
-                    tocar("nota", 0.3)
-                elif j.vida < j.vida_max:
-                    j.vida += 1
-                    self.texto(j.pos + Vector2(0, -24), "+1", VERMELHO, 28)
-                    tocar("melhoria", 0.5)
+                # O que cada coisa da e uma regra do jogo (apanhar_recompensa).
+                apanhar_recompensa(r)
         self.recompensas = [r for r in self.recompensas if r.vida > 0]
 
         self.combo_t -= dt
@@ -2069,6 +2286,7 @@ class Jogo:
             self.escala_tempo = 0.25
             self.balas_inimigas.clear()
             tocar("onda")
+            ao_acabar_onda(self.onda)
         return dt
 
     def atualizar_balas(self, dt):
@@ -2209,21 +2427,11 @@ class Jogo:
     def desenhar_mundo(self, cena, cam):
         j = self.jogador
         for a in self.avisos:
-            p = a.pos - cam
-            cor = PERFIS[a.tipo]["cor"]
-            r = 8 + a.t * 30
-            if int(a.t * 12) % 2:
-                pygame.draw.circle(cena, cor, p, r, 2)
-            pygame.draw.line(cena, cor, p + Vector2(-6, -6), p + Vector2(6, 6), 2)
-            pygame.draw.line(cena, cor, p + Vector2(-6, 6), p + Vector2(6, -6), 2)
+            desenhar_aviso(cena, a, a.pos - cam)
         for r in self.recompensas:
-            p = r.pos - cam
             if r.vida < 2 and int(r.vida * 10) % 2:
-                continue
-            if r.tipo == "nota":
-                pygame.draw.polygon(cena, AMARELO, poligono(p, 5, 4, r.ang), 0)
-            else:
-                coracao(cena, (p.x, p.y - 2), 9 + math.sin(r.ang * 2) * 1.5, VERMELHO, True)
+                continue        # quase a desaparecer: pisca
+            desenhar_recompensa(cena, r, r.pos - cam)
         for e in self.inimigos:
             if e is self.chefe and self.fase == "chefe_intro" and e.pos.y < -60:
                 continue
@@ -2231,9 +2439,7 @@ class Jogo:
         for b in self.balas:
             desenhar_bala(cena, b, b.pos - cam)
         for b in self.balas_inimigas:
-            p = b.pos - cam
-            pygame.draw.circle(cena, b.cor, p, b.raio + 2)
-            pygame.draw.circle(cena, BRANCO, p, b.raio - 1)
+            desenhar_bala_inimiga(cena, b, b.pos - cam)
         if self.fase != "morte" or self.fase_t > 2.1:
             for f in j.fantasmas:
                 cor = misturar(FUNDO, CIANO, f[2] / 0.25)

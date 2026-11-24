@@ -54,6 +54,10 @@ from jogos import JOGOS  # noqa: E402
 ORIGINAIS = os.path.join(AQUI, ".originais")
 JOGAR = "jogar"               # a "escolha" que quer dizer: o jogo inteiro (ver palco.py)
 CAPAS = os.path.join(AQUI, "capas")       # a fotografia de cada jogo, para o cartao dele
+# Os modelos de pixel art: um PNG para cada imagem que os jogos sabem
+# mostrar, com o mesmo nome (galo.png). Usam-se tal como estao, ou serve de
+# comeco no editor de desenho. (Quem os desenha e o fazer_modelos.py.)
+MODELOS = os.path.join(AQUI, "modelos")
 # Imagens e sons: a pasta onde os jogos os procuram, como tem de ser o nome,
 # como comeca um ficheiro desses, e um nome de exemplo.
 FICHEIROS = {
@@ -350,6 +354,7 @@ class Sessao:
                 # O que dizem os botoes de apagar esta coisa e de escolher de
                 # uma lista (None se aqui nao os ha).
                 "apagar": regiao.get("apagar"), "lista": regiao.get("lista"),
+                "renomear": regiao.get("renomear"),
                 "caixas": bool(regiao.get("caixas")),
             }
 
@@ -528,6 +533,8 @@ class Sessao:
 
     def estado_da_imagem(self):
         estado = self.estado_do_ficheiro("imagem")
+        if estado is not None and not estado["erro"]:
+            estado["modelo"] = os.path.isfile(os.path.join(MODELOS, estado["nome"]))
         if estado is not None and len(self.imagens) > 1:
             estado["opcoes"] = [imagem["nome"] for imagem in self.imagens]
             estado["qual"] = self.qual_imagem
@@ -596,6 +603,22 @@ class Sessao:
             with open(caminho, "rb") as f:
                 return f.read()
 
+    def modelos(self):
+        # Os nomes dos modelos que ha, com o da imagem aberta em primeiro.
+        nomes = sorted(nome for nome in os.listdir(MODELOS) if nome.lower().endswith(".png")) \
+            if os.path.isdir(MODELOS) else []
+        meu = self.imagem if isinstance(self.imagem, str) else None
+        if meu in nomes:
+            nomes.remove(meu)
+            nomes.insert(0, meu)
+        return {"modelos": nomes, "meu": meu if meu in nomes else None}
+
+    def ler_modelo(self, nome):
+        if not FICHEIROS["imagem"][1].fullmatch(str(nome)) or not os.path.isfile(os.path.join(MODELOS, str(nome))):
+            raise Falha("Esse modelo não existe.")
+        with open(os.path.join(MODELOS, str(nome)), "rb") as f:
+            return f.read()
+
     # --- Criar uma coisa nova ---
 
     def criar(self, jogo, grupo):
@@ -643,6 +666,28 @@ class Sessao:
             shutil.copyfile(caminho, caminho + ".anterior")
             escrever(caminho, nova, fim_de_linha)
             return {"aviso": aviso}
+
+    def renomear(self, nome):
+        # Muda o nome a coisa aberta em todos os sitios onde esta escrito
+        # (quem sabe quais sao e o ficheiro do jogo em oficina/jogos/).
+        with self.tranca:
+            config = self.config
+            if config is None or self.escolha == JOGAR or not hasattr(config, "renomear"):
+                raise Falha("A isto não se pode mudar o nome aqui.")
+            caminho = caminho_do_jogo(config)
+            fonte, fim_de_linha = ler(caminho)
+            try:
+                nova, escolha, aviso = config.renomear(fonte, self.escolha, nome)
+                compile(nova, config.FICHEIRO, "exec")
+                if escolha not in [e["id"] for e in config.escolhas(nova)]:
+                    raise ValueError("deixei de encontrar a coisa com o nome novo")
+            except (SyntaxError, ValueError) as erro:
+                raise Falha("Não deu para mudar o nome: " + str(erro))
+            self.parar()
+            self.config = None
+            shutil.copyfile(caminho, caminho + ".anterior")
+            escrever(caminho, nova, fim_de_linha)
+            return {"escolha": escolha, "aviso": aviso}
 
     def lista(self, dados):
         # Sem "escolhidos": a lista de onde se escolhe, e o que esta escolhido
@@ -869,6 +914,13 @@ class Pedido(BaseHTTPRequestHandler):
                 self.responder(200, dados, "image/png" if tipo == "imagem" else "audio/wav")
             except Falha as falha:
                 self.responder(404, {"falha": str(falha)})
+        elif url.path == "/api/modelos":
+            self.tratar(sessao.modelos)
+        elif url.path == "/api/modelo":
+            try:
+                self.responder(200, sessao.ler_modelo(parametros.get("nome", [""])[0]), "image/png")
+            except Falha as falha:
+                self.responder(404, {"falha": str(falha)})
         elif url.path == "/api/descarregar":
             self.tratar(lambda: sessao.descarregar(parametros.get("jogo", [""])[0]))
         else:
@@ -954,6 +1006,8 @@ class Pedido(BaseHTTPRequestHandler):
             self.tratar(lambda: sessao.tirar_ficheiro(caminho[11:]))
         elif caminho == "/api/apagar":
             self.tratar(sessao.apagar)
+        elif caminho == "/api/renomear":
+            self.tratar(lambda: sessao.renomear(dados.get("nome")))
         elif caminho == "/api/lista":
             self.tratar(lambda: sessao.lista(dados))
         elif caminho == "/api/caixas":

@@ -10,6 +10,9 @@ import inspect
 import re
 
 import blocos
+# (Tirar uma coisa de uma lista escrita no codigo, com a virgula dela, ja
+# esta feito no bicharada.py: usa-se o de la.)
+from jogos import bicharada as base
 
 NOME = "O Cerco"
 FICHEIRO = "s13-o-cerco/o-cerco.py"
@@ -20,14 +23,17 @@ SOBRE_OS_GRUPOS = {
     "Inimigos": "Vida, velocidade, cor, tamanho. Podes pôr uma imagem tua.",
     "Torres": "Custo, alcance, dano, efeito. Podes pôr uma imagem tua.",
     "Mapa": "O caminho, desenhado com letras.",
-    "Ondas": "Que inimigos vêm em cada onda, e quantos.",
-    "Regras do jogo": "Aqui mudas a maneira como o jogo se comporta: é programar a sério.",
+    "Ondas": "Que inimigos vêm em cada onda, e quantos. Cada onda abre sozinha, e há a lista de todas.",
+    "Regras do jogo": "Aqui mudas a maneira como o jogo se comporta, no combate e nas contas: é programar a sério.",
     "Acontecimentos": "Estão vazios: o que lá escreveres passa a acontecer nesse momento. É aqui que se inventa.",
-    "Desenhos": "Como se desenha uma torre e um inimigo, com círculos, retângulos e linhas.",
+    "Desenhos": "Como se desenha uma torre, um inimigo, o mapa, o castelo e um projétil.",
 }
 
 # Os grupos onde se pode criar uma coisa nova, e o que diz o botao.
-CRIAVEIS = {"Inimigos": "Novo inimigo", "Torres": "Nova torre"}
+CRIAVEIS = {"Inimigos": "Novo inimigo", "Torres": "Nova torre", "Ondas": "Nova onda"}
+
+LINHA_A_LINHA = "Explica-me esta função linha a linha"
+QUE_FAZER = "O que posso fazer aqui?"
 
 # Pedidos ja escritos para o ajudante, para se perceber o que se pode pedir.
 SUGESTOES = {
@@ -43,6 +49,29 @@ SUGESTOES = {
     "mover_inimigo": ["Faz os inimigos acelerarem quando têm pouca vida", "Faz os inimigos pararem um bocadinho de vez em quando",
                       "Explica-me esta função linha a linha"],
     "ondas": ["Acrescenta uma onda só de Cavaleiros", "Faz a primeira onda mais fácil", "Como é que se lê uma onda?"],
+    "onda": ["Põe mais inimigos nesta onda", "Faz os inimigos saírem mais juntos", "Como é que se lê uma onda?"],
+    "vida_do_inimigo": ["Faz os inimigos terem sempre a mesma vida, em todas as ondas",
+                        "A vida dobra de 5 em 5 ondas", LINHA_A_LINHA],
+    "valor_da_torre": ["No último nível o dano fica a triplicar", "O alcance não cresce com o nível", LINHA_A_LINHA],
+    "custo_melhoria": ["Faz melhorar custar sempre 40 de ouro", "A primeira melhoria de cada torre é de borla",
+                       LINHA_A_LINHA],
+    "valor_de_venda": ["Ao vender recebe-se o ouro todo de volta", "As torres no nível máximo valem o dobro",
+                       LINHA_A_LINHA],
+    "premio_da_onda": ["Cada onda dá mais 10 de ouro do que a anterior", "De 5 em 5 ondas o prémio é de 200",
+                       LINHA_A_LINHA],
+    "pode_construir": ["Deixa construir também por cima das árvores", "Só se pode construir colado ao caminho",
+                       LINHA_A_LINHA],
+    "ao_acabar_onda": ["Recupero uma vida por cada onda vencida", "Mostra um texto a dizer quantas ondas faltam",
+                       QUE_FAZER],
+    "ao_melhorar": ["A torre dispara logo a seguir a ser melhorada", "Mostra um texto a festejar com o nível novo",
+                    QUE_FAZER],
+    "ao_vender": ["Ao ser vendida, a torre rebenta e magoa os inimigos que estão perto",
+                  "Conta na memoria quantas torres já vendi", QUE_FAZER],
+    "desenhar_quadrado": ["Põe flores na relva", "Dá um tronco às árvores", "Explica-me este desenho linha a linha"],
+    "desenhar_castelo": ["Muda a bandeira para vermelha", "Põe uma torre de cada lado do castelo",
+                         "Explica-me este desenho linha a linha"],
+    "desenhar_projetil": ["Faz as setas compridas em vez de bolinhas", "Faz a pedra do Trabuco cinzenta",
+                          "Explica-me este desenho linha a linha"],
     "ao_comecar_onda": ["Dá 50 de ouro de 3 em 3 ondas", "Mostra um texto a dizer o número da onda", "O que posso fazer aqui?"],
     "ao_cair_inimigo": ["Quando um inimigo cai, rebenta e magoa os que estão perto",
                         "Um Aríete que ao cair larga dois Soldados", "O que posso fazer aqui?"],
@@ -68,7 +97,20 @@ REGRAS = {
     "disparar": ("O que a torre faz ao disparar", ["torre", "alvo"]),
     "magoar": ("O que acontece a um inimigo atingido", ["inimigo", "dano"]),
     "mover_inimigo": ("Como anda um inimigo", ["inimigo"]),
+    "vida_do_inimigo": ("Quanta vida tem um inimigo", ["nome", "onda"]),
+    "valor_da_torre": ("O que vale uma torre em cada nível", ["torre", "chave"]),
+    "custo_melhoria": ("Quanto custa melhorar uma torre", ["torre"]),
+    "valor_de_venda": ("Quanto se recebe ao vender uma torre", ["torre"]),
+    "premio_da_onda": ("Quanto ouro dá acabar uma onda", ["numero"]),
+    "pode_construir": ("Onde se pode construir", ["coluna", "linha"]),
 }
+# As regras que sao das torres: no palco ha uma torre escolhida, que vai
+# mudando de nivel, para se ver o que a regra da em cada um.
+DAS_TORRES = ["valor_da_torre", "custo_melhoria", "valor_de_venda"]
+# As funcoes que so se veem com as ondas a passar: o jogo joga-se sozinho.
+COM_ONDAS = ["premio_da_onda"]
+# Nestas as ondas andam a dobrar, para chegar depressa ao fim de cada uma.
+DEPRESSA = ["premio_da_onda", "ao_acabar_onda"]
 INICIO_DAS_REGRAS = "# --- As regras do jogo ---"
 
 # Os acontecimentos: funcoes que o jogo chama em certos momentos, e que vem
@@ -80,11 +122,17 @@ ACONTECIMENTOS = {
     "ao_construir": ("Quando se constrói uma torre", ["torre"]),
     "ao_carregar_tecla": ("Quando se carrega numa tecla", ["tecla"]),
     "a_cada_frame": ("A cada frame", []),
+    "ao_acabar_onda": ("Quando acaba uma onda", ["numero"]),
+    "ao_melhorar": ("Quando se melhora uma torre", ["torre"]),
+    "ao_vender": ("Quando se vende uma torre", ["torre"]),
 }
 INICIO_DOS_ACONTECIMENTOS = "# --- Os acontecimentos ---"
 DESENHOS = {
     "desenhar_torre": ("O desenho de uma torre", ["torre"]),
     "desenhar_inimigo": ("O desenho de um inimigo", ["inimigo"]),
+    "desenhar_quadrado": ("Um quadrado do mapa", ["letra", "coluna", "linha"]),
+    "desenhar_castelo": ("O castelo", ["x", "y"]),
+    "desenhar_projetil": ("Um projétil", ["projetil"]),
 }
 INICIO_DOS_DESENHOS = "# --- Os desenhos ---"
 
@@ -111,6 +159,35 @@ DICAS = {
     "desenho": "Isto é o desenho: muda-o e vês logo, no jogo e aumentado no canto. "
                "Experimenta mudar um número, ou acrescentar um círculo.",
     "ondas": "O jogo joga-se sozinho desde a primeira onda, para veres as ondas como as escreveste.",
+    "onda": "O jogo joga esta onda sozinho, e quando ela acaba começa-a outra vez. "
+            "«Escolher os inimigos» mostra os inimigos que existem, para não teres de escrever os nomes.",
+}
+
+# As funcoes cujo palco nao e o habitual do genero delas: o que la se ve.
+DICAS_DAS_FUNCOES = {
+    "vida_do_inimigo": "Isto é uma regra do jogo. O quadro do canto mostra a vida com que cada inimigo nasce na "
+                       "primeira onda, a meio e na última. Os inimigos que passam são da primeira.",
+    "valor_da_torre": "Isto é uma regra do jogo. A primeira torre está escolhida e vai mudando de nível sozinha: "
+                      "vê o dano na barra de baixo, o círculo do alcance, e as contas no quadro do canto.",
+    "custo_melhoria": "Isto é uma regra do jogo. A primeira torre está escolhida e vai mudando de nível sozinha: "
+                      "a barra de baixo diz quanto custa melhorá-la, e o quadro do canto diz o de todas.",
+    "valor_de_venda": "Isto é uma regra do jogo. A primeira torre está escolhida e vai mudando de nível sozinha: "
+                      "a barra de baixo diz por quanto se vende, e o quadro do canto diz o de todas.",
+    "premio_da_onda": "Isto é uma regra do jogo. O jogo joga-se sozinho, a dobrar, onda atrás de onda: "
+                      "o prémio aparece quando uma onda acaba, e o quadro do canto diz o de cada onda.",
+    "pode_construir": "Isto é uma regra do jogo. Os pontos verdes marcam os quadrados onde, com a tua regra, "
+                      "dá para construir. Clica num para experimentar.",
+    "ao_acabar_onda": "O jogo joga-se sozinho, a dobrar, onda atrás de onda, para veres o que acontece quando "
+                      "cada uma acaba. Tira o pass e escreve o que queres que aconteça.",
+    "ao_melhorar": "O jogo joga-se sozinho e, de dois em dois segundos, melhora uma torre por ti, para veres o teu "
+                   "acontecimento a acontecer. Tira o pass e escreve o que queres que aconteça.",
+    "ao_vender": "O jogo joga-se sozinho e, de vez em quando, vende uma torre por ti (e põe outra no lugar), para "
+                 "veres o teu acontecimento a acontecer. Tira o pass e escreve o que queres que aconteça.",
+    "desenhar_quadrado": "Isto é o desenho de cada quadrado do mapa: muda-o e vês logo, no mapa todo e aumentado "
+                         "no canto, uma letra de cada vez.",
+    "desenhar_castelo": "Isto é o desenho do castelo: muda-o e vês logo, no fim do caminho e aumentado no canto.",
+    "desenhar_projetil": "Isto é o desenho das setas e das pedras: muda-o e vês logo, no jogo e aumentado no canto "
+                         "(ora uma seta, ora uma pedra).",
 }
 
 
@@ -139,8 +216,12 @@ def escolhas(fonte):
     if blocos.instrucao(arvore, "MAPA") is not None:
         lista.append({"id": "mapa", "grupo": "Mapa", "titulo": "O mapa"})
 
-    if blocos.instrucao(arvore, "ONDAS") is not None:
-        lista.append({"id": "ondas", "grupo": "Ondas", "titulo": "As ondas"})
+    no = blocos.instrucao(arvore, "ONDAS")
+    if no is not None:
+        lista.append({"id": "ondas", "grupo": "Ondas", "titulo": "As ondas todas"})
+        # Cada onda sozinha, se estiverem escritas uma por linha.
+        for i in range(len(blocos.entradas(no) or [])):
+            lista.append({"id": "onda:" + str(i), "grupo": "Ondas", "titulo": "Onda " + str(i + 1)})
 
     for tipo in FUNCOES:
         funcoes, grupo, _ = FUNCOES[tipo]
@@ -171,9 +252,10 @@ def regiao(fonte, escolha):
             geral = blocos.comentarios_a_partir_de(linhas, inicio)
             if geral and geral != ajuda:
                 ajuda = ajuda + "\n\n" + geral
-        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda, "dica": DICAS[tipo],
+        return {"inicio": no.lineno, "fim": no.end_lineno, "ajuda": ajuda,
+                "dica": DICAS_DAS_FUNCOES.get(numero, DICAS[tipo]),
                 "titulo": funcoes[numero][0], "imagem": None, "som": None, "sugestoes": SUGESTOES[numero]}
-    nomes = {"inimigo": "INIMIGOS", "torre": "TORRES", "mapa": "MAPA", "ondas": "ONDAS"}
+    nomes = {"inimigo": "INIMIGOS", "torre": "TORRES", "mapa": "MAPA", "ondas": "ONDAS", "onda": "ONDAS"}
     if tipo not in nomes:
         return None
     no = blocos.instrucao(arvore, nomes[tipo])
@@ -190,6 +272,13 @@ def regiao(fonte, escolha):
     if not partes or not numero.isdigit() or int(numero) >= len(partes):
         return None
     parte, inicio, fim = partes[int(numero)]
+    # O que dizem os botoes de apagar e de escolher de uma lista (ve apagar e
+    # lista, mais abaixo).
+    if tipo == "onda":
+        resposta.update(inicio=inicio, fim=fim, titulo="Onda " + str(int(numero) + 1),
+                        apagar="Apagar esta onda", lista="Escolher os inimigos")
+        return resposta
+    resposta["apagar"] = "Apagar este inimigo" if tipo == "inimigo" else "Apagar esta torre"
     if tipo == "inimigo":
         titulo = blocos.texto_constante(parte)
     else:
@@ -292,7 +381,189 @@ def novo(fonte, grupo):
         aviso = ('Criei a "' + nome + '", igual ao ' + str(antigo) + ". Escolhe-se com a tecla " + tecla
                  + ". Muda-lhe o nome e os números.")
         return nova, "torre:" + str(len(partes)), aviso
+    if grupo == "Ondas":
+        # Uma copia da primeira onda (a mais facil), no fim: passa a ser a
+        # ultima do jogo.
+        no = blocos.instrucao(arvore, "ONDAS")
+        partes = blocos.entradas(no) if no is not None else None
+        if not partes:
+            raise ValueError("não percebi como estão escritas as ONDAS: cada onda tem de começar numa linha nova.")
+        _, inicio, fim = partes[0]
+        ultima = partes[-1][2]
+        copia = linhas[inicio - 1:fim]
+        if not copia[-1].rstrip().endswith(","):
+            copia[-1] = copia[-1].rstrip() + ","
+        if not linhas[ultima - 1].rstrip().endswith(","):
+            linhas[ultima - 1] = linhas[ultima - 1].rstrip() + ","
+        nova = "\n".join(linhas[:ultima] + copia + linhas[ultima:])
+        numero = len(partes) + 1
+        aviso = ("Criei a onda " + str(numero) + ", igual à primeira. É a última do jogo: "
+                 "escolhe os inimigos dela, e quantos vêm.")
+        return nova, "onda:" + str(len(partes)), aviso
     raise ValueError("aqui não dá para criar isso.")
+
+
+# =====================================================================
+#                          APAGAR UMA COISA
+# =====================================================================
+# Um inimigo, uma torre ou uma onda saem do jogo, e acerta-se o que falava
+# deles: o inimigo sai das ondas (uma onda que so o tinha a ele fica com
+# outro, para nao ficar vazia), e as torres que vinham a seguir a apagada
+# passam para a tecla anterior. Devolve o ficheiro inteiro ja sem a coisa, e
+# uma frase a contar o que se fez.
+
+def _arrumar_ondas(fonte):
+    # Depois de tirar grupos das ondas podem ficar um "[" ou um "]," sozinhos
+    # numa linha. Juntam-se a linha do lado, so dentro das ONDAS.
+    no = blocos.instrucao(ast.parse(fonte), "ONDAS")
+    if no is None:
+        return fonte
+    linhas = fonte.split("\n")
+    texto = "\n".join(linhas[no.lineno - 1:no.end_lineno])
+    texto = re.sub(r'\[[ \t]*\n[ \t]*(\{"inimigo")', r"[\1", texto)
+    texto = re.sub(r"\},[ \t]*\n[ \t]*\]", "}]", texto)
+    return "\n".join(linhas[:no.lineno - 1] + texto.split("\n") + linhas[no.end_lineno:])
+
+
+def apagar(fonte, escolha):
+    tipo, _, numero = escolha.partition(":")
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    nomes = {"inimigo": "INIMIGOS", "torre": "TORRES", "onda": "ONDAS"}
+    no = blocos.instrucao(arvore, nomes[tipo]) if tipo in nomes else None
+    partes = (blocos.entradas(no) if no is not None else None) or []
+    if not numero.isdigit() or int(numero) >= len(partes):
+        raise ValueError("isso não se pode apagar.")
+    qual = int(numero)
+    parte, inicio, fim = partes[qual]
+    cortes = [(inicio, fim)]     # linhas inteiras que saem (ve o _aplicar do bicharada.py)
+    trocas = []                  # bocados de uma linha que mudam
+
+    if tipo == "onda":
+        if len(partes) < 2:
+            raise ValueError("tem de haver pelo menos uma onda.")
+        aviso = "Apaguei a onda " + str(qual + 1) + ". Agora o jogo tem " + str(len(partes) - 1) + "."
+        if qual + 1 < len(partes):
+            aviso = aviso + " As que vinham a seguir passaram a ter o número anterior."
+        return base._aplicar(linhas, cortes, trocas), aviso
+
+    if tipo == "torre":
+        if len(partes) < 2:
+            raise ValueError("tem de haver pelo menos uma torre.")
+        nome = blocos.valor_da_chave(parte, "nome") or "a torre"
+        # As que vinham a seguir passam para a tecla anterior, para a tecla
+        # continuar a ser o numero que aparece na barra de baixo.
+        mudaram = False
+        for lugar in range(qual + 1, len(partes)):
+            tecla = base._no_da_chave(partes[lugar][0], "tecla") if isinstance(partes[lugar][0], ast.Dict) else None
+            if isinstance(tecla, ast.Attribute) and tecla.attr == "K_" + str(lugar + 1) and tecla.lineno == tecla.end_lineno:
+                base._trocar_no(linhas, tecla, "pygame.K_" + str(lugar), trocas)
+                mudaram = True
+        aviso = 'Apaguei a "' + str(nome) + '".'
+        if mudaram:
+            aviso = aviso + " As torres que vinham a seguir passaram para a tecla anterior."
+        return base._aplicar(linhas, cortes, trocas), aviso
+
+    if len(partes) < 2:
+        raise ValueError("tem de haver pelo menos um inimigo.")
+    nome = blocos.texto_constante(parte)
+    outro = [blocos.texto_constante(chave) for chave, _, _ in partes if blocos.texto_constante(chave) != nome][0]
+    ondas = blocos.instrucao(arvore, "ONDAS")
+    quantas = 0
+    trocado = False
+    for onda in ondas.value.elts if ondas is not None and isinstance(ondas.value, ast.List) else []:
+        grupos = onda.elts if isinstance(onda, ast.List) else []
+        dele = [grupo for grupo in grupos if blocos.valor_da_chave(grupo, "inimigo") == nome]
+        if len(dele) == 0:
+            continue
+        quantas = quantas + 1
+        ficam = len(grupos) - len(dele)
+        for grupo in dele:
+            if (ficam == 0 and grupo is dele[0]) or not base._tirar_da_lista(linhas, grupo, cortes, trocas):
+                # A onda so o tinha a ele: em vez de ficar vazia, fica com outro.
+                base._trocar_no(linhas, base._no_da_chave(grupo, "inimigo"), '"' + str(outro) + '"', trocas)
+                trocado = True
+    aviso = 'Apaguei o "' + str(nome) + '".'
+    if quantas == 1:
+        aviso = aviso + " Saiu também de uma onda."
+    elif quantas > 1:
+        aviso = aviso + " Saiu também de " + str(quantas) + " ondas."
+    if trocado:
+        aviso = aviso + ' Nas ondas que só o tinham a ele ficou o "' + str(outro) + '".'
+    return _arrumar_ondas(base._aplicar(linhas, cortes, trocas)), aviso
+
+
+# =====================================================================
+#              ESCOLHER DE UMA LISTA OS INIMIGOS DE UMA ONDA
+# =====================================================================
+# A Oficina mostra os inimigos que existem e a crianca carrega nos que vem
+# nessa onda. Trabalha-se sobre o codigo que esta no editor (a onda), e
+# devolve-se esse codigo com os grupos novos: o resto do caminho e o de
+# sempre, como se a crianca o tivesse escrito.
+#   sem "escolhidos": devolve a lista e os que vem agora
+#   com "escolhidos": devolve {"codigo": ...}
+
+def lista(fonte, escolha, codigo, escolhidos=None):
+    tipo, _, numero = escolha.partition(":")
+    if tipo != "onda":
+        raise ValueError("aqui não há nada para escolher de uma lista.")
+    no = blocos.instrucao(ast.parse(fonte), "INIMIGOS")
+    nomes = [blocos.texto_constante(chave) for chave, _, _ in (blocos.entradas(no) if no is not None else None) or []]
+    nomes = [nome for nome in nomes if nome]
+    texto = codigo.rstrip()
+    virgula = texto.endswith(",")
+    if virgula:
+        texto = texto[:-1]
+    try:
+        onda = ast.parse(texto.strip(), mode="eval").body
+    except SyntaxError:
+        raise ValueError("o código tem um erro: corrige-o primeiro, ou carrega em Repor o original.")
+    if not isinstance(onda, ast.List):
+        raise ValueError("não percebi esta onda: tem de estar entre [ ].")
+    # O que cada grupo diz agora: (inimigo, quantos, intervalo).
+    grupos = []
+    for grupo in onda.elts:
+        if not isinstance(grupo, ast.Dict):
+            continue
+        valores = []
+        for chave in ("quantos", "intervalo"):
+            valor = base._no_da_chave(grupo, chave)
+            valores.append(valor.value if isinstance(valor, ast.Constant) and isinstance(valor.value, int) else None)
+        grupos.append((blocos.valor_da_chave(grupo, "inimigo"), valores[0], valores[1]))
+    if escolhidos is None:
+        atuais = []
+        for nome, _, _ in grupos:
+            if nome in nomes and nome not in atuais:
+                atuais.append(nome)
+        quem = "na onda " + str(int(numero) + 1) if numero.isdigit() else "nesta onda"
+        return {"titulo": "Que inimigos vêm " + quem + "?", "opcoes": nomes, "escolhidos": atuais,
+                "nota": "Carrega nos inimigos pela ordem em que saem. Quantos vêm de cada um, e de quanto em "
+                        "quanto tempo, muda-se depois no código."}
+
+    feita = []
+    for nome in escolhidos if isinstance(escolhidos, list) else []:
+        if nome in nomes and nome not in feita:
+            feita.append(nome)
+    if len(feita) == 0:
+        raise ValueError("uma onda tem de ter pelo menos um inimigo.")
+    # Quem ja la estava fica com os numeros que tinha; os novos, com os do primeiro grupo.
+    quantos = [grupo[1] for grupo in grupos if grupo[1] is not None]
+    intervalos = [grupo[2] for grupo in grupos if grupo[2] is not None]
+    antigos = {}
+    for nome, quantos_dele, intervalo_dele in grupos:
+        antigos.setdefault(nome, (quantos_dele, intervalo_dele))
+    escritos = []
+    for nome in feita:
+        quantos_dele, intervalo_dele = antigos.get(nome, (None, None))
+        if quantos_dele is None:
+            quantos_dele = quantos[0] if quantos else 5
+        if intervalo_dele is None:
+            intervalo_dele = intervalos[0] if intervalos else 40
+        escritos.append('{"inimigo": "' + nome + '", "quantos": ' + str(quantos_dele)
+                        + ', "intervalo": ' + str(intervalo_dele) + "}")
+    margem = texto[:len(texto) - len(texto.lstrip())]
+    novo_texto = margem + "[" + (",\n" + margem + " ").join(escritos) + "]" + ("," if virgula else "")
+    return {"codigo": novo_texto + codigo[len(codigo.rstrip()):]}
 
 
 # =====================================================================
@@ -344,7 +615,10 @@ def _ver_imagem(ficha, quem, problemas):
         problemas.append(quem + ': o "som" é o nome de um ficheiro, entre aspas, como "soldado.wav".')
 
 
-def _ver_ondas(ns, problemas, avisos):
+def _ver_ondas(ns, problemas, avisos, aberta=False):
+    # aberta: e uma onda (ou as ondas todas) que esta aberta no editor? Entao
+    # um inimigo que nao existe e um engano de quem a escreveu, e nao entra.
+    inimigos = ns.get("INIMIGOS")
     ondas = ns.get("ONDAS")
     if not isinstance(ondas, list) or len(ondas) == 0:
         problemas.append("Tem de haver pelo menos uma onda: uma linha [ ... ] dentro de ONDAS.")
@@ -362,6 +636,9 @@ def _ver_ondas(ns, problemas, avisos):
                 continue
             if not isinstance(grupo.get("inimigo"), str):
                 problemas.append(quem + ': falta o "inimigo", com o nome entre aspas.')
+            elif aberta and isinstance(inimigos, dict) and grupo["inimigo"] not in inimigos:
+                problemas.append(quem + ': o inimigo "' + grupo["inimigo"] + '" não existe em INIMIGOS.'
+                                 + base._parecido(grupo["inimigo"], [nome for nome in inimigos if isinstance(nome, str)]))
             for chave, maximo in (("quantos", 300), ("intervalo", 6000)):
                 valor = grupo.get(chave)
                 if not isinstance(valor, int) or isinstance(valor, bool):
@@ -517,6 +794,54 @@ def _ver_regras(ns, problemas, avisos):
                              "A primeira linha tem de ser: " + como)
 
 
+def _torre_de_exemplo(ns, tipo, nivel):
+    # Uma torre como as que o jogo faz, para perguntar as regras o que dao.
+    custo = ns["TORRES"][tipo]["custo"]
+    gasto = custo
+    for subida in range(1, nivel):
+        gasto = gasto + custo * subida
+    return {"tipo": tipo, "coluna": 0, "linha": 0, "x": 100, "y": 100, "nivel": nivel, "gasto": gasto,
+            "recarga": 0, "mira": (101, 100)}
+
+
+def _experimentar(ns, regra, problemas):
+    # Uma regra das contas tem de devolver um numero que o jogo perceba.
+    def ver(valor, nome, minimo, quando):
+        if not _numero(valor):
+            problemas.append(nome + " tem de devolver um número: falta um return no fim, ou devolve outra coisa? "
+                             "(" + quando + " devolveu " + repr(valor)[:40] + ")")
+            return False
+        if valor < minimo:
+            problemas.append(nome + " não pode devolver menos que " + str(minimo) + " (" + quando + " devolveu "
+                             + repr(valor)[:40] + ").")
+            return False
+        return True
+
+    torre = _torre_de_exemplo(ns, 0, 1)
+    quem = ns["TORRES"][0]["nome"]
+    if regra == "vida_do_inimigo":
+        for nome in ns["INIMIGOS"]:
+            for onda in (1, len(ns["ONDAS"])):
+                if not ver(ns["vida_do_inimigo"](nome, onda), "vida_do_inimigo", 1, nome + " na onda " + str(onda)):
+                    return
+    elif regra == "valor_da_torre":
+        for chave in ("dano", "alcance"):
+            if not ver(ns["valor_da_torre"](torre, chave), "valor_da_torre", 0, 'o "' + chave + '" de ' + quem):
+                return
+            if chave == "alcance" and ns["valor_da_torre"](_torre_de_exemplo(ns, 0, ns["NIVEL_MAXIMO"]), chave) > 2000:
+                problemas.append("valor_da_torre: o alcance é grande demais para o ecrã. O máximo é 2000.")
+    elif regra == "custo_melhoria":
+        ver(ns["custo_melhoria"](torre), "custo_melhoria", 0, quem)
+    elif regra == "valor_de_venda":
+        ver(ns["valor_de_venda"](torre), "valor_de_venda", 0, quem)
+    elif regra == "premio_da_onda":
+        for onda in (1, len(ns["ONDAS"])):
+            if not ver(ns["premio_da_onda"](onda), "premio_da_onda", 0, "a onda " + str(onda)):
+                return
+    elif regra == "pode_construir":
+        ns["pode_construir"](0, 0)
+
+
 # =====================================================================
 #                              O PALCO
 # =====================================================================
@@ -534,9 +859,11 @@ class Palco:
         self.regra = numero if tipo in FUNCOES else None
         # Nos acontecimentos e nas ondas o jogo joga-se sozinho, onda atras
         # de onda; nas regras e nos desenhos ha inimigos sempre a passar.
-        self.sozinho = tipo in ("evento", "ondas")
-        self.passeio = tipo in ("regra", "desenho")
+        self.sozinho = tipo in ("evento", "ondas", "onda") or self.regra in COM_ONDAS
+        self.passeio = tipo in ("regra", "desenho") and not self.sozinho
         self.pausa_entre_ondas = 0
+        self.relogio = 0
+        self.contas = []         # as linhas do quadro do canto: (texto, cor)
         if tipo in FUNCOES:
             # Uma regra nova so mostra o que vale quando chega a vez de ser
             # usada (a torre disparar, o golpe acertar): prova-se mais tempo.
@@ -548,8 +875,10 @@ class Palco:
         _ver_inimigos(ns, problemas, avisos)
         _ver_torres(ns, problemas, avisos)
         _ver_mapa(ns, problemas, avisos)
-        _ver_ondas(ns, problemas, avisos)
+        _ver_ondas(ns, problemas, avisos, self.tipo in ("onda", "ondas"))
         _ver_regras(ns, problemas, avisos)
+        if self.tipo == "regra" and self.preparado and not problemas:
+            _experimentar(ns, self.regra, problemas)
         return problemas, avisos
 
     # --- Preparar e voltar a preparar ---
@@ -563,6 +892,8 @@ class Palco:
             self.espalhar_inimigos(ns)
         if self.sozinho:
             ns["ouro"] = 300
+        if self.regra in DEPRESSA:
+            ns["velocidade_jogo"] = 2
 
     def ao_mudar(self, ns):
         # O codigo mudou. Os inimigos que andavam no ecra foram feitos com
@@ -575,12 +906,12 @@ class Palco:
             # O jogo continua como ia. So recomeca a onda quando isso e
             # preciso para se ver a mudanca: as ondas novas desde a primeira,
             # e "quando comeca uma onda" a acontecer outra vez, ja.
-            if self.tipo == "ondas" or self.regra == "ao_comecar_onda":
+            if self.tipo in ("ondas", "onda") or self.regra == "ao_comecar_onda":
                 ns["inimigos"] = []
                 ns["projeteis"] = []
                 ns["a_por_sair"] = []
                 ns["onda_a_decorrer"] = False
-                ns["numero_onda"] = 0 if self.tipo == "ondas" else max(0, ns["numero_onda"] - 1)
+                ns["numero_onda"] = 0 if self.tipo in ("ondas", "onda") else max(0, ns["numero_onda"] - 1)
                 self.pausa_entre_ondas = 0
             self.arrumar(ns)
             return
@@ -669,8 +1000,13 @@ class Palco:
         if not self.preparado:
             self.preparar(ns, pygame)
 
+        self.relogio = self.relogio + 1
         if self.sozinho:
             self.jogar_sozinho(ns)
+            if self.regra in COM_ONDAS:
+                if self.relogio % 30 == 1:
+                    self.fazer_contas(ns)
+                self.mostrar_contas(ns, pygame)
             return
 
         # O jogo fica sempre "a meio": sem menu, sem ondas, sem perder.
@@ -680,6 +1016,18 @@ class Palco:
         ns["numero_onda"] = 1
         ns["onda_a_decorrer"] = False
         ns["a_por_sair"] = []
+
+        if self.regra in DAS_TORRES and len(ns["torres"]) > 0:
+            # A primeira torre fica escolhida (com a ficha na barra de baixo)
+            # e vai mudando de nivel, para se ver a regra em todos.
+            torre = ns["torres"][0]
+            nivel = 1 + (self.relogio // 100) % max(1, ns["NIVEL_MAXIMO"])
+            if torre["nivel"] != nivel:
+                torre["nivel"] = nivel
+                torre["gasto"] = _torre_de_exemplo(ns, torre["tipo"], nivel)["gasto"]
+            ns["torre_escolhida"] = torre
+        if self.tipo == "regra" and self.relogio % 30 == 1:
+            self.fazer_contas(ns)
 
         nomes = list(ns["INIMIGOS"])
         if not ns["pausa"]:
@@ -706,15 +1054,113 @@ class Palco:
         ns["estado"] = "jogo"
         if ns["vidas"] < 5:
             ns["vidas"] = ns["VIDAS_INICIAIS"]
+        # Nestes dois acontecimentos faz-se pela crianca o que os faz
+        # acontecer: de vez em quando melhora-se, ou vende-se, uma torre.
+        if self.regra == "ao_melhorar" and self.relogio % 120 == 0:
+            self.melhorar_uma(ns)
+        if self.regra == "ao_vender" and self.relogio % 200 == 0:
+            self.vender_uma(ns)
         if ns["onda_a_decorrer"]:
             self.pausa_entre_ondas = 0
             return
         self.pausa_entre_ondas = self.pausa_entre_ondas + 1
         if self.pausa_entre_ondas > 50:
-            if ns["numero_onda"] >= len(ns["ONDAS"]):
+            if self.tipo == "onda":
+                # Sempre a mesma onda: a que esta aberta.
+                ns["numero_onda"] = min(self.numero, len(ns["ONDAS"]) - 1)
+            elif ns["numero_onda"] >= len(ns["ONDAS"]):
                 ns["numero_onda"] = 0          # acabaram: volta a primeira
             ns["comecar_onda"]()
             self.pausa_entre_ondas = 0
+
+    def melhorar_uma(self, ns):
+        # Melhora a primeira torre que ainda nao esta no nivel maximo, com a
+        # funcao do jogo (e com ouro que chegue). Quando estao todas, voltam
+        # ao nivel 1.
+        por_melhorar = [torre for torre in ns["torres"] if torre["nivel"] < ns["NIVEL_MAXIMO"]]
+        if len(por_melhorar) == 0:
+            for torre in ns["torres"]:
+                torre["nivel"] = 1
+                torre["gasto"] = ns["TORRES"][torre["tipo"]]["custo"]
+            return
+        ns["torre_escolhida"] = por_melhorar[0]
+        custo = ns["custo_melhoria"](por_melhorar[0])
+        if _numero(custo) and custo > 0:
+            ns["ouro"] = ns["ouro"] + custo        # a melhoria e oferta: o ouro fica como estava
+        ns["melhorar"]()
+        ns["torre_escolhida"] = None
+
+    def vender_uma(self, ns):
+        # Vende uma torre com a funcao do jogo, e poe outra igual no lugar.
+        if len(ns["torres"]) == 0:
+            return
+        ns["torre_escolhida"] = ns["torres"][(self.relogio // 200) % len(ns["torres"])]
+        ns["vender"]()
+        self.arrumar(ns)
+
+    def fazer_contas(self, ns):
+        # As linhas do quadro do canto: o que a regra aberta responde agora.
+        linhas = []
+        torres = ns["TORRES"]
+        niveis = range(1, min(ns["NIVEL_MAXIMO"], 4) + 1)
+        if self.regra == "vida_do_inimigo":
+            ultima = len(ns["ONDAS"])
+            ondas = sorted({1, max(1, (ultima + 1) // 2), ultima})
+            linhas.append(("A vida com que nascem, na onda " + ", ".join(str(onda) for onda in ondas) + ":", ns["AMARELO"]))
+            for nome in list(ns["INIMIGOS"])[:6]:
+                vidas = [str(ns["vida_do_inimigo"](nome, onda)) for onda in ondas]
+                linhas.append((nome + ":  " + "  ·  ".join(vidas), ns["BRANCO"]))
+        elif self.regra == "valor_da_torre":
+            linhas.append(("O dano e o alcance, em cada nível:", ns["AMARELO"]))
+            for tipo in range(min(4, len(torres))):
+                partes = []
+                for nivel in niveis:
+                    torre = _torre_de_exemplo(ns, tipo, nivel)
+                    partes.append(_arredondar(ns["valor_da_torre"](torre, "dano")) + "/"
+                                  + _arredondar(ns["valor_da_torre"](torre, "alcance")))
+                linhas.append((torres[tipo]["nome"] + ":  " + "  ·  ".join(partes), ns["BRANCO"]))
+        elif self.regra == "custo_melhoria":
+            linhas.append(("Quanto custa subir de nível:", ns["AMARELO"]))
+            for tipo in range(min(4, len(torres))):
+                partes = [str(nivel) + "→" + str(nivel + 1) + ": "
+                          + _arredondar(ns["custo_melhoria"](_torre_de_exemplo(ns, tipo, nivel))) for nivel in list(niveis)[:-1]]
+                linhas.append((torres[tipo]["nome"] + ":  " + "  ·  ".join(partes), ns["BRANCO"]))
+        elif self.regra == "valor_de_venda":
+            linhas.append(("Por quanto se vende, em cada nível:", ns["AMARELO"]))
+            for tipo in range(min(4, len(torres))):
+                partes = [_arredondar(ns["valor_de_venda"](_torre_de_exemplo(ns, tipo, nivel))) for nivel in niveis]
+                linhas.append((torres[tipo]["nome"] + ":  " + "  ·  ".join(partes), ns["BRANCO"]))
+        elif self.regra == "premio_da_onda":
+            linhas.append(("O ouro de prémio, no fim de cada onda:", ns["AMARELO"]))
+            premios = [_arredondar(ns["premio_da_onda"](onda)) for onda in range(1, min(len(ns["ONDAS"]), 12))]
+            for inicio in range(0, len(premios), 6):
+                linhas.append(("ondas " + str(inicio + 1) + " a " + str(inicio + len(premios[inicio:inicio + 6])) + ":  "
+                               + "  ·  ".join(premios[inicio:inicio + 6]), ns["BRANCO"]))
+            linhas.append(("(a última não dá prémio: ganha-se o jogo)", ns["CINZA"]))
+        elif self.regra == "pode_construir":
+            quantos = 0
+            for linha in range(len(ns["MAPA"])):
+                for coluna in range(len(ns["MAPA"][linha])):
+                    if ns["pode_construir"](coluna, linha):
+                        quantos = quantos + 1
+            linhas.append(("Dá para construir em " + str(quantos) + " quadrados", ns["AMARELO"]))
+            linhas.append(("(os que têm um ponto verde)", ns["BRANCO"]))
+        self.contas = linhas
+
+    def mostrar_contas(self, ns, pygame):
+        # O quadro do canto, por baixo da barra de cima, a direita.
+        if len(self.contas) == 0:
+            return
+        ecra = ns["ecra"]
+        desenhos = [self.letra.render(texto, True, cor) for texto, cor in self.contas]
+        largura = min(ns["LARGURA"] - 20, 20 + max(desenho.get_width() for desenho in desenhos))
+        caixa = pygame.Rect(ns["LARGURA"] - largura - 8, ns["TOPO"] + 8, largura, 10 + 19 * len(desenhos))
+        pygame.draw.rect(ecra, ns["PAINEL"], caixa, border_radius=6)
+        pygame.draw.rect(ecra, ns["AMARELO"], caixa, 2, border_radius=6)
+        y = caixa.y + 6
+        for desenho in desenhos:
+            ecra.blit(desenho, (caixa.x + 10, y), (0, 0, caixa.width - 20, 19))
+            y = y + 19
 
     def desenhar(self, ns, pygame, nomes):
         ecra = ns["ecra"]
@@ -744,6 +1190,24 @@ class Palco:
             if self.regra == "desenhar_inimigo":
                 nome = nomes[(self.vez_da_lupa // 120) % len(nomes)]
                 self.lupa(ns, pygame, ns["desenhar_inimigo"], ns["criar_inimigo"](nome), ns["INIMIGOS"][nome]["tamanho"] + 16)
+            elif self.regra == "desenhar_projetil":
+                # Ora uma seta, ora uma pedra das que rebentam, com a cor de cada torre.
+                vez = self.vez_da_lupa // 90
+                cor = ns["TORRES"][vez % len(ns["TORRES"])]["cor"]
+                modelo = {"x": 0, "y": 0, "alvo": None, "destino_x": 0, "destino_y": 0, "dano": 1,
+                          "raio": 55 if vez % 2 == 1 else 0, "velocidade": 5, "cor": cor}
+                self.lupa(ns, pygame, ns["desenhar_projetil"], modelo, 28)
+            elif self.regra == "desenhar_quadrado":
+                # Uma letra do mapa de cada vez, as que o jogo conhece e as que la estiverem.
+                letras = []
+                for letra in ".#TEC" + "".join(ns["MAPA"]):
+                    if letra not in letras:
+                        letras.append(letra)
+                letra = letras[(self.vez_da_lupa // 90) % len(letras)]
+                texto = texto + '      agora: "' + letra + '"'
+                self.lupa_livre(ns, pygame, ns["TILE"], lambda: ns["desenhar_quadrado"](letra, 0, 0), sem_topo=True)
+            elif self.regra == "desenhar_castelo":
+                self.lupa_livre(ns, pygame, 96, lambda: ns["desenhar_castelo"](48, 68))
             else:
                 tipo = (self.vez_da_lupa // 120) % len(ns["TORRES"])
                 modelo = {"tipo": tipo, "nivel": 1 + (self.vez_da_lupa // 40) % 3, "x": 0, "y": 0, "mira": (1, 0)}
@@ -755,6 +1219,15 @@ class Palco:
                 alvo = ns["escolher_alvo"](torre)
                 if isinstance(alvo, dict) and "x" in alvo and "y" in alvo:
                     pygame.draw.circle(ecra, ns["AMARELO"], (int(alvo["x"]), int(alvo["y"])), 16, 2)
+            if self.regra == "pode_construir":
+                # Um ponto verde em cada quadrado onde a regra deixa construir.
+                for linha in range(len(ns["MAPA"])):
+                    for coluna in range(len(ns["MAPA"][linha])):
+                        if ns["pode_construir"](coluna, linha):
+                            centro = (coluna * ns["TILE"] + ns["TILE"] // 2, ns["TOPO"] + linha * ns["TILE"] + ns["TILE"] // 2)
+                            pygame.draw.circle(ecra, ns["PRETO"], centro, 5)
+                            pygame.draw.circle(ecra, ns["VERDE"], centro, 4)
+            self.mostrar_contas(ns, pygame)
         elif self.tipo == "mapa":
             mapa = ns["MAPA"]
             texto = "Mapa:   " + str(max(len(linha) for linha in mapa)) + " letras de largura   "
@@ -784,6 +1257,37 @@ class Palco:
         pygame.draw.rect(ecra, ns["PAINEL"], caixa.inflate(6, 6), border_radius=6)
         ecra.blit(grande, (caixa.x + 2, caixa.y + 2))
         pygame.draw.rect(ecra, ns["AMARELO"], caixa.inflate(6, 6), 2, border_radius=6)
+
+
+    def lupa_livre(self, ns, pygame, lado, desenhar, sem_topo=False):
+        # Como a lupa, para os desenhos que nao recebem uma coisa com x e y:
+        # "desenhar" desenha numa folha com esse lado, e mostra-se aumentada.
+        # sem_topo: o desenho conta a partir da barra de cima (um quadrado do
+        # mapa), por isso a barra tira-se enquanto ele se faz.
+        folha = pygame.Surface((lado, lado))
+        folha.fill(ns["RELVA"])
+        ecra = ns["ecra"]
+        topo = ns["TOPO"]
+        ns["ecra"] = folha
+        if sem_topo:
+            ns["TOPO"] = 0
+        try:
+            desenhar()
+        finally:
+            ns["ecra"] = ecra
+            ns["TOPO"] = topo
+        grande = pygame.transform.scale(folha, (110, 110))
+        caixa = pygame.Rect(ns["LARGURA"] - 122, ns["TOPO"] + 8, 114, 114)
+        pygame.draw.rect(ecra, ns["PAINEL"], caixa.inflate(6, 6), border_radius=6)
+        ecra.blit(grande, (caixa.x + 2, caixa.y + 2))
+        pygame.draw.rect(ecra, ns["AMARELO"], caixa.inflate(6, 6), 2, border_radius=6)
+
+
+def _arredondar(valor):
+    # 10.5 fica "10.5", 14.0 fica "14": para o quadro das contas.
+    if _numero(valor):
+        return "%g" % round(valor, 1)
+    return str(valor)[:12]
 
 
 def criar_palco(escolha):

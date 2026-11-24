@@ -301,6 +301,10 @@ CORES_TIPO = {
     "planta": (90, 180, 80),
 }
 
+# O tipo que todos podem aprender: um bicho so sabe ataques do tipo dele e
+# deste. (E a Oficina que o verifica, quando mudas um bicho ou um ataque.)
+TIPO_NORMAL = "normal"
+
 # Le-se: "um ataque de FOGO contra um bicho de PLANTA faz o dobro".
 # O que nao estiver aqui faz o normal (1.0). Para acrescentar um tipo novo
 # (eletrico? pedra? fantasma?) poe-lhe uma cor em CORES_TIPO e uma linha
@@ -344,6 +348,13 @@ ATAQUES = {
 
 # --- Os bichos ---
 # Os numeros sao os valores BASE, ao nivel 1. Cada nivel acima soma 10%.
+# ataques:  os que o bicho sabe desde o inicio (pelo menos um). Um bicho so
+#           sabe ataques do tipo dele ou do tipo "normal": um bicho de fogo
+#           nao aprende ataques de agua
+# aprende:  (so se quiseres) os que passa a saber quando chega a um nivel:
+#           {"Estalido": 9} quer dizer "aprende o Estalido ao nivel 9". Um
+#           bicho que ja aparece com esse nivel ja o sabe. No menu da batalha
+#           cabem 4: se souber mais, ficam os 4 ultimos que aprendeu.
 # forma: "circulo", "quadrado", "triangulo" ou "gota"
 # imagem:         o nome de um PNG com o bicho visto de frente: e como se ve
 #                 quando e o adversario, e nos menus
@@ -357,43 +368,50 @@ ATAQUES = {
 BICHOS = {
     "Galo de Barcelos": {
         "tipo": "fogo", "vida": 45, "ataque": 15, "defesa": 10, "velocidade": 14,
-        "ataques": ["Bicada", "Crista em Brasa", "Cocoricó", "Estalido"],
+        "ataques": ["Bicada", "Cocoricó"],
+        "aprende": {"Crista em Brasa": 6, "Estalido": 9},
         "cor": (200, 45, 45), "forma": "triangulo", "imagem": "galo.png", "imagem_costas": "galo-costas.png",
         "som": "galo.wav",
     },
     "Castanha Assada": {
         "tipo": "fogo", "vida": 55, "ataque": 12, "defesa": 13, "velocidade": 7,
-        "ataques": ["Investida", "Fumarada", "Estalido", "Casca Dura"],
+        "ataques": ["Investida", "Casca Dura"],
+        "aprende": {"Fumarada": 4, "Estalido": 8},
         "cor": (130, 70, 35), "forma": "gota", "imagem": "castanha.png", "imagem_costas": "castanha-costas.png",
         "som": "castanha.wav",
     },
     "Sardinhão": {
         "tipo": "agua", "vida": 48, "ataque": 13, "defesa": 10, "velocidade": 15,
-        "ataques": ["Investida", "Esguicho", "Onda da Nazaré", "Escamas"],
+        "ataques": ["Investida", "Escamas"],
+        "aprende": {"Esguicho": 4, "Onda da Nazaré": 8},
         "cor": (120, 160, 200), "forma": "gota", "imagem": "sardinhao.png", "imagem_costas": "sardinhao-costas.png",
         "som": "sardinhao.wav",
     },
     "Polvo Lagareiro": {
         "tipo": "agua", "vida": 60, "ataque": 11, "defesa": 13, "velocidade": 6,
-        "ataques": ["Tentáculo", "Tinta de Choco", "Esguicho", "Patada"],
+        "ataques": ["Patada", "Tinta de Choco"],
+        "aprende": {"Esguicho": 4, "Tentáculo": 7},
         "cor": (170, 80, 150), "forma": "circulo", "imagem": "polvo.png", "imagem_costas": "polvo-costas.png",
         "som": "polvo.wav",
     },
     "Sobreirinho": {
         "tipo": "planta", "vida": 58, "ataque": 11, "defesa": 15, "velocidade": 5,
-        "ataques": ["Chicote de Cortiça", "Bolotada", "Seiva", "Casca Dura"],
+        "ataques": ["Chicote de Cortiça", "Casca Dura"],
+        "aprende": {"Seiva": 5, "Bolotada": 8},
         "cor": (120, 100, 50), "forma": "quadrado", "imagem": "sobreirinho.png", "imagem_costas": "sobreirinho-costas.png",
         "som": "sobreirinho.wav",
     },
     "Couve Galega": {
         "tipo": "planta", "vida": 50, "ataque": 13, "defesa": 11, "velocidade": 11,
-        "ataques": ["Folha de Couve", "Seiva", "Investida", "Bolotada"],
+        "ataques": ["Investida", "Seiva"],
+        "aprende": {"Folha de Couve": 4, "Bolotada": 8},
         "cor": (60, 150, 70), "forma": "circulo", "imagem": "couve.png", "imagem_costas": "couve-costas.png",
         "som": "couve.wav",
     },
     "Lince Ibérico": {
         "tipo": "normal", "vida": 46, "ataque": 15, "defesa": 9, "velocidade": 16,
-        "ataques": ["Arranhão", "Salto Felino", "Rugido", "Patada"],
+        "ataques": ["Arranhão", "Rugido"],
+        "aprende": {"Patada": 5, "Salto Felino": 8},
         "cor": (205, 155, 85), "forma": "quadrado", "imagem": "lince.png", "imagem_costas": "lince-costas.png",
         "som": "lince.wav",
     },
@@ -616,7 +634,8 @@ def escurecer(cor, quanto):
 # E ha mais:
 #   minha_equipa[ativo_meu]             o teu bicho que esta em campo
 #   equipa_inimiga[ativo_inimigo]       o bicho inimigo que esta em campo
-#   BICHOS[bicho["nome"]]               a ficha dele, la em cima ("ataques"...)
+#   BICHOS[bicho["nome"]]               a ficha dele, la em cima ("tipo"...)
+#   ataques_de(bicho)                   os nomes dos ataques que ele sabe agora
 #   ATAQUES[nome]                       a ficha de um ataque ("tipo", "poder",
 #                                       "precisao", "efeito")
 #   eficacia(tipo_do_ataque, tipo_do_alvo)    2.0, 0.5 ou 1.0, pela tabela EFICACIA
@@ -680,6 +699,19 @@ def curar_tudo(equipa):
         bicho["mod_ataque"] = 1.0
         bicho["mod_defesa"] = 1.0
         bicho["anunciado"] = False
+
+
+def ataques_de(bicho):
+    # Os ataques que um bicho sabe AGORA, pela ordem em que aparecem no menu:
+    # os de "ataques" e, dos de "aprende", aqueles para que ja tem nivel. No
+    # menu cabem 4: se souber mais, ficam os 4 ultimos.
+    dados = BICHOS[bicho["nome"]]
+    sabe = list(dados["ataques"])
+    if "aprende" in dados:
+        for nome in dados["aprende"]:
+            if bicho["nivel"] >= dados["aprende"][nome] and nome not in sabe:
+                sabe.append(nome)
+    return sabe[-4:]
 
 
 def nivel_mais_alto(equipa):
@@ -1594,14 +1626,14 @@ def a_cada_frame():
 # esta em campo. Como esta: da pontos a cada ataque (os que magoam mais
 # valem mais, e curar vale muito quando ele tem pouca vida), junta-lhes
 # alguma sorte e escolhe o que ficou com mais pontos.
-# Ideias: escolher ao calhas, com random.choice(BICHOS[inimigo["nome"]]["ataques"]);
+# Ideias: escolher ao calhas, com random.choice(ataques_de(inimigo));
 # escolher sempre o que magoa mais, sem sorte nenhuma; curar-se mais cedo.
 def escolher_ataque_inimigo():
     inimigo = equipa_inimiga[ativo_inimigo]
     eu = minha_equipa[ativo_meu]
     melhor = ""
     melhor_pontos = -1
-    for nome in BICHOS[inimigo["nome"]]["ataques"]:
+    for nome in ataques_de(inimigo):
         dados = ATAQUES[nome]
         if dados["efeito"] == "dano":
             pontos = dados["poder"] * eficacia(dados["tipo"], eu["tipo"])
@@ -1758,6 +1790,12 @@ def ganhar_xp(bicho, quanto):
         calcular_valores(bicho)
         bicho["vida"] = max(1, bicho["vida_max"] - perdida)
         mensagens.append(bicho["nome"] + " subiu para o nível " + str(bicho["nivel"]) + "!")
+        # Ha algum ataque que ele aprenda exatamente neste nivel?
+        dados = BICHOS[bicho["nome"]]
+        if "aprende" in dados:
+            for nome in dados["aprende"]:
+                if dados["aprende"][nome] == bicho["nivel"]:
+                    mensagens.append(bicho["nome"] + " aprendeu " + nome + "!")
         ao_subir_de_nivel(bicho)
 
 
@@ -1848,7 +1886,7 @@ def tecla_na_batalha(tecla):
     if fase == "menu":
         quantas = len(opcoes_do_menu())
     elif fase == "ataques":
-        quantas = len(BICHOS[eu["nome"]]["ataques"])
+        quantas = len(ataques_de(eu))
     else:
         quantas = len(minha_equipa)
     if tecla == pygame.K_UP:
@@ -1899,7 +1937,7 @@ def tecla_na_batalha(tecla):
             fase = "menu"
             cursor = 0
         elif confirmar:
-            nome = BICHOS[eu["nome"]]["ataques"][cursor]
+            nome = ataques_de(eu)[cursor]
             jogador_escolheu({"quem": "jogador", "tipo": "atacar", "ataque": nome})
 
     elif fase == "equipa":
@@ -2395,7 +2433,7 @@ def desenhar_batalha():
             indice = indice + 1
 
     elif fase == "ataques":
-        nomes = BICHOS[eu["nome"]]["ataques"]
+        nomes = ataques_de(eu)
         y = 460
         indice = 0
         for nome in nomes:

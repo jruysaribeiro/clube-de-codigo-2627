@@ -26,14 +26,14 @@ SOBRE_OS_GRUPOS = {
     "Bichos": "Tipo, vida, ataque, forma, cor. Podes pôr uma imagem tua.",
     "Ataques": "O poder, a precisão e o efeito de cada ataque.",
     "Treinadores": "Quem enfrentas, o que dizem e que bichos levam.",
-    "Tipos": "As cores dos tipos, e quem é forte contra quem.",
+    "Tipos": "Cada tipo e a cor dele, e quem é forte contra quem.",
     "Regras do jogo": "Aqui mudas a maneira como a batalha se comporta: é programar a sério.",
     "Acontecimentos": "Estão vazios: o que lá escreveres passa a acontecer nesse momento. É aqui que se inventa.",
     "Desenhos": "Como se desenha um bicho e a barra de vida, com círculos, retângulos e linhas.",
 }
 
 # Os grupos onde se pode criar uma coisa nova, e o que diz o botao.
-CRIAVEIS = {"Bichos": "Novo bicho", "Ataques": "Novo ataque", "Treinadores": "Novo treinador"}
+CRIAVEIS = {"Bichos": "Novo bicho", "Ataques": "Novo ataque", "Treinadores": "Novo treinador", "Tipos": "Novo tipo"}
 
 # Pedidos ja escritos para o ajudante, para se perceber o que se pode pedir.
 SUGESTOES = {
@@ -41,6 +41,9 @@ SUGESTOES = {
     "ataque": ["Faz este ataque mais forte, mas a falhar mais vezes", "Muda-lhe o tipo para fogo", "O que faz o efeito?"],
     "treinador": ["Põe os bichos dele dois níveis acima", "Muda-lhe a frase para uma mais assustadora",
                   "Como é que lhe dou mais um bicho?"],
+    "tipo": ["Muda-lhe a cor para um tom mais escuro", "Para que serve a cor de um tipo?",
+             "Como é que digo contra quem este tipo é forte?"],
+    "tipos:normal": ["O que quer dizer isto?", "Que tipos é que há?", "O que muda se eu puser aqui outro tipo?"],
     "tipos:cores": ["Muda a cor do tipo agua para um azul mais escuro", "Acrescenta um tipo novo chamado pedra, cinzento",
                     "Para que servem estas cores?"],
     "tipos:eficacia": ["Faz o fogo bater o triplo na planta", "Faz a planta bater o dobro no fogo",
@@ -136,6 +139,9 @@ DICAS = {
               ' Para lhe dares um som, acrescenta à ficha "som": "nome.wav".' + TECLAS,
     "treinador": "A batalha é contra este treinador: lê o nome e a frase dele no início."
                  " Enter passa o texto à frente." + TECLAS,
+    "tipo": "A cor deste tipo aparece nos menus e nas etiquetas lá em cima. Para lhe mudares o nome usa o"
+            " botão «Mudar o nome», que acerta os bichos e os ataques que são deste tipo."
+            " Contra quem ele é forte diz-se em «Quem é forte contra quem»." + TECLAS,
     "tipos": "A tabela do meio diz quem é forte contra quem: a linha ataca, a coluna leva."
              " Levas um bicho de cada tipo para experimentar." + TECLAS,
     "regra": "Isto é uma regra do jogo: muda-a e a batalha passa a comportar-se de outra maneira."
@@ -150,7 +156,20 @@ DICAS = {
 TIPOS = {
     "tipos:cores": ("CORES_TIPO", "As cores dos tipos"),
     "tipos:eficacia": ("EFICACIA", "Quem é forte contra quem"),
+    "tipos:normal": ("TIPO_NORMAL", "O tipo que todos podem aprender"),
 }
+# Um bicho so sabe ataques do tipo dele, ou do tipo "de todos": o que o jogo
+# disser em TIPO_NORMAL ou, se nao disser nada, o que se chama "normal".
+TIPO_DE_TODOS = "normal"
+# As cores para um tipo novo, por ordem: a primeira que ainda nao estiver usada.
+CORES_PARA_TIPOS = [(150, 150, 165), (240, 210, 70), (110, 210, 230), (120, 90, 170), (200, 150, 100), (230, 130, 190)]
+
+
+def _tipo_de_todos(arvore):
+    no = blocos.instrucao(arvore, "TIPO_NORMAL")
+    if no is not None and blocos.texto_constante(no.value) is not None:
+        return blocos.texto_constante(no.value)
+    return TIPO_DE_TODOS
 
 
 # =====================================================================
@@ -196,7 +215,16 @@ def escolhas(fonte):
                       "titulo": nome or "Treinador " + str(numero + 1)})
         numero = numero + 1
 
+    # Cada tipo abre sozinho (a linha dele em CORES_TIPO). Se as cores nao
+    # estiverem escritas uma por linha, abre-se o dicionario inteiro.
+    cores = _fichas(blocos.instrucao(arvore, "CORES_TIPO"))
+    numero = 0
+    for nome, _, _, _ in cores:
+        lista.append({"id": "tipo:" + str(numero), "grupo": "Tipos", "titulo": nome or "Tipo " + str(numero + 1)})
+        numero = numero + 1
     for escolha, (instrucao, titulo) in TIPOS.items():
+        if escolha == "tipos:cores" and cores:
+            continue
         if blocos.instrucao(arvore, instrucao) is not None:
             lista.append({"id": escolha, "grupo": "Tipos", "titulo": titulo})
 
@@ -243,7 +271,7 @@ def regiao(fonte, escolha):
                 "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS["tipos"],
                 "sugestoes": SUGESTOES[escolha]}
 
-    nomes = {"bicho": "BICHOS", "ataque": "ATAQUES", "treinador": "TREINADORES"}
+    nomes = {"bicho": "BICHOS", "ataque": "ATAQUES", "treinador": "TREINADORES", "tipo": "CORES_TIPO"}
     if tipo not in nomes:
         return None
     no = blocos.instrucao(arvore, nomes[tipo])
@@ -251,6 +279,10 @@ def regiao(fonte, escolha):
     if not numero.isdigit() or int(numero) >= len(partes):
         return None
     nome, ficha, inicio, fim = partes[int(numero)]
+    if tipo == "tipo":
+        return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": None, "som": None,
+                "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS["tipo"], "sugestoes": SUGESTOES["tipo"],
+                "apagar": "Apagar este tipo", "renomear": "Mudar o nome"}
     imagem = None
     som = None
     if tipo == "bicho":
@@ -265,14 +297,17 @@ def regiao(fonte, escolha):
     return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": imagem, "som": som,
             "ajuda": blocos.ajuda_acima(linhas, no.lineno), "dica": DICAS[tipo], "sugestoes": SUGESTOES[tipo],
             "apagar": "Apagar este " + tipo,
-            "lista": "Escolher os bichos" if tipo == "treinador" else None}
+            # (Mudar o nome a um bicho ou a um ataque acerta quem o usava.)
+            "renomear": "Mudar o nome" if tipo in ("bicho", "ataque") else None,
+            "lista": {"treinador": "Escolher os bichos", "bicho": "Escolher os ataques"}.get(tipo)}
 
 
 # =====================================================================
 #                        CRIAR UMA COISA NOVA
 # =====================================================================
 # Um bicho, um ataque ou um treinador novos nascem como copia do primeiro
-# que la esta, com outro nome, e ficam no fim da lista. Devolve o ficheiro
+# que la esta, com outro nome, e ficam no fim da lista. (Um ataque novo nao
+# fica com nenhum bicho.) Devolve o ficheiro
 # inteiro ja com a coisa nova, a escolha a abrir, e uma frase a contar o que
 # se fez.
 
@@ -309,40 +344,36 @@ def _copiar_ficha(linhas, inicio, fim, antigo, nome, ultima):
     return texto.split("\n")
 
 
-def _dar_ataque(linhas, arvore, ataque):
-    # Sem isto o ataque novo existia mas nenhum bicho o sabia usar. Vai para
-    # o primeiro bicho: se ele ja tiver 4 (os que cabem no menu), fica no
-    # lugar do ultimo. Devolve (o bicho, o ataque que saiu ou None), ou None
-    # se nao deu.
-    partes = _fichas(blocos.instrucao(arvore, "BICHOS"))
-    if not partes or not isinstance(partes[0][1], ast.Dict):
-        return None
-    bicho, ficha, _, _ = partes[0]
-    lista = None
-    for chave, valor in zip(ficha.keys, ficha.values):
-        if blocos.texto_constante(chave) == "ataques" and isinstance(valor, ast.List):
-            lista = valor
-    if lista is None:
-        return None
-    novo = '"' + ataque + '"'
-    if len(lista.elts) >= 4:
-        ultimo = lista.elts[-1]
-        if ultimo.lineno != ultimo.end_lineno:
-            return None
-        linha = linhas[ultimo.lineno - 1]
-        antes = linha[:_coluna(linha, ultimo.col_offset)]
-        linhas[ultimo.lineno - 1] = antes + novo + linha[_coluna(linha, ultimo.end_col_offset):]
-        return bicho, blocos.texto_constante(ultimo)
-    linha = linhas[lista.end_lineno - 1]
-    corte = _coluna(linha, lista.end_col_offset - 1)
-    antes = linha[:corte].rstrip()
-    if len(lista.elts) > 0 and not antes.endswith(","):
-        novo = ", " + novo
-    linhas[lista.end_lineno - 1] = antes + novo + linha[corte:]
-    return bicho, None
+def _novo_tipo(fonte):
+    # Uma linha nova em CORES_TIPO e outra, ainda vazia, em EFICACIA.
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    cores = _fichas(blocos.instrucao(arvore, "CORES_TIPO"))
+    if not cores:
+        raise ValueError("não percebi como está escrito CORES_TIPO no ficheiro.")
+    nome = _nome_livre("tipo novo", [parte[0] for parte in cores])
+    usadas = [linhas[parte[2] - 1].replace(" ", "") for parte in cores]
+    cor = CORES_PARA_TIPOS[0]
+    for candidata in CORES_PARA_TIPOS:
+        if not any(str(candidata).replace(" ", "") in usada for usada in usadas):
+            cor = candidata
+            break
+    juntar = [(cores[-1][3], '    "' + nome + '": ' + str(cor) + ",")]
+    tabela = _fichas(blocos.instrucao(arvore, "EFICACIA"))
+    if tabela:
+        juntar.append((tabela[-1][3], '    "' + nome + '": {},'))
+    for ultima, linha in sorted(juntar, reverse=True):        # de baixo para cima
+        if not linhas[ultima - 1].rstrip().endswith(","):
+            linhas[ultima - 1] = linhas[ultima - 1].rstrip() + ","
+        linhas[ultima:ultima] = [linha]
+    aviso = ('Criei o tipo "' + nome + '". Muda-lhe o nome (com o botão «Mudar o nome») e a cor.'
+             " Em «Quem é forte contra quem» dizes contra quem ele bate mais.")
+    return "\n".join(linhas), "tipo:" + str(len(cores)), aviso
 
 
 def novo(fonte, grupo):
+    if grupo == "Tipos":
+        return _novo_tipo(fonte)
     arvore = ast.parse(fonte)
     linhas = fonte.split("\n")
     nomes = {"Bichos": "BICHOS", "Ataques": "ATAQUES", "Treinadores": "TREINADORES"}
@@ -374,21 +405,14 @@ def novo(fonte, grupo):
                  " No jogo inteiro é o último da feira: aparece depois de ganhares aos outros.")
         return "\n".join(linhas[:ultima] + copia + linhas[ultima:]), "treinador:" + str(len(partes)), aviso
 
+    # Um ataque novo nao e de nenhum bicho: da-se a quem se quiser, na ficha
+    # do bicho, com o botao "Escolher os ataques".
     nome = _nome_livre("Ataque novo", existentes)
-    # (Primeiro o bicho, que esta mais abaixo no ficheiro e nao muda o numero
-    # de linhas: assim as linhas dos ATAQUES continuam certas.)
-    dado = _dar_ataque(linhas, arvore, nome)
     copia = _copiar_ficha(linhas, inicio, fim, antigo, nome, ultima)
     if '"som"' not in "\n".join(copia) and copia[-1].rstrip().endswith("},"):
         copia[-1] = copia[-1].rstrip()[:-2] + ', "som": "' + _ficheiro(nome) + '.wav"},'
-    aviso = 'Criei o "' + nome + '", igual a ' + antigo + ". Muda-lhe o nome e os números."
-    if dado is None:
-        aviso = aviso + " Ainda nenhum bicho o tem: em Bichos, põe o nome dele nos ataques de um."
-    elif dado[1] is None:
-        aviso = aviso + " Dei-o ao " + str(dado[0]) + ", para o poderes usar no jogo."
-    else:
-        aviso = (aviso + " Dei-o ao " + str(dado[0]) + ", no lugar de " + str(dado[1])
-                 + " (só cabem 4 no menu): em Bichos podes mudar isso.")
+    aviso = ('Criei o "' + nome + '", igual a ' + antigo + ". Muda-lhe o nome e os números."
+             " Ainda nenhum bicho o tem: abre um bicho e carrega em «Escolher os ataques».")
     return "\n".join(linhas[:ultima] + copia + linhas[ultima:]), "ataque:" + str(len(partes)), aviso
 
 
@@ -468,8 +492,173 @@ def _e_de(nomes):
     return ", de ".join(nomes[:-1]) + " e de " + nomes[-1]
 
 
+class _Bocado:
+    # Um bocado de uma linha do codigo, do inicio de uma coisa ao fim de outra
+    # (uma chave de um dicionario e o valor dela, por exemplo).
+    def __init__(self, inicio, fim):
+        self.lineno, self.col_offset = inicio.lineno, inicio.col_offset
+        self.end_lineno, self.end_col_offset = fim.end_lineno, fim.end_col_offset
+
+
+def _usos_do_tipo(arvore, nome):
+    # Onde um tipo esta escrito, fora de CORES_TIPO:
+    #   fichas    os nos do "tipo" dos bichos e dos ataques que sao desse tipo
+    #   linha     as linhas da fila dele em EFICACIA, ou None
+    #   chave     o no do nome dele nessa fila
+    #   alvos     [(a chave, o valor)] onde ele aparece nas filas dos outros
+    #   de_todos  o no do valor de TIPO_NORMAL, se for ele
+    usos = {"fichas": [], "quantos": {"BICHOS": 0, "ATAQUES": 0}, "linha": None, "chave": None, "alvos": [],
+            "de_todos": None}
+    for instrucao in ("BICHOS", "ATAQUES"):
+        for _, ficha, _, _ in _fichas(blocos.instrucao(arvore, instrucao)):
+            no = _no_da_chave(ficha, "tipo") if isinstance(ficha, ast.Dict) else None
+            if no is not None and blocos.texto_constante(no) == nome and no.lineno == no.end_lineno:
+                usos["fichas"].append(no)
+                usos["quantos"][instrucao] += 1
+    tabela = blocos.instrucao(arvore, "EFICACIA")
+    for atacante, fila, primeira, ultima in _fichas(tabela):
+        chave = [k for k in tabela.value.keys if blocos.texto_constante(k) == atacante][0]
+        if atacante == nome:
+            usos["linha"], usos["chave"] = (primeira, ultima), chave
+        for alvo, valor in zip(fila.keys, fila.values) if isinstance(fila, ast.Dict) else []:
+            if blocos.texto_constante(alvo) == nome:
+                usos["alvos"].append((alvo, valor))
+    no = blocos.instrucao(arvore, "TIPO_NORMAL")
+    if no is not None and blocos.texto_constante(no.value) == nome:
+        usos["de_todos"] = no.value
+    return usos
+
+
+def _apagar_tipo(fonte, numero):
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    cores = _fichas(blocos.instrucao(arvore, "CORES_TIPO"))
+    if not numero.isdigit() or int(numero) >= len(cores):
+        raise ValueError("isso não se pode apagar.")
+    nome, _, inicio, fim = cores[int(numero)]
+    de_todos = _tipo_de_todos(arvore)
+    if nome == de_todos:
+        raise ValueError('o tipo "' + str(nome) + '" é o que todos podem aprender: é para ele que vão os bichos e '
+                         "os ataques dos tipos que se apagam. Não se pode apagar.")
+    if len(cores) < 2:
+        raise ValueError("tem de haver pelo menos um tipo.")
+    usos = _usos_do_tipo(arvore, nome)
+    cortes = [(inicio, fim)]
+    trocas = []
+    for no in usos["fichas"]:                       # os bichos e os ataques dele passam para o tipo de todos
+        _trocar_no(linhas, no, '"' + de_todos + '"', trocas)
+    if usos["linha"] is not None:
+        cortes.append(usos["linha"])
+    for alvo, valor in usos["alvos"]:
+        dentro = usos["linha"] is not None and usos["linha"][0] <= alvo.lineno <= usos["linha"][1]
+        if not dentro:
+            _tirar_da_lista(linhas, _Bocado(alvo, valor), cortes, trocas)
+    aviso = 'Apaguei o tipo "' + str(nome) + '".'
+    bichos, ataques = usos["quantos"]["BICHOS"], usos["quantos"]["ATAQUES"]
+    if bichos or ataques:
+        aviso = (aviso + " Os bichos e os ataques que eram desse tipo (" + str(bichos) + " e " + str(ataques)
+                 + ') passaram a ser do tipo "' + de_todos + '".')
+    return _aplicar(linhas, cortes, trocas), aviso
+
+
+# =====================================================================
+#                          MUDAR UM NOME
+# =====================================================================
+# Os dados falam uns dos outros pelo nome: mudar o nome a um ataque so no
+# sitio dele deixava os bichos a chamar pelo antigo. Aqui muda-se o nome em
+# todos os sitios de uma vez. Devolve o ficheiro inteiro e uma frase.
+
+def _nome_escrito(nome):
+    # O nome novo, tal como vai para o codigo, entre aspas.
+    nome = " ".join(str(nome or "").split())
+    if nome == "":
+        raise ValueError("escreve um nome.")
+    if len(nome) > 40:
+        raise ValueError("esse nome é comprido demais: no máximo 40 letras.")
+    if '"' in nome or "\\" in nome:
+        raise ValueError("o nome não pode ter aspas nem barras.")
+    return nome
+
+
+def renomear(fonte, escolha, nome):
+    tipo, _, numero = escolha.partition(":")
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    instrucoes = {"bicho": "BICHOS", "ataque": "ATAQUES", "tipo": "CORES_TIPO"}
+    no = blocos.instrucao(arvore, instrucoes[tipo]) if tipo in instrucoes else None
+    partes = _fichas(no)
+    if not numero.isdigit() or int(numero) >= len(partes):
+        raise ValueError("a isso não se pode mudar o nome.")
+    antigo = partes[int(numero)][0]
+    nome = _nome_escrito(nome)
+    if nome == antigo:
+        raise ValueError("esse já é o nome dele.")
+    if nome in [parte[0] for parte in partes]:
+        raise ValueError('já há outro com o nome "' + nome + '".')
+    novo_nome = '"' + nome + '"'
+    trocas = []
+    _trocar_no(linhas, no.value.keys[int(numero)], novo_nome, trocas)
+    onde = []
+
+    if tipo == "tipo":
+        usos = _usos_do_tipo(arvore, antigo)
+        if antigo == _tipo_de_todos(arvore) and usos["de_todos"] is None:
+            # (Um jogo sem TIPO_NORMAL procura o tipo de todos por este nome.)
+            raise ValueError('o tipo "' + str(antigo) + '" é o que todos podem aprender, e neste jogo tem de se '
+                             "chamar assim.")
+        for uso in usos["fichas"] + [alvo for alvo, _ in usos["alvos"]]:
+            _trocar_no(linhas, uso, novo_nome, trocas)
+        for uso in (usos["chave"], usos["de_todos"]):
+            if uso is not None:
+                _trocar_no(linhas, uso, novo_nome, trocas)
+        if usos["fichas"]:
+            onde.append("nos " + str(usos["quantos"]["BICHOS"]) + " bichos e " + str(usos["quantos"]["ATAQUES"])
+                        + " ataques desse tipo")
+        if usos["chave"] is not None or usos["alvos"]:
+            onde.append("em «Quem é forte contra quem»")
+    elif tipo == "ataque":
+        donos = []
+        for bicho, ficha, _, _ in _fichas(blocos.instrucao(arvore, "BICHOS")):
+            usa = False
+            ataques = _lista_da_chave(ficha, "ataques")
+            for uso in ataques.elts if ataques is not None else []:
+                if blocos.texto_constante(uso) == antigo and uso.lineno == uso.end_lineno:
+                    _trocar_no(linhas, uso, novo_nome, trocas)
+                    usa = True
+            aprende = _no_da_chave(ficha, "aprende") if isinstance(ficha, ast.Dict) else None
+            for uso in aprende.keys if isinstance(aprende, ast.Dict) else []:
+                if blocos.texto_constante(uso) == antigo and uso.lineno == uso.end_lineno:
+                    _trocar_no(linhas, uso, novo_nome, trocas)
+                    usa = True
+            if usa:
+                donos.append(str(bicho))
+        if donos:
+            onde.append("na ficha de " + _e_de(donos))
+    else:
+        donos = []
+        for _, ficha, _, _ in _fichas(blocos.instrucao(arvore, "TREINADORES")):
+            equipa = _lista_da_chave(ficha, "equipa")
+            usa = False
+            for membro in equipa.elts if equipa is not None else []:
+                uso = _no_da_chave(membro, "bicho") if isinstance(membro, ast.Dict) else None
+                if uso is not None and blocos.texto_constante(uso) == antigo and uso.lineno == uso.end_lineno:
+                    _trocar_no(linhas, uso, novo_nome, trocas)
+                    usa = True
+            if usa:
+                donos.append(blocos.valor_da_chave(ficha, "nome") or "um treinador")
+        if donos:
+            onde.append("na equipa de " + _e_de(donos))
+
+    aviso = '"' + str(antigo) + '" passou a chamar-se "' + nome + '".'
+    if onde:
+        aviso = aviso + " Mudei o nome também " + " e ".join(onde) + "."
+    return _aplicar(linhas, [], trocas), escolha, aviso
+
+
 def apagar(fonte, escolha):
     tipo, _, numero = escolha.partition(":")
+    if tipo == "tipo":
+        return _apagar_tipo(fonte, numero)
     arvore = ast.parse(fonte)
     linhas = fonte.split("\n")
     nomes = {"bicho": "BICHOS", "ataque": "ATAQUES", "treinador": "TREINADORES"}
@@ -539,16 +728,117 @@ def apagar(fonte, escolha):
 
 
 # =====================================================================
-#               ESCOLHER DE UMA LISTA OS BICHOS DE UM TREINADOR
+#     ESCOLHER DE UMA LISTA: OS BICHOS DE UM TREINADOR, OS ATAQUES DE UM BICHO
 # =====================================================================
 # A Oficina mostra os bichos que existem e a crianca escolhe os que o
-# treinador leva. Trabalha-se sobre o codigo que esta no editor (a ficha do
+# treinador leva (ou os ataques que existem, e escolhe os que o bicho sabe). Trabalha-se sobre o codigo que esta no editor (a ficha do
 # treinador), e devolve-se esse codigo com a "equipa" nova: o resto do
 # caminho e o de sempre, como se a crianca o tivesse escrito.
 #   sem "escolhidos": devolve a lista e os que ele leva agora
 #   com "escolhidos": devolve {"codigo": ...}
 
+# Um bicho so sabe ataques do tipo dele, ou do tipo de todos (ve TIPO_DE_TODOS,
+# la em cima): um bicho de fogo nao aprende ataques de agua.
+
+def _tipo_serve(tipo_do_bicho, tipo_do_ataque, de_todos):
+    return tipo_do_ataque == tipo_do_bicho or tipo_do_ataque == de_todos
+
+
+def _ver_tipo_dos_ataques(quem, ficha, nomes, onde, ns, aberto, problemas, avisos):
+    # Os ataques com esses nomes (os de "ataques", ou os de "aprende") tem de
+    # ser do tipo do bicho, ou normais. aberto: e a ficha deste bicho que
+    # esta aberta no editor?
+    fichas = ns.get("ATAQUES") if isinstance(ns.get("ATAQUES"), dict) else {}
+    tipo = ficha.get("tipo")
+    de_todos = ns.get("TIPO_NORMAL") if isinstance(ns.get("TIPO_NORMAL"), str) else TIPO_DE_TODOS
+    for ataque in nomes:
+        do_ataque = fichas[ataque].get("tipo") if isinstance(fichas.get(ataque), dict) else None
+        if not isinstance(tipo, str) or not isinstance(do_ataque, str) or _tipo_serve(tipo, do_ataque, de_todos):
+            continue
+        frase = (quem + " é do tipo " + tipo + ": não pode " + ("aprender" if onde else "saber") + ' "' + str(ataque)
+                 + '", que é do tipo ' + do_ataque + ". Só ataques do tipo " + tipo
+                 + (" ou do tipo " + de_todos if tipo != de_todos else "") + ".")
+        if aberto:
+            problemas.append(frase)
+        else:
+            avisos.append(frase + " Acerta a ficha desse bicho.")
+
+
+def _resumir_avisos_de_tipo(avisos):
+    # Mudar o tipo de todos (ou o tipo de um ataque muito usado) deixa muitos
+    # bichos com ataques que ja nao podem saber: em vez de um aviso por cada
+    # um, fica um so, a dizer quantos sao e como se resolve.
+    deles = [aviso for aviso in avisos if ": não pode saber " in aviso or ": não pode aprender " in aviso]
+    if len(deles) <= 3:
+        return
+    bichos = []
+    for aviso in deles:
+        avisos.remove(aviso)
+        nome = aviso.split(" é do tipo ")[0]
+        if nome not in bichos:
+            bichos.append(nome)
+    avisos.append("Há " + str(len(deles)) + " ataques que os bichos já não podem saber, por não serem do tipo deles "
+                  "nem do tipo de todos (" + ", ".join(bichos[:8]) + ("..." if len(bichos) > 8 else "")
+                  + "). Abre cada um desses bichos e usa «Escolher os ataques».")
+
+
+def _lista_de_ataques(fonte, codigo, escolhidos):
+    # Os ataques de um bicho. O codigo do editor e uma entrada de BICHOS
+    # ("Nome": {...},): para o Python a ler, mete-se entre chavetas.
+    arvore = ast.parse(fonte)
+    de_todos = _tipo_de_todos(arvore)
+    fichas = [(nome, blocos.valor_da_chave(ficha, "tipo"))
+              for nome, ficha, _, _ in _fichas(blocos.instrucao(arvore, "ATAQUES")) if nome]
+    texto = codigo.rstrip()
+    if texto.endswith(","):
+        texto = texto[:-1]
+    try:
+        dicionario = ast.parse("{" + texto + "}", mode="eval").body
+    except SyntaxError:
+        raise ValueError("o código tem um erro: corrige-o primeiro, ou carrega em Repor o original.")
+    if not isinstance(dicionario, ast.Dict) or len(dicionario.values) != 1:
+        raise ValueError("não percebi a ficha deste bicho.")
+    ataques = _lista_da_chave(dicionario.values[0], "ataques")
+    if ataques is None:
+        raise ValueError('não encontrei os "ataques" deste bicho no código.')
+    atuais = [blocos.texto_constante(no) for no in ataques.elts]
+    # So se mostram os ataques que este bicho pode saber: os do tipo dele e
+    # os normais.
+    tipo = blocos.valor_da_chave(dicionario.values[0], "tipo")
+    nomes = [nome for nome, do_ataque in fichas
+             if tipo is None or do_ataque is None or _tipo_serve(tipo, do_ataque, de_todos)]
+    if escolhidos is None:
+        quem = blocos.texto_constante(dicionario.keys[0]) or "este bicho"
+        nota = "Carrega nos ataques pela ordem em que aparecem no menu da batalha. Cabem 4."
+        if tipo is not None and len(nomes) < len(fichas):
+            nota = nota + (" Só aparecem os ataques do tipo dele (" + tipo + ")"
+                           + (" e os do tipo " + de_todos if tipo != de_todos else "") + ".")
+        return {"titulo": "Que ataques sabe " + quem + "?", "opcoes": nomes,
+                "escolhidos": [ataque for ataque in atuais if ataque in nomes], "nota": nota}
+    escolha_feita = []
+    for ataque in escolhidos if isinstance(escolhidos, list) else []:
+        if ataque in nomes and ataque not in escolha_feita:
+            escolha_feita.append(ataque)
+    if len(escolha_feita) == 0:
+        raise ValueError("um bicho tem de saber pelo menos um ataque.")
+    if len(escolha_feita) > 4:
+        raise ValueError("só cabem 4 ataques no menu da batalha: tira um primeiro.")
+    # (A chaveta que se pos antes do codigo empurra uma letra as colunas da
+    # primeira linha.)
+    linhas = texto.split("\n")
+    desvio = 1 if ataques.lineno == 1 else 0
+    desvio_do_fim = 1 if ataques.end_lineno == 1 else 0
+    antes = linhas[ataques.lineno - 1][:_coluna("{" * desvio + linhas[ataques.lineno - 1], ataques.col_offset) - desvio]
+    depois = linhas[ataques.end_lineno - 1][_coluna("{" * desvio_do_fim + linhas[ataques.end_lineno - 1],
+                                                    ataques.end_col_offset) - desvio_do_fim:]
+    nova = antes + "[" + ", ".join('"' + ataque + '"' for ataque in escolha_feita) + "]" + depois
+    linhas[ataques.lineno - 1:ataques.end_lineno] = [nova]
+    return {"codigo": "\n".join(linhas) + codigo[len(codigo.rstrip()) - (1 if codigo.rstrip().endswith(",") else 0):]}
+
+
 def lista(fonte, escolha, codigo, escolhidos=None):
+    if escolha.partition(":")[0] == "bicho":
+        return _lista_de_ataques(fonte, codigo, escolhidos)
     if escolha.partition(":")[0] != "treinador":
         raise ValueError("aqui não há nada para escolher de uma lista.")
     nomes = [nome for nome, _, _, _ in _fichas(blocos.instrucao(ast.parse(fonte), "BICHOS")) if nome]
@@ -686,6 +976,25 @@ def _ver_tipos(ns, problemas, avisos):
             problemas.append('A cor do tipo "' + tipo + '" são três números de 0 a 255, como (200, 60, 60).')
     tipos = [tipo for tipo in cores if isinstance(tipo, str)]
 
+    # Um tipo que desapareceu daqui mas ainda e o de bichos ou de ataques:
+    # diz-se uma vez so (e nao uma vez por cada bicho e por cada ataque), e
+    # como se resolve.
+    usados = {}
+    for instrucao in ("BICHOS", "ATAQUES"):
+        fichas = ns.get(instrucao)
+        for ficha in fichas.values() if isinstance(fichas, dict) else []:
+            tipo = ficha.get("tipo") if isinstance(ficha, dict) else None
+            if isinstance(tipo, str) and tipo not in tipos:
+                usados[tipo] = usados.get(tipo, 0) + 1
+    for tipo, quantos in usados.items():
+        problemas.append('O tipo "' + tipo + '" não está em CORES_TIPO, e ainda é o tipo de ' + str(quantos)
+                         + " bichos e ataques. Para lhe mudares o nome usa o botão «Mudar o nome»; para o tirares, "
+                           "o «Apagar este tipo»: os dois acertam os bichos e os ataques.")
+    de_todos = ns.get("TIPO_NORMAL")
+    if de_todos is not None and de_todos not in tipos:
+        problemas.append("TIPO_NORMAL tem de ser o nome de um dos tipos, entre aspas: " + ", ".join(tipos) + ".")
+    tipos = tipos + list(usados)
+
     tabela = ns.get("EFICACIA")
     if not isinstance(tabela, dict):
         problemas.append("EFICACIA tem de estar entre { }.")
@@ -800,6 +1109,8 @@ def _ver_bichos(bichos, ns, tipos, ataques, aberto, problemas, avisos):
                 else:
                     avisos.append(quem + ' ainda usa o ataque "' + ataque + '", que já não existe. '
                                   "Muda o nome também na ficha desse bicho, senão o jogo pára.")
+        _ver_tipo_dos_ataques(quem, ficha, [ataque for ataque in lista if isinstance(ataque, str)], "",
+                              ns, aberto, problemas, avisos)
 
     minimo = ns.get("TAMANHO_EQUIPA")
     if isinstance(minimo, int) and len(bichos) < minimo:
@@ -907,7 +1218,11 @@ def _experimentar(ns, regra, problemas):
 
 
 def _ataques_de(ns, bicho):
-    # Os nomes dos ataques de um bicho que esta em batalha.
+    # Os nomes dos ataques de um bicho que esta em batalha: os que aparecem
+    # no menu dele. (Ha jogos em que os ataques se aprendem com o nivel: esses
+    # tem uma funcao ataques_de, e e ela que diz.)
+    if "ataques_de" in ns:
+        return ns["ataques_de"](bicho)
     return ns["BICHOS"][bicho["nome"]]["ataques"]
 
 
@@ -920,6 +1235,8 @@ class Palco:
     def __init__(self, escolha):
         tipo, _, numero = escolha.partition(":")
         self.tipo = tipo             # bicho, ataque, treinador, tipos, regra, evento ou desenho
+        if tipo == "tipo":
+            self.tipo = "tipos"      # um tipo sozinho abre no palco dos tipos
         self.numero = int(numero) if numero.isdigit() else 0
         # Uma regra, um acontecimento ou um desenho: o nome da funcao. Com
         # eles a batalha joga-se sozinha.
@@ -974,6 +1291,7 @@ class Palco:
         _ver_funcoes(ns, problemas, avisos)
         if self.tipo == "regra" and self.preparado and not problemas:
             _experimentar(ns, self.regra, problemas)
+        _resumir_avisos_de_tipo(avisos)
         return problemas, avisos
 
     # --- Preparar e voltar a preparar ---
@@ -1109,7 +1427,8 @@ class Palco:
             ns["fase"] = "ataques"
             ns["cursor"] = 0
             if self.ataque is not None:
-                ns["cursor"] = ns["BICHOS"][self.meu]["ataques"].index(self.ataque)
+                sabe = _ataques_de(ns, ns["minha_equipa"][0])
+                ns["cursor"] = sabe.index(self.ataque) if self.ataque in sabe else 0
         if noticia is not None:
             ns["mensagens"].insert(0, noticia)
             ns["fase"] = "texto"
