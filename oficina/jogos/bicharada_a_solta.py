@@ -746,6 +746,32 @@ def _so_com_blocos(arvore, filas, chao):
     return ["".join(letra if letra in os_blocos or letra == "?" else chao for letra in fila) for fila in filas]
 
 
+def _por_casa(arvore, mundo, linhas, letra):
+    # Ca fora: tres quadrados de parede e, por baixo, parede, porta, parede.
+    # Num sitio com relva a toda a volta, onde se chegue a pe a frente da
+    # porta, de preferencia na zona da partida. Devolve a zona (None se nao
+    # houve onde a por).
+    partida = mundo.partida()
+    if partida is None:
+        return None
+    passos, _, _ = mundo.andar(partida)
+    sitios = []
+    for zona in mundo.no_mundo():
+        for linha in range(1, ZONA[1] - 3):
+            for coluna in range(1, ZONA[0] - 3):
+                a_volta = [mundo.letra(zona, coluna + dc, linha + dl) for dc in range(-1, 4) for dl in range(-1, 3)]
+                casa = [mundo.letra(zona, coluna + dc, linha + dl) for dc in range(3) for dl in range(2)]
+                frente = (zona, coluna + 1, linha + 2)
+                if all(vizinha in ".e" for vizinha in a_volta) and all(esta == "." for esta in casa):
+                    if frente in passos:
+                        sitios.append((zona != partida[0], passos[frente] < 2, passos[frente], zona, coluna, linha))
+    for _, _, _, zona, coluna, linha in sorted(sitios):
+        if _escrever_na_zona(arvore, linhas, zona, coluna, linha, "###"):
+            _escrever_na_zona(arvore, linhas, zona, coluna, linha + 1, "#" + letra + "#")
+            return zona
+    return None
+
+
 def _novo_edificio(fonte):
     arvore, mundo = _ler_mundo(fonte)
     if mundo is None:
@@ -759,28 +785,7 @@ def _novo_edificio(fonte):
     nome = base._nome_livre("casa nova", list(mundo.zonas))
     linhas = fonte.split("\n")
 
-    # Ca fora: tres quadrados de parede e, por baixo, parede, porta, parede.
-    # Num sitio com relva a toda a volta, onde se chegue a pe a frente da
-    # porta, de preferencia na zona da partida.
-    posta = None
-    partida = mundo.partida()
-    if partida is not None:
-        passos, _, _ = mundo.andar(partida)
-        sitios = []
-        for zona in mundo.no_mundo():
-            for linha in range(1, ZONA[1] - 3):
-                for coluna in range(1, ZONA[0] - 3):
-                    a_volta = [mundo.letra(zona, coluna + dc, linha + dl) for dc in range(-1, 4) for dl in range(-1, 3)]
-                    casa = [mundo.letra(zona, coluna + dc, linha + dl) for dc in range(3) for dl in range(2)]
-                    frente = (zona, coluna + 1, linha + 2)
-                    if all(vizinha in ".e" for vizinha in a_volta) and all(esta == "." for esta in casa):
-                        if frente in passos:
-                            sitios.append((zona != partida[0], passos[frente] < 2, passos[frente], zona, coluna, linha))
-        for _, _, _, zona, coluna, linha in sorted(sitios):
-            if _escrever_na_zona(arvore, linhas, zona, coluna, linha, "###"):
-                _escrever_na_zona(arvore, linhas, zona, coluna, linha + 1, "#" + letra + "#")
-                posta = zona
-                break
+    posta = _por_casa(arvore, mundo, linhas, letra)
 
     # (Primeiro o dicionario que esta mais abaixo no ficheiro.)
     sala = _so_com_blocos(arvore, SALA_NOVA, CHAO_DE_DENTRO)
@@ -2262,3 +2267,428 @@ class Palco(base.Palco):
 
 def criar_palco(escolha):
     return Palco(escolha)
+
+
+# =====================================================================
+#                           JUNTAR JOGOS
+# =====================================================================
+# O que o juntar.py nao sabe deste jogo (ve la as explicacoes):
+#   - duas criancas inventaram coisas com o mesmo nome: uma muda de nome;
+#   - dois blocos ou duas portas novas com a mesma letra: um muda de letra;
+#   - os treinadores sao numeros no mapa, e o numero de cada um depende de
+#     quantos ha: enquanto se junta, cada numero e trocado por uma "ficha"
+#     (uma letra so dele), e no fim as fichas voltam a ser numeros;
+#   - duas criancas mexeram na mesma zona em sitios diferentes: junta-se
+#     quadrado a quadrado;
+#   - duas criancas fizeram zonas novas: cabem as duas no MUNDO.
+
+import difflib      # noqa: E402
+import juntar as _juntar      # noqa: E402
+
+JUNTAR_COM_NOME = [("BICHOS", "bicho"), ("ATAQUES", "ataque"), ("CORES_TIPO", "tipo"), ("ZONAS", "zona")]
+PRIMEIRA_FICHA = 0xE000      # letras que ninguem usa (zona de uso privado do Unicode)
+
+
+def _fichas_de(fonte, instrucao):
+    # {nome: o texto da ficha}, pela ordem do ficheiro.
+    linhas = fonte.split("\n")
+    fichas = {}
+    for nome, _, primeira, ultima in base._fichas(blocos.instrucao(ast.parse(fonte), instrucao)):
+        fichas[str(nome)] = "\n".join(linhas[primeira - 1:ultima])
+    return fichas
+
+
+def _fichas_com_nome(fonte, instrucao):
+    # {o nome (ou a letra) de cada ficha: (primeira linha, ultima)}. Serve
+    # tambem para os TREINADORES, que sao uma lista.
+    fichas = {}
+    for nome, ficha, primeira, ultima in base._fichas(blocos.instrucao(ast.parse(fonte), instrucao)):
+        if nome is None:
+            nome = blocos.valor_da_chave(ficha, "nome")
+        fichas[str(nome)] = (primeira, ultima)
+    return fichas
+
+
+JUNTAR_CHAMAR = {"BICHOS": "o bicho", "ATAQUES": "o ataque", "TREINADORES": "o treinador", "ZONAS": "a zona",
+                 "CORES_TIPO": "o tipo", "PORTAS": "a porta", "LOJA": "na loja,", "JOGADOR": "no teu boneco,",
+                 "EFICACIA": "em «Quem é forte contra quem», o tipo"}
+
+
+def juntar_chamar(unidade, chave, texto):
+    # O nome de uma coisa, numa duvida ou no relato do que se juntou.
+    if chave is None:
+        if unidade == "MUNDO":
+            return "o MUNDO (como as zonas se juntam)"
+        return None
+    if unidade == "BLOCOS":
+        nome = re.search(r'"nome": "([^"]*)"', texto or "")
+        return 'o bloco "' + (nome.group(1) if nome else chave) + '"'
+    if unidade in JUNTAR_CHAMAR and not chave.startswith("("):
+        return JUNTAR_CHAMAR[unidade] + ' "' + chave + '"'
+    return None
+
+
+def _nomes_dos_treinadores(fonte):
+    partes = base._fichas(blocos.instrucao(ast.parse(fonte), "TREINADORES"))
+    return [str(blocos.valor_da_chave(parte[1], "nome")) for parte in partes]
+
+
+def _mudar_nome_ao_juntar(fonte, instrucao, prefixo, antigo, novo):
+    # Usa o "Mudar o nome" da Oficina, que acerta o resto do ficheiro.
+    nomes = list(_fichas_de(fonte, instrucao))
+    if antigo not in nomes or novo in nomes:
+        return fonte
+    try:
+        return renomear(fonte, prefixo + ":" + str(nomes.index(antigo)), novo)[0]
+    except (ValueError, SyntaxError):
+        return fonte
+
+
+def _mudar_letra(fonte, antiga, nova):
+    # Um bloco ou uma porta passam a ser outra letra: em BLOCOS, em PORTAS,
+    # no "por_baixo" dos outros blocos e em todas as zonas.
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    trocas = _trocas_nas_zonas(arvore, linhas, lambda zona, texto: texto.replace(antiga, nova))
+    for instrucao in ("BLOCOS", "PORTAS"):
+        no = blocos.instrucao(arvore, instrucao)
+        for chave in no.value.keys if no is not None and isinstance(no.value, ast.Dict) else []:
+            if blocos.texto_constante(chave) == antiga and chave.lineno == chave.end_lineno:
+                base._trocar_no(linhas, chave, '"' + nova + '"', trocas)
+    for _, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "BLOCOS")):
+        no = base._no_da_chave(ficha, "por_baixo") if isinstance(ficha, ast.Dict) else None
+        if no is not None and blocos.texto_constante(no) == antiga and no.lineno == no.end_lineno:
+            base._trocar_no(linhas, no, '"' + nova + '"', trocas)
+    return base._aplicar(linhas, [], trocas)
+
+
+def _mudar_nome_de_treinador(fonte, antigo, novo):
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    trocas = []
+    for _, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "TREINADORES")):
+        no = base._no_da_chave(ficha, "nome") if isinstance(ficha, ast.Dict) else None
+        if no is not None and blocos.texto_constante(no) == antigo and no.lineno == no.end_lineno and not trocas:
+            base._trocar_no(linhas, no, '"' + novo + '"', trocas)
+    return base._aplicar(linhas, [], trocas)
+
+
+def _letras_das_zonas(fonte):
+    zonas = _valor(ast.parse(fonte), "ZONAS")
+    return set("".join("".join(filas) for filas in zonas.values())) if _sao_zonas(zonas) else set()
+
+
+def _numeros_para_fichas(fonte, quem_e, fichas):
+    # Nas zonas, o numero de cada treinador passa a ser a ficha dele.
+    # quem_e: os treinadores deste ficheiro, pela ordem ("quem e o 1, o 2...").
+    for nome in quem_e:
+        if nome not in fichas:
+            fichas[nome] = chr(PRIMEIRA_FICHA + len(fichas))
+
+    def mudar(zona, texto):
+        return "".join(fichas[quem_e[int(letra) - 1]] if letra in "123456789" and int(letra) <= len(quem_e) else letra
+                       for letra in texto)
+    arvore = ast.parse(fonte)
+    linhas = fonte.split("\n")
+    return base._aplicar(linhas, [], _trocas_nas_zonas(arvore, linhas, mudar))
+
+
+def juntar_preparar(tronco, jogos):
+    # jogos: [(quem, a base desse jogo, como esta agora)]. Devolve o tronco e
+    # os jogos ja arrumados, o "estado" para as outras funcoes, e os avisos.
+    jogos = [list(jogo) for jogo in jogos]
+    avisos = []
+
+    # 1. Uma coisa que ja existia e mudou de nome num jogo muda de nome em
+    #    todos, para as outras criancas nao ficarem a chamar pelo nome antigo.
+    for jogo in jogos:
+        for instrucao, prefixo in JUNTAR_COM_NOME:
+            antes, agora = _fichas_de(jogo[1], instrucao), _fichas_de(jogo[2], instrucao)
+            for novo, antigo in _juntar.pares_no_sitio(list(antes), list(agora)).items():
+                parecidas = difflib.SequenceMatcher(None, antes[antigo].replace(antigo, novo), agora[novo]).ratio()
+                if parecidas < 0.85:
+                    continue             # nao e a mesma coisa com outro nome: uma saiu e entrou outra
+                tronco = _mudar_nome_ao_juntar(tronco, instrucao, prefixo, antigo, novo)
+                for outro in jogos:
+                    outro[1] = _mudar_nome_ao_juntar(outro[1], instrucao, prefixo, antigo, novo)
+                    outro[2] = _mudar_nome_ao_juntar(outro[2], instrucao, prefixo, antigo, novo)
+                avisos.append('Em «' + jogo[0] + '», "' + antigo + '" passou a chamar-se "' + novo
+                              + '": mudei o nome em todos.')
+
+    # 2. Duas coisas novas com o mesmo nome (e que nao sao iguais): a do jogo
+    #    que vem depois fica com outro nome.
+    for instrucao, prefixo in JUNTAR_COM_NOME:
+        de_quem = dict(_fichas_de(tronco, instrucao))
+        todos = set(de_quem)
+        for jogo in jogos:
+            todos.update(_fichas_de(jogo[1], instrucao), _fichas_de(jogo[2], instrucao))
+        for jogo in jogos:
+            antes = _fichas_de(jogo[1], instrucao)
+            for nome, texto in list(_fichas_de(jogo[2], instrucao).items()):
+                if nome in antes:
+                    continue
+                if nome in de_quem and not _juntar._igual(de_quem[nome], texto):
+                    novo = base._nome_livre(nome, todos)
+                    mudado = _mudar_nome_ao_juntar(jogo[2], instrucao, prefixo, nome, novo)
+                    if mudado != jogo[2]:
+                        jogo[2] = mudado
+                        todos.add(novo)
+                        de_quem[novo] = _fichas_de(jogo[2], instrucao).get(novo, texto)
+                        avisos.append('Havia duas coisas novas chamadas "' + nome + '": a de «' + jogo[0]
+                                      + '» passou a chamar-se "' + novo + '".')
+                else:
+                    de_quem[nome] = texto
+    #    (Os treinadores: o nome so esta na ficha deles.)
+    de_quem = {nome: None for nome in _nomes_dos_treinadores(tronco)}
+    todos = set(de_quem)
+    for jogo in jogos:
+        todos.update(_nomes_dos_treinadores(jogo[1]), _nomes_dos_treinadores(jogo[2]))
+    do_tronco = _juntar.partir(tronco)
+    for unidade in do_tronco:
+        if unidade.nome == "TREINADORES":
+            de_quem.update(dict(unidade.fichas))
+    for jogo in jogos:
+        antes, agora = _nomes_dos_treinadores(jogo[1]), _nomes_dos_treinadores(jogo[2])
+        mesmos = _juntar.pares_no_sitio(antes, agora)
+        for nome in agora:
+            if nome in antes or nome in mesmos:
+                continue
+            texto = None
+            for unidade in _juntar.partir(jogo[2]):
+                if unidade.nome == "TREINADORES":
+                    texto = unidade.ficha(nome)
+            if nome in de_quem and not _juntar._igual(de_quem[nome], texto):
+                novo = base._nome_livre(nome, todos)
+                jogo[2] = _mudar_nome_de_treinador(jogo[2], nome, novo)
+                todos.add(novo)
+                de_quem[novo] = texto
+                avisos.append('Havia dois treinadores novos chamados "' + nome + '": o de «' + jogo[0]
+                              + '» passou a chamar-se "' + novo + '".')
+            else:
+                de_quem[nome] = texto
+
+    # 3. Dois blocos ou duas portas novas com a mesma letra: a do jogo que vem
+    #    depois muda de letra, tambem nas zonas dele.
+    ocupadas = {}
+    for instrucao in ("BLOCOS", "PORTAS"):
+        for letra, texto in _fichas_de(tronco, instrucao).items():
+            ocupadas[letra] = (instrucao, texto)
+    usadas = set(CONHECIDAS) | _letras_das_zonas(tronco) | set(ocupadas)
+    for jogo in jogos:
+        for fonte in (jogo[1], jogo[2]):
+            usadas |= _letras_das_zonas(fonte) | set(_fichas_de(fonte, "BLOCOS")) | set(_fichas_de(fonte, "PORTAS"))
+    for jogo in jogos:
+        for instrucao, livres in (("BLOCOS", LETRAS_DE_BLOCO + "abcdefghijklmnopqrstuvwxyz"),
+                                  ("PORTAS", LETRAS_DE_PORTA)):
+            antes = _fichas_de(jogo[1], instrucao)
+            for letra, texto in list(_fichas_de(jogo[2], instrucao).items()):
+                if letra in antes:
+                    continue
+                if letra in ocupadas and not (ocupadas[letra][0] == instrucao and _juntar._igual(ocupadas[letra][1], texto)):
+                    novas = [nova for nova in livres if nova not in usadas]
+                    if not novas:
+                        continue         # ja nao ha letras: fica para quem esta a juntar decidir
+                    jogo[2] = _mudar_letra(jogo[2], letra, novas[0])
+                    usadas.add(novas[0])
+                    ocupadas[novas[0]] = (instrucao, _fichas_de(jogo[2], instrucao).get(novas[0], texto))
+                    avisos.append(("Dois blocos novos" if instrucao == "BLOCOS" else "Duas portas novas")
+                                  + ' tinham a letra "' + letra + '": em «' + jogo[0] + '» passou a ser a letra "'
+                                  + novas[0] + '", também nas zonas.')
+                else:
+                    ocupadas[letra] = (instrucao, texto)
+
+    # 3b. Duas coisas novas, de jogos diferentes, a usar o mesmo nome de
+    #     imagem ("bicho-novo.png"): a segunda fica com outro nome, para os
+    #     desenhos de uma nao taparem os da outra. (O oficina.py da o nome
+    #     novo ao ficheiro dessa crianca: ve estado["renomeados"].)
+    renomeados = []
+    escritos = tronco + "".join(jogo[1] + jogo[2] for jogo in jogos)
+    de_quem = {}                 # {nome do ficheiro: (o jogo, a instrucao, a chave)}
+    for jogo in jogos:
+        for instrucao in ("BICHOS", "BLOCOS", "TREINADORES"):
+            antes = _fichas_com_nome(jogo[1], instrucao)
+            for chave, (primeira, ultima) in list(_fichas_com_nome(jogo[2], instrucao).items()):
+                if chave in antes:
+                    continue
+                linhas = jogo[2].split("\n")
+                texto = "\n".join(linhas[primeira - 1:ultima])
+                for ficheiro in sorted(set(re.findall(r'"([A-Za-z0-9_][A-Za-z0-9_.-]*\.(?:png|wav))"', texto))):
+                    if '"' + ficheiro + '"' in tronco:
+                        continue         # e de uma coisa que ja existia: partilha-se
+                    dono = de_quem.setdefault(ficheiro, (jogo[0], instrucao, chave))
+                    if dono[0] == jogo[0] or dono[1:] == (instrucao, chave):
+                        continue
+                    corpo, ponto, fim = ficheiro.rpartition(".")
+                    numero = 2
+                    while '"' + corpo + "-" + str(numero) + ponto + fim + '"' in escritos:
+                        numero = numero + 1
+                    novo = corpo + "-" + str(numero) + ponto + fim
+                    escritos = escritos + '"' + novo + '"'
+                    for linha in range(primeira - 1, ultima):
+                        linhas[linha] = linhas[linha].replace('"' + ficheiro + '"', '"' + novo + '"')
+                    jogo[2] = "\n".join(linhas)
+                    de_quem[novo] = (jogo[0], instrucao, chave)
+                    renomeados.append((jogo[0], ficheiro, novo))
+
+    # 4. Os numeros dos treinadores, nas zonas, passam a fichas.
+    fichas = {}
+    do_tronco = _nomes_dos_treinadores(tronco)
+    tronco = _numeros_para_fichas(tronco, do_tronco, fichas)
+    for jogo in jogos:
+        antes, agora = _nomes_dos_treinadores(jogo[1]), _nomes_dos_treinadores(jogo[2])
+        mesmos = _juntar.pares_no_sitio(antes, agora)
+        jogo[1] = _numeros_para_fichas(jogo[1], antes, fichas)
+        jogo[2] = _numeros_para_fichas(jogo[2], [mesmos.get(nome, nome) for nome in agora], fichas)
+    portas = set(_fichas_de(tronco, "PORTAS"))
+    for jogo in jogos:
+        portas |= set(_fichas_de(jogo[2], "PORTAS"))
+    estado = {"fichas": fichas, "tronco": do_tronco, "portas": portas, "portas_do_tronco": set(_fichas_de(tronco, "PORTAS")),
+              "renomeados": renomeados}
+    return tronco, [tuple(jogo) for jogo in jogos], estado, avisos
+
+
+def juntar_mostrar(estado, texto):
+    # Numa duvida, as fichas dos treinadores veem-se como numeros (os que ja
+    # havia) ou como um * (os novos).
+    for nome, ficha in estado["fichas"].items():
+        numero = estado["tronco"].index(nome) + 1 if nome in estado["tronco"] else 0
+        texto = texto.replace(ficha, str(numero) if 1 <= numero <= 9 else "*")
+    return texto
+
+
+def _filas_da_zona(texto):
+    try:
+        zonas = ast.literal_eval("{" + texto + "}")
+    except (SyntaxError, ValueError):
+        return None
+    if not isinstance(zonas, dict) or len(zonas) != 1:
+        return None
+    filas = list(zonas.values())[0]
+    if not isinstance(filas, list) or not all(isinstance(fila, str) for fila in filas):
+        return None
+    return filas
+
+
+def _grelha_do_mundo(texto):
+    try:
+        no = ast.parse(texto).body[0]
+        grelha = ast.literal_eval(no.value)
+    except (SyntaxError, ValueError, IndexError, AttributeError):
+        return None
+    if not isinstance(grelha, list) or not all(isinstance(fila, list) and all(isinstance(nome, str) for nome in fila)
+                                               for fila in grelha):
+        return None
+    return [list(fila) for fila in grelha]
+
+
+def juntar_duvida(estado, unidade, chave, tronco, versoes):
+    # Devolve o texto ja junto, ou None se nao sabe (e a duvida fica para
+    # quem esta a juntar).
+    if tronco is None:
+        return None
+    if unidade == "ZONAS" and chave is not None:
+        # Uma zona em que mexeram duas criancas: quadrado a quadrado. Se
+        # mexeram no mesmo quadrado, nao da.
+        do_tronco = _filas_da_zona(tronco)
+        if do_tronco is None:
+            return None
+        juntas = [list(fila) for fila in do_tronco]
+        # (Um treinador ou uma porta podem ir para outro sitio: se dois jogos
+        # os puseram no mesmo quadrado, fica o primeiro, e o juntar_acabar
+        # arranja lugar ao outro.)
+        moveis = set(estado["fichas"].values()) | estado["portas"]
+        for _, antes, agora in versoes:
+            if _juntar._igual(antes, agora):
+                continue
+            antes = _filas_da_zona(antes) if antes is not None else None
+            agora = _filas_da_zona(agora) if agora is not None else None
+            if antes is None or agora is None:
+                return None
+            if [len(fila) for fila in antes] != [len(fila) for fila in do_tronco] or \
+                    [len(fila) for fila in agora] != [len(fila) for fila in do_tronco]:
+                return None
+            for linha in range(len(do_tronco)):
+                for coluna in range(len(do_tronco[linha])):
+                    letra = agora[linha][coluna]
+                    if letra == antes[linha][coluna] or letra == do_tronco[linha][coluna]:
+                        continue
+                    if juntas[linha][coluna] not in (do_tronco[linha][coluna], letra):
+                        if juntas[linha][coluna] in moveis and letra in moveis:
+                            continue
+                        return None      # dois jogos mudaram este quadrado
+                    juntas[linha][coluna] = letra
+        return "\n".join(_texto_da_zona(chave, ["".join(fila) for fila in juntas]))
+
+    if unidade == "MUNDO" and chave is None:
+        # Zonas novas em mais do que um jogo: cabem todas. (Se alguem tirou
+        # ou mudou zonas de sitio, nao da.)
+        grelha = _grelha_do_mundo(tronco)
+        if grelha is None:
+            return None
+        for _, antes, agora in versoes:
+            if _juntar._igual(antes, agora):
+                continue
+            antes = _grelha_do_mundo(antes) if antes is not None else None
+            agora = _grelha_do_mundo(agora) if agora is not None else None
+            if antes is None or agora is None:
+                return None
+            sitio_antes = {nome: (l, c) for l, fila in enumerate(antes) for c, nome in enumerate(fila) if nome != ""}
+            sitio_agora = {nome: (l, c) for l, fila in enumerate(agora) for c, nome in enumerate(fila) if nome != ""}
+            if any(nome not in sitio_agora or sitio_agora[nome] != sitio for nome, sitio in sitio_antes.items()):
+                return None
+            for nome, (linha, coluna) in sitio_agora.items():
+                if nome in sitio_antes or any(nome in fila for fila in grelha):
+                    continue
+                while len(grelha) <= linha:
+                    grelha.append([])
+                fila = grelha[linha]
+                if coluna < len(fila) and fila[coluna] == "":
+                    fila[coluna] = nome
+                else:
+                    while len(fila) < coluna:
+                        fila.append("")
+                    fila.append(nome)      # no sitio dela ou, se ja estava ocupado, a seguir
+        linhas = tronco.split("\n")
+        primeira = [numero for numero, linha in enumerate(linhas) if linha.startswith("MUNDO")]
+        if not primeira:
+            return None
+        escrito = ["MUNDO = ["] + ["    [" + ", ".join('"' + nome + '"' for nome in fila) + "]," for fila in grelha] + ["]"]
+        return "\n".join(linhas[:primeira[0]] + escrito)
+    return None
+
+
+def juntar_acabar(estado, fonte, ordem):
+    # As fichas voltam a ser numeros: o de cada treinador na lista ja junta.
+    # (ordem["TREINADORES"] sao as fichas pela ordem em que ficaram. Um
+    # treinador que deixou de existir, ou o decimo, fica chao.)
+    finais = ordem.get("TREINADORES")
+    if finais is None:
+        finais = _nomes_dos_treinadores(fonte)
+    numero_de = {estado["fichas"][nome]: str(lugar + 1)
+                 for lugar, nome in enumerate(finais) if nome in estado["fichas"] and lugar < 9}
+    todas = set(estado["fichas"].values())
+    arvore = ast.parse(fonte)
+    interiores = _interiores(arvore)
+    linhas = fonte.split("\n")
+
+    def mudar(zona, texto):
+        chao = CHAO_DE_DENTRO if zona in interiores else CHAO_DE_FORA
+        return "".join(numero_de.get(letra, chao) if letra in todas else letra for letra in texto)
+    fonte = base._aplicar(linhas, [], _trocas_nas_zonas(arvore, linhas, mudar))
+
+    # Um treinador novo ou uma porta nova que ficaram sem lugar (outro jogo
+    # tinha posto uma coisa no mesmo quadrado): arranja-se-lhes um.
+    for lugar, nome in enumerate(finais):
+        if nome not in estado["tronco"] and lugar < 9:
+            fonte = _por_treinador(fonte, lugar + 1)[0]
+    arvore, mundo = _ler_mundo(fonte)
+    if mundo is not None:
+        la_fora = "".join("".join(mundo.zonas[zona]) for zona in mundo.no_mundo())
+        linhas = fonte.split("\n")
+        for letra in mundo.portas:
+            if letra not in estado["portas_do_tronco"] and letra not in la_fora:
+                if _por_casa(arvore, mundo, linhas, letra) is not None:
+                    fonte = "\n".join(linhas)
+                    arvore, mundo = _ler_mundo(fonte)
+                    linhas = fonte.split("\n")
+    return fonte

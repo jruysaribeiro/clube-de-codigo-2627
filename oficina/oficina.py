@@ -26,6 +26,7 @@ import argparse
 import ast
 import atexit
 import base64
+import hashlib
 import importlib
 import io
 import json
@@ -49,6 +50,7 @@ sys.path.insert(0, AQUI)
 
 import ajudante as modulo_do_ajudante  # noqa: E402
 import blocos  # noqa: E402
+import juntar as modulo_de_juntar  # noqa: E402
 from jogos import JOGOS  # noqa: E402
 
 ORIGINAIS = os.path.join(AQUI, ".originais")
@@ -70,12 +72,17 @@ FICHEIRO_MAXIMO = 1500000         # bytes (a pagina ja os encolhe antes de os ma
 # Um jogo guardado e um zip: o ficheiro do jogo e, nestas pastas, as imagens
 # e os sons que ele usa.
 PASTAS_DO_ZIP = {"imagem": "imagens", "som": "sons"}
+PASTA_DA_BASE = "base"            # no zip: o jogo de onde se partiu (ve "A base", mais abaixo)
 ZIP_MAXIMO = 60000000             # bytes, tudo somado e fora do zip
 ZIP_FICHEIROS = 500
 LEIA_ME = ("Este é um jogo guardado na Oficina.\n\n"
            "Para continuares a mexer nele: abre a Oficina, entra no jogo, carrega em\n"
            "\"Abrir um jogo guardado\" e escolhe este ficheiro zip, tal como está.\n"
-           "O jogo, as imagens e os sons vão cada um para o seu sítio.\n")
+           "O jogo, as imagens e os sons vão cada um para o seu sítio.\n\n"
+           "Para juntares o que fizeste ao jogo de um colega (ou ao da turma): na\n"
+           "Oficina dele, \"Juntar jogos\", e escolhe este ficheiro.\n\n"
+           "(A pasta \"base\" tem o jogo de onde partiste: é com ela que a Oficina\n"
+           "descobre o que mudaste.)\n")
 PACIENCIA = 6                 # segundos a espera de um jogo que nao responde
 
 
@@ -119,6 +126,81 @@ def guardar_original(config):
     if not os.path.exists(destino):
         os.makedirs(ORIGINAIS, exist_ok=True)
         shutil.copyfile(caminho_do_jogo(config), destino)
+
+
+# --- A base: o jogo de onde se partiu ---
+# Para juntar o que varias criancas fizeram (ve o juntar.py) e preciso saber
+# de onde cada uma partiu. A Oficina guarda aqui esse jogo: o que veio no
+# ultimo "Abrir um jogo guardado" ou "Juntar jogos" (ou, se nunca houve
+# nenhum, o original). Vai dentro de cada zip do "Descarregar o meu jogo".
+BASES = os.path.join(AQUI, ".bases")
+
+
+def caminho_da_base(config):
+    return os.path.join(BASES, os.path.basename(config.FICHEIRO))
+
+
+def impressao(conteudo):
+    return hashlib.sha1(conteudo).hexdigest()
+
+
+def ficheiros_do_jogo(fonte):
+    # As imagens e os sons de que o codigo fala e que existem nas pastas:
+    # [(tipo, nome, caminho)].
+    nomes = set()
+    try:
+        for no in ast.walk(ast.parse(fonte)):
+            if isinstance(no, ast.Constant) and isinstance(no.value, str):
+                nomes.add(no.value)
+    except (SyntaxError, ValueError):
+        return []
+    lista = []
+    for tipo in PASTAS_DO_ZIP:
+        pasta, regra, _, _ = FICHEIROS[tipo]
+        for nome in sorted(nomes):
+            if regra.fullmatch(nome) and os.path.isfile(os.path.join(pasta, nome)):
+                lista.append((tipo, nome, os.path.join(pasta, nome)))
+    return lista
+
+
+def ler_base(config):
+    # (o codigo da base, {"feito": quando, "imagens": {"imagens/galo.png": a
+    # impressao digital do ficheiro nessa altura}}).
+    caminho = caminho_da_base(config)
+    if os.path.exists(caminho):
+        fonte, _ = ler(caminho)
+        try:
+            with open(caminho + ".json", encoding="utf-8") as f:
+                info = json.load(f)
+        except (OSError, ValueError):
+            info = {}
+    else:
+        original = caminho_do_original(config)
+        fonte, _ = ler(original if os.path.exists(original) else caminho_do_jogo(config))
+        info = {}
+    return fonte, info_certa(info)
+
+
+def info_certa(info):
+    info = info if isinstance(info, dict) else {}
+    feito = info.get("feito")
+    imagens = info.get("imagens")
+    return {"feito": feito if isinstance(feito, (int, float)) and not isinstance(feito, bool) else 0,
+            "imagens": {str(k): str(v) for k, v in imagens.items()} if isinstance(imagens, dict) else {}}
+
+
+def guardar_base(config, fonte, info=None):
+    # Sem "info", a base e de agora: fica com a hora e com as impressoes
+    # digitais das imagens e dos sons que o jogo usa neste momento.
+    if info is None:
+        info = {"feito": time.time(), "imagens": {}}
+        for tipo, nome, caminho in ficheiros_do_jogo(fonte):
+            with open(caminho, "rb") as f:
+                info["imagens"][PASTAS_DO_ZIP[tipo] + "/" + nome] = impressao(f.read())
+    os.makedirs(BASES, exist_ok=True)
+    escrever(caminho_da_base(config), fonte, "\n")
+    with open(caminho_da_base(config) + ".json", "w", encoding="utf-8") as f:
+        json.dump(info, f)
 
 
 class Falha(Exception):
@@ -848,32 +930,29 @@ class Sessao:
         nome = os.path.basename(config.FICHEIRO)
         with open(caminho_do_jogo(config), "rb") as f:
             jogo_em_bytes = f.read()
-        nomes = set()
-        try:
-            for no in ast.walk(ast.parse(jogo_em_bytes.decode("utf-8"))):
-                if isinstance(no, ast.Constant) and isinstance(no.value, str):
-                    nomes.add(no.value)
-        except (SyntaxError, ValueError):
-            pass                 # um jogo com um erro vai na mesma, so sem imagens
+        base, info = ler_base(config)
         memoria = io.BytesIO()
         with zipfile.ZipFile(memoria, "w", zipfile.ZIP_DEFLATED) as pacote:
             pacote.writestr(nome, jogo_em_bytes)
             pacote.writestr("LEIA-ME.txt", LEIA_ME)
-            for tipo, pasta_no_zip in PASTAS_DO_ZIP.items():
-                pasta, regra, _, _ = FICHEIROS[tipo]
-                for ficheiro in sorted(nomes):
-                    caminho = os.path.join(pasta, ficheiro)
-                    if regra.fullmatch(ficheiro) and os.path.isfile(caminho):
-                        pacote.write(caminho, pasta_no_zip + "/" + ficheiro)
+            try:
+                for tipo, ficheiro, caminho in ficheiros_do_jogo(jogo_em_bytes.decode("utf-8")):
+                    pacote.write(caminho, PASTAS_DO_ZIP[tipo] + "/" + ficheiro)
+            except UnicodeDecodeError:
+                pass             # um jogo estragado vai na mesma, so sem imagens
+            # O jogo de onde se partiu, para o "Juntar jogos".
+            pacote.writestr(PASTA_DA_BASE + "/" + nome, base)
+            pacote.writestr(PASTA_DA_BASE + "/base.json", json.dumps(info))
         return os.path.splitext(nome)[0] + ".zip", memoria.getvalue()
 
     def abrir_pacote(self, config, dados):
         # O que vem num jogo guardado: (o codigo do jogo, [(tipo, nome,
-        # conteudo), ...] com as imagens e os sons). Um ficheiro .py sozinho,
-        # como os que a Oficina guardava antes, tambem serve.
+        # conteudo), ...] com as imagens e os sons, e a base: (o codigo de
+        # onde se partiu, a informacao dela) ou None). Um ficheiro .py
+        # sozinho, como os que a Oficina guardava antes, tambem serve.
         if not zipfile.is_zipfile(io.BytesIO(dados)):
             try:
-                return dados.decode("utf-8"), []
+                return dados.decode("utf-8"), [], None
             except UnicodeDecodeError:
                 raise Falha("Esse ficheiro não é um jogo guardado pela Oficina.")
         try:
@@ -901,7 +980,18 @@ class Sessao:
                     conteudo = pacote.read(entrada)
                     if conteudo.startswith(inicio) and (tipo != "som" or conteudo[8:12] == b"WAVE"):
                         ficheiros.append((tipo, nome, conteudo))
-            return fonte, ficheiros
+            base = None
+            da_base = {caminhos[e].partition("/")[2]: e for e in entradas if caminhos[e].startswith(PASTA_DA_BASE + "/")}
+            escrita = da_base.get(os.path.basename(config.FICHEIRO))
+            if escrita is not None and escrita.file_size <= ZIP_MAXIMO:
+                info = {}
+                if "base.json" in da_base and da_base["base.json"].file_size <= FICHEIRO_MAXIMO:
+                    try:
+                        info = json.loads(pacote.read(da_base["base.json"]).decode("utf-8"))
+                    except ValueError:
+                        info = {}
+                base = (pacote.read(escrita).decode("utf-8").replace("\r\n", "\n"), info_certa(info))
+            return fonte, ficheiros, base
         except (zipfile.BadZipFile, UnicodeDecodeError, RuntimeError, OSError):
             raise Falha("Não consegui ler esse ficheiro: está estragado, ou não é um jogo guardado pela Oficina.")
 
@@ -911,12 +1001,13 @@ class Sessao:
         with self.tranca:
             config = configuracao(jogo)
             ficheiros = []
+            base = None
             if pacote is not None:
                 try:
                     dados = base64.b64decode(str(pacote), validate=True)
                 except ValueError:
                     raise Falha("O ficheiro chegou estragado. Tenta outra vez.")
-                fonte, ficheiros = self.abrir_pacote(config, dados)
+                fonte, ficheiros, base = self.abrir_pacote(config, dados)
             fonte = str(fonte or "").replace("\r\n", "\n")
             try:
                 escolhas = config.escolhas(fonte)
@@ -939,8 +1030,146 @@ class Sessao:
                 with open(os.path.join(pasta, nome) + ".novo", "wb") as f:
                     f.write(conteudo)
                 os.replace(os.path.join(pasta, nome) + ".novo", os.path.join(pasta, nome))
+            # De onde este jogo partiu: o que o zip disser ou, se nao disser
+            # (um jogo sozinho, ou um zip antigo), ele proprio.
+            if base is not None:
+                guardar_base(config, base[0], base[1])
+            else:
+                guardar_base(config, fonte)
             return {"ok": True, "imagens": len([f for f in ficheiros if f[0] == "imagem"]),
                     "sons": len([f for f in ficheiros if f[0] == "som"])}
+
+    # --- Juntar jogos ---
+
+    def juntar(self, jogo, pacotes, decisoes=None):
+        # Junta ao jogo que esta neste computador o que vem noutros jogos
+        # guardados (ve o juntar.py). pacotes: [{"nome", "dados" em base64}].
+        # Enquanto houver duvidas nao se escreve nada: devolve-as, e a pagina
+        # volta a pedir com as decisoes.
+        with self.tranca:
+            config = configuracao(jogo)
+            if not isinstance(pacotes, list) or len(pacotes) == 0:
+                raise Falha("Escolhe pelo menos um jogo guardado para juntar ao teu.")
+            if len(pacotes) > 40:
+                raise Falha("São jogos demais de uma vez: junta até 40.")
+            caminho = caminho_do_jogo(config)
+            daqui, fim_de_linha = ler(caminho)
+            base_daqui, info_daqui = ler_base(config)
+            avisos = []
+
+            # Quem entra: este computador, e cada jogo escolhido.
+            entram = [{"quem": "este computador", "base": base_daqui, "info": info_daqui, "agora": daqui, "ficheiros": {}}]
+            for tipo, nome, onde in ficheiros_do_jogo(daqui):
+                with open(onde, "rb") as f:
+                    entram[0]["ficheiros"][(tipo, nome)] = f.read()
+            for numero, pacote in enumerate(pacotes):
+                pacote = pacote if isinstance(pacote, dict) else {}
+                nome = re.sub(r"\.(zip|py)$", "", str(pacote.get("nome") or "jogo " + str(numero + 1)), flags=re.IGNORECASE)[:40]
+                while nome in [outro["quem"] for outro in entram]:
+                    nome = nome + " (outro)"
+                try:
+                    dados = base64.b64decode(str(pacote.get("dados")), validate=True)
+                except ValueError:
+                    raise Falha('O ficheiro "' + nome + '" chegou estragado. Tenta outra vez.')
+                if str(pacote.get("nome", "")).lower().endswith(".zip") and not zipfile.is_zipfile(io.BytesIO(dados)):
+                    raise Falha('"' + nome + '" não é um jogo guardado pela Oficina.')
+                fonte, ficheiros, base = self.abrir_pacote(config, dados)
+                fonte = fonte.replace("\r\n", "\n")
+                try:
+                    reconhecido = len(config.escolhas(fonte)) > 0
+                except (SyntaxError, ValueError):
+                    raise Falha('O jogo "' + nome + '" tem um erro de Python e não dá para juntar. Abre-o e corrige-o primeiro.')
+                if not reconhecido:
+                    raise Falha('"' + nome + '" não parece ser o ' + config.NOME + ".")
+                if base is None:
+                    avisos.append('"' + nome + '" não diz de que jogo partiu (é de uma Oficina mais antiga): comparei-o '
+                                  "com o jogo de onde este computador partiu.")
+                    base = (base_daqui, dict(info_daqui))
+                entram.append({"quem": nome, "base": base[0], "info": base[1], "agora": fonte,
+                               "ficheiros": {(tipo, nome_dele): conteudo for tipo, nome_dele, conteudo in ficheiros}})
+
+            # As imagens e os sons. Um ficheiro so conta como "desta crianca"
+            # se nao for igual ao que ela tinha quando partiu. Dois ficheiros
+            # diferentes com o mesmo nome: se sao de coisas novas, o segundo
+            # muda de nome (e o codigo dessa crianca tambem); se sao de uma
+            # coisa que ja existia, fica o primeiro.
+            todos = {chave for entra in entram for chave in entra["ficheiros"]}
+            donos = {}
+            for entra in entram:
+                for (tipo, nome), conteudo in list(entra["ficheiros"].items()):
+                    marca = impressao(conteudo)
+                    if entra["info"]["imagens"].get(PASTAS_DO_ZIP[tipo] + "/" + nome) == marca:
+                        continue
+                    if (tipo, nome) not in donos:
+                        donos[(tipo, nome)] = (marca, entra["quem"], conteudo)
+                    elif donos[(tipo, nome)][0] != marca:
+                        del entra["ficheiros"][(tipo, nome)]
+                        if '"' + nome + '"' in entra["base"]:
+                            avisos.append('"' + nome + '" foi mudado em mais do que um jogo: ficou o de «'
+                                          + donos[(tipo, nome)][1] + "».")
+                            continue
+                        corpo, ponto, fim = nome.rpartition(".")
+                        numero = 2
+                        while (tipo, corpo + "-" + str(numero) + ponto + fim) in todos:
+                            numero = numero + 1
+                        novo = corpo + "-" + str(numero) + ponto + fim
+                        todos.add((tipo, novo))
+                        entra["ficheiros"][(tipo, novo)] = conteudo
+                        entra["agora"] = entra["agora"].replace('"' + nome + '"', '"' + novo + '"')
+                        donos[(tipo, novo)] = (marca, entra["quem"], conteudo)
+                        avisos.append('Havia dois "' + nome + '" diferentes: o de «' + entra["quem"]
+                                      + '» passou a chamar-se "' + novo + '".')
+
+            # O tronco: a base mais recente de todas.
+            tronco = max(entram, key=lambda entra: entra["info"]["feito"])["base"]
+            # (Nao tem de ser a base de todos: de cada jogo conta so o que
+            # mudou desde a base dele.)
+            try:
+                junto = modulo_de_juntar.juntar(config, tronco, [(e["quem"], e["base"], e["agora"]) for e in entram], decisoes)
+                if not junto["duvidas"]:
+                    compile(junto["fonte"], config.FICHEIRO, "exec")
+                    if len(config.escolhas(junto["fonte"])) == 0:
+                        raise ValueError("o jogo ficou sem nada")
+            except Falha:
+                raise
+            except Exception as erro:
+                raise Falha("Não consegui juntar estes jogos (" + type(erro).__name__ + ": " + str(erro)[:200]
+                            + "). Não mudei nada.")
+            avisos = avisos + junto["avisos"]
+            if junto["duvidas"]:
+                return {"duvidas": junto["duvidas"], "avisos": avisos}
+
+            guardar_original(config)
+            self.parar()
+            self.config = None
+            shutil.copyfile(caminho, caminho + ".anterior")
+            escrever(caminho, junto["fonte"], fim_de_linha)
+            for entra in entram[1:]:
+                for (tipo, nome), conteudo in entra["ficheiros"].items():
+                    pasta = FICHEIROS[tipo][0]
+                    destino = os.path.join(pasta, nome)
+                    dono = donos.get((tipo, nome))
+                    if (dono is not None and dono[1] == entra["quem"]) or (dono is None and not os.path.exists(destino)):
+                        os.makedirs(pasta, exist_ok=True)
+                        with open(destino + ".novo", "wb") as f:
+                            f.write(conteudo)
+                        os.replace(destino + ".novo", destino)
+            # (Um ficheiro a que o jogo mudou o nome ao juntar: ve o
+            # "renomeados" do juntar_preparar.)
+            estado = junto.get("estado")
+            for quem, antigo, novo in estado.get("renomeados", []) if isinstance(estado, dict) else []:
+                for entra in entram:
+                    for tipo in PASTAS_DO_ZIP:
+                        conteudo = entra["ficheiros"].get((tipo, antigo))
+                        _, regra, _, _ = FICHEIROS[tipo]
+                        if entra["quem"] == quem and conteudo is not None and regra.fullmatch(str(novo)):
+                            with open(os.path.join(FICHEIROS[tipo][0], novo), "wb") as f:
+                                f.write(conteudo)
+            guardar_base(config, junto["fonte"])
+            frases = {"novo": "Novo", "mudou": "Mudado", "juntei": "Juntei as mudanças de vários", "escolhido": "Escolheste"}
+            feito = [frases[que] + ": " + onde + " — " + ", ".join(quem) for quem, que, onde in junto["relato"]
+                     if quem != ["este computador"]]
+            return {"ok": True, "feito": feito, "avisos": avisos}
 
 
 sessao = Sessao()
@@ -1134,6 +1363,8 @@ class Pedido(BaseHTTPRequestHandler):
             self.pergunta(dados)
         elif caminho == "/api/carregar":
             self.tratar(lambda: sessao.carregar(dados.get("jogo"), dados.get("fonte"), dados.get("pacote")))
+        elif caminho == "/api/juntar":
+            self.tratar(lambda: sessao.juntar(dados.get("jogo"), dados.get("pacotes"), dados.get("decisoes")))
         elif caminho == "/api/foto":      # para testes: tira uma fotografia a janela
             self.tratar(lambda: sessao.dizer({"tipo": "foto", "ficheiro": str(dados.get("ficheiro"))}) or {"ok": True})
         else:

@@ -480,6 +480,15 @@ microfone. Ficam em `comum/assets/imagens/` e `comum/assets/sons/` com esses
 nomes, e o jogo usa-os logo. Não vão para o git, mas vão dentro do zip que o
 **Descarregar o meu jogo** dá.
 
+### Vários a mexer no mesmo jogo
+
+Cada um mexe no seu computador e, no fim, carrega em **Descarregar o meu
+jogo**. No computador onde se quer o jogo de todos, **Juntar jogos** e
+escolhem-se os zips (vários de uma vez). A Oficina junta o que cada um fez;
+só pergunta quando dois mexeram na mesma coisa, ou quando alguém apagou
+alguma. Esse jogo descarrega-se e é o que todos abrem na sessão seguinte.
+Mais em `oficina/README.md`.
+
 ### O ajudante (o botão «Pedir ajuda»)
 
 Só aparece se a Oficina souber de um computador da sala a servir um modelo

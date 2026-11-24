@@ -132,6 +132,20 @@
   #opcoes-lista button b { color: var(--amarelo); margin-right: 6px; }
   #lista .fim { display: flex; gap: 8px; }
   #guardar-lista { border-color: var(--verde); color: var(--verde); font-weight: 600; }
+  /* ---------- juntar jogos ---------- */
+  #juntar { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(10, 10, 18, .8); padding: 12px; overflow: auto; }
+  #juntar .folha { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; width: min(760px, 100%); max-height: 94vh; overflow: auto; }
+  #juntar h2 { margin: 0; font-size: 19px; }
+  #juntar p { margin: 0; color: var(--fraco); font-size: 14px; }
+  #juntar ul { margin: 0; padding-left: 20px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+  #juntar .duvida { border: 1px solid var(--linha); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  #juntar .duvida h3 { margin: 0; font-size: 15px; }
+  #juntar .duvida label { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+  #juntar .duvida pre { margin: 4px 0 0; padding: 8px; background: rgba(0, 0, 0, .35); border-radius: 8px; font-size: 12px; line-height: 1.25; max-height: 230px; overflow: auto; white-space: pre; }
+  #juntar .duvida details { flex: 1; min-width: 0; }
+  #juntar .duvida summary { cursor: pointer; }
+  #juntar .fim { display: flex; gap: 8px; }
+  #confirmar-juntar { border-color: var(--verde); color: var(--verde); font-weight: 600; }
   #renomear { margin-left: auto; }
   #renomear[hidden] + #apagar { margin-left: auto; }
   #apagar { color: var(--vermelho); }
@@ -324,8 +338,22 @@
 </main>
 
 <input type="file" id="escolher-ficheiro" accept=".zip,.py,application/zip,text/x-python,text/plain" hidden>
+<input type="file" id="escolher-varios" accept=".zip,.py,application/zip,text/x-python,text/plain" multiple hidden>
 <input type="file" id="escolher-imagem" accept="image/*" hidden>
 <input type="file" id="escolher-som" accept="audio/*" hidden>
+
+<div id="juntar" hidden>
+  <div class="folha" role="dialog" aria-labelledby="titulo-juntar">
+    <h2 id="titulo-juntar"></h2>
+    <p id="nota-juntar"></p>
+    <ul id="avisos-juntar"></ul>
+    <div id="duvidas-juntar"></div>
+    <div class="fim">
+      <button type="button" id="confirmar-juntar">Juntar</button>
+      <button type="button" id="fechar-juntar">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <div id="lista" hidden>
   <div class="folha" role="dialog" aria-labelledby="titulo-lista">
@@ -528,8 +556,11 @@ async function mostrarJogos() {
     guardar.onclick = () => guardarJogo(jogo.id);
     const trazer = elemento("button", "Abrir um jogo guardado");
     trazer.onclick = () => trazerJogo(jogo.id, jogo.nome);
-    ficheiro.append(guardar, trazer, elemento("span",
-      "Guardar dá-te o ficheiro inteiro do jogo, para levares. Noutro dia, abre-o aqui e continuas dele."));
+    const juntar = elemento("button", "Juntar jogos");
+    juntar.onclick = () => juntarJogos(jogo.id, jogo.nome);
+    ficheiro.append(guardar, trazer, juntar, elemento("span",
+      "Descarregar dá-te o ficheiro inteiro do jogo, para levares. Noutro dia, abre-o aqui e continuas dele. "
+      + "Juntar jogos põe no teu jogo o que os teus colegas fizeram no deles: escolhe os ficheiros que eles descarregaram."));
     cartao.append(ficheiro);
     caixa.append(cartao);
   }
@@ -670,6 +701,111 @@ function trazerJogo(jogo, nome) {
     }
   };
   entrada.click();
+}
+
+/* ---------------- juntar jogos ---------------- */
+
+function emBase64(bytes) {
+  let texto = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    texto += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(texto);
+}
+
+function juntarJogos(jogo, nome) {
+  // Junta ao jogo deste computador o que vem noutros jogos guardados (os zips
+  // dos colegas). O servidor compara cada um com o jogo de onde partiu; se
+  // houver duvidas (duas criancas mexeram na mesma coisa), pergunta-se aqui.
+  const entrada = $("escolher-varios");
+  entrada.value = "";
+  entrada.onchange = async () => {
+    const ficheiros = Array.from(entrada.files);
+    if (ficheiros.length === 0) return;
+    const pacotes = [];
+    for (const ficheiro of ficheiros) {
+      pacotes.push({nome: ficheiro.name, dados: emBase64(new Uint8Array(await ficheiro.arrayBuffer()))});
+    }
+    await pedirParaJuntar(jogo, nome, pacotes, {});
+  };
+  entrada.click();
+}
+
+async function pedirParaJuntar(jogo, nome, pacotes, decisoes) {
+  let dados;
+  try {
+    dados = await pedir("/api/juntar", {jogo, pacotes, decisoes});
+  } catch (erro) {
+    $("juntar").hidden = true;
+    alert(erro.message);
+    return;
+  }
+  const lista = $("avisos-juntar");
+  lista.replaceChildren();
+  const caixa = $("duvidas-juntar");
+  caixa.replaceChildren();
+  $("juntar").hidden = false;
+  $("fechar-juntar").onclick = () => { $("juntar").hidden = true; };
+
+  if (dados.ok) {
+    // Ja esta: o que entrou, e o que a Oficina acertou sozinha.
+    $("titulo-juntar").textContent = "Jogos juntos no teu " + nome;
+    $("nota-juntar").textContent = dados.feito.length > 0
+      ? "O teu jogo ficou com isto dos outros. (O jogo como estava antes ficou guardado ao lado, com .anterior no nome.)"
+      : "Os outros jogos não tinham nada de novo.";
+    for (const frase of dados.feito.concat(dados.avisos)) lista.append(elemento("li", frase));
+    $("confirmar-juntar").hidden = true;
+    $("fechar-juntar").textContent = "Fechar";
+    $("fechar-juntar").onclick = async () => { $("juntar").hidden = true; await mostrarJogos(); };
+    return;
+  }
+
+  // Ha duvidas: uma caixa por cada, com as versoes a escolha.
+  $("titulo-juntar").textContent = "Juntar jogos: " + dados.duvidas.length + (dados.duvidas.length === 1 ? " dúvida" : " dúvidas");
+  $("nota-juntar").textContent = "Estas coisas foram mudadas em mais do que um jogo, ou apagadas num deles. "
+    + "Escolhe o que fica em cada uma. Ainda não mudei nada no teu jogo.";
+  for (const frase of dados.avisos) lista.append(elemento("li", frase));
+  $("confirmar-juntar").hidden = false;
+  $("fechar-juntar").textContent = "Cancelar";
+  dados.duvidas.forEach((duvida, numero) => {
+    const cartao = elemento("div", "", "duvida");
+    cartao.append(elemento("h3", duvida.titulo));
+    duvida.opcoes.forEach((opcao, qual) => {
+      const linha = elemento("label");
+      const botao = document.createElement("input");
+      botao.type = "radio";
+      botao.name = "duvida-" + numero;
+      botao.value = String(qual);
+      botao.checked = qual === duvida.sugerida;
+      linha.append(botao);
+      if (opcao.texto === null) {
+        linha.append(elemento("span", opcao.quem));
+      } else {
+        const ver = document.createElement("details");
+        ver.append(elemento("summary", opcao.quem), elemento("pre", opcao.texto));
+        ver.open = duvida.opcoes.length <= 3 && opcao.texto.split("\n").length <= 16;
+        linha.append(ver);
+      }
+      cartao.append(linha);
+    });
+    caixa.append(cartao);
+  });
+  $("confirmar-juntar").onclick = async () => {
+    const todas = Object.assign({}, decisoes);
+    let porEscolher = 0;
+    dados.duvidas.forEach((duvida, numero) => {
+      const marcada = caixa.querySelector('input[name="duvida-' + numero + '"]:checked');
+      if (marcada) todas[duvida.id] = Number(marcada.value);
+      else porEscolher = porEscolher + 1;
+    });
+    if (porEscolher > 0) {
+      alert(porEscolher === 1 ? "Falta escolher o que fica numa das dúvidas." : "Falta escolher o que fica em " + porEscolher + " dúvidas.");
+      return;
+    }
+    $("confirmar-juntar").disabled = true;
+    await pedirParaJuntar(jogo, nome, pacotes, todas);
+    $("confirmar-juntar").disabled = false;
+  };
 }
 
 /* ---------------- editar ---------------- */

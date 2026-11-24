@@ -19,6 +19,8 @@ Thumbs.db
 
 # A Oficina guarda aqui uma copia de cada jogo tal como estava
 oficina/.originais/
+# ... e o jogo de onde cada crianca partiu, para o "Juntar jogos"
+oficina/.bases/
 *.py.anterior
 *.py.novo
 

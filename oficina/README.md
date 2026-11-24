@@ -237,8 +237,54 @@ início de `oficina/ajudante.py`.
   estava fica ao lado, em `o-cerco.py.anterior`) e põe as imagens e os sons
   nas pastas deles. Também abre um `.py` sozinho, como os que a Oficina
   guardava antes.
+- **Juntar jogos** põe no jogo o que os colegas fizeram nos deles (ver mais
+  abaixo).
 - **Repor o original** devolve o bocado aberto ao que era da primeira vez
   que a Oficina abriu o jogo nesse computador (cópia em `oficina/.originais/`).
+
+## Vários a mexer no mesmo jogo («Juntar jogos»)
+
+Cada criança mexe no jogo no seu computador. No fim, carrega em **Descarregar
+o meu jogo**. Quem quer ficar com o trabalho dos outros carrega em **Juntar
+jogos** e escolhe os zips deles (vários de uma vez): a Oficina põe no jogo
+desse computador o que cada um fez.
+
+O zip leva, além do jogo, o jogo de onde essa criança partiu (a pasta
+`base`). É a comparar os dois que a Oficina sabe o que ela fez, coisa a
+coisa: cada bicho, cada zona, cada bloco, cada função.
+
+| O que encontra | O que faz |
+|---|---|
+| Uma coisa em que ninguém mexeu | Fica como estava |
+| Uma coisa em que só um mexeu | Fica a dele |
+| Uma coisa nova | Entra, com as imagens e os sons |
+| Duas coisas novas com o mesmo nome | Uma muda de nome («Bicho novo 2») |
+| Dois blocos ou duas portas novas com a mesma letra | Um muda de letra, também nas zonas dessa criança |
+| Dois treinadores novos | Ficam os dois, cada um com o seu número |
+| Duas zonas novas | Cabem as duas no `MUNDO` |
+| A mesma zona mudada por dois, em sítios diferentes | Junta-se quadrado a quadrado |
+| Dois desenhos novos com o mesmo nome de ficheiro | Um muda de nome |
+| A mesma coisa mudada por dois, de maneiras diferentes | **Pergunta** qual fica, mostrando as duas |
+| Uma coisa que alguém apagou | **Pergunta** antes de a apagar para todos |
+
+Enquanto houver perguntas por responder não muda nada. No fim diz o que
+entrou e o que acertou sozinha, e o jogo como estava fica ao lado, com
+`.anterior` no nome.
+
+Usos:
+
+- **O jogo da turma.** No computador onde ele está, juntam-se os zips de
+  todos. Depois descarrega-se, e é esse zip que cada um abre (**Abrir um
+  jogo guardado**) para começar a sessão seguinte.
+- **Entre dois colegas.** Um junta ao seu o zip do outro.
+- **Ir buscar o que há de novo.** Quem junta ao seu o zip do jogo da turma
+  fica com o que os outros fizeram, sem perder o que fez.
+
+Limites: quando dois mexeram na mesma coisa, fica uma versão inteira (não se
+misturam duas versões de uma função ou de um bicho; as zonas, sim). O que
+se junta sozinho (letras, nomes, números) está afinado para a Bicharada à
+Solta; nos outros jogos, duas coisas novas com o mesmo nome dão uma pergunta.
+O jogo de onde cada computador partiu fica em `oficina/.bases/`.
 
 ## Juntar outro jogo
 
