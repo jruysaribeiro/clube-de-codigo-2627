@@ -377,7 +377,8 @@ DICAS_DAS_FUNCOES = {
     "aplicar_carta": "Escolhe uma carta (teclas 1 2 3, ou um clique) para veres o que ela te faz: os teus "
                      "números estão na faixa lá em baixo. Passados uns segundos vêm outras três cartas.",
     "ao_comecar_onda": "O jogo joga-se sozinho. Cada vez que mudas o código a onda começa outra vez, "
-                       "para veres logo o teu acontecimento. A faixa lá em baixo mostra a tua memoria.",
+                       "para veres logo o teu acontecimento. A faixa lá em baixo mostra a tua memoria e em "
+                       "que onda vais. Aqui não se morre: com um coração só, deixas de levar dano.",
     "ao_perder_coracao": "Aqui não disparas sozinho (a tecla T liga isso), para os inimigos te acertarem. "
                          "Cada vez que mudas o código levas um golpe, para veres logo o que acontece.",
     "ao_carregar_tecla": "O jogo joga-se sozinho. Clica no jogo e carrega na tua tecla para experimentares. "
@@ -1760,8 +1761,16 @@ class Palco:
                 self.sem_dano()
             elif jogo.jogador.vida <= 1 and jogo.fase != "morte":
                 # Nos acontecimentos perdem-se coracoes a serio (ha um
-                # acontecimento para isso), mas antes do ultimo voltam todos.
-                jogo.jogador.vida = jogo.jogador.vida_max
+                # acontecimento para isso), mas aqui nao se morre. No
+                # "quando perdes um coracao", antes do ultimo voltam todos,
+                # para continuar a haver coracoes para perder. Nos outros, o
+                # ultimo coracao fica como esta e deixa de se levar dano:
+                # encher os coracoes desfazia o que a crianca escreveu
+                # ("na onda 2 ficas so com um coracao" nunca se chegava a ver).
+                if self.funcao == "ao_perder_coracao":
+                    jogo.jogador.vida = jogo.jogador.vida_max
+                else:
+                    jogo.jogador.invulneravel = max(jogo.jogador.invulneravel, 0.12)
             if jogo.estado in ("titulo", "fim"):
                 jogo.novo_jogo()
             elif jogo.estado == "vitoria" and jogo.estado_t > 4:
@@ -1945,7 +1954,9 @@ class Palco:
             memoria = str(ns["memoria"])
             if len(memoria) > 70:
                 memoria = memoria[:67] + "..."
-            return funcoes[self.funcao][0] + "   (" + self.funcao + ")   ·   memoria = " + memoria
+            # (E a onda e os coracoes: e o que quase todos os acontecimentos mudam.)
+            agora = "onda " + str(self.jogo.onda) + "   ·   corações " + str(self.jogo.jogador.vida)
+            return funcoes[self.funcao][0] + "   ·   " + agora + "   ·   memoria = " + memoria
         if self.funcao == "aplicar_carta":
             j = jogo.jogador
             texto = "Tu:   balas " + str(j.multi) + "   espera " + str(round(j.intervalo, 3))
