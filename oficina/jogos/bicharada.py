@@ -1237,6 +1237,11 @@ def _ataques_de(ns, bicho):
 
 class Palco:
 
+    # Quando se ganha uma batalha, a seguinte e com os mesmos bichos, tal
+    # como ficaram (magoados, com a experiencia que ganharam), como no jogo?
+    # Senao, cada batalha comeca com bichos novos.
+    mesma_equipa = False
+
     def __init__(self, escolha):
         tipo, _, numero = escolha.partition(":")
         self.tipo = tipo             # bicho, ataque, treinador, tipos, regra, evento ou desenho
@@ -1416,12 +1421,14 @@ class Palco:
                 return nome
         return list(bichos)[0]
 
-    def batalha(self, ns, noticia):
-        # Comeca uma batalha com as funcoes do proprio jogo.
-        equipa = []
-        for nome in self.equipa:
-            equipa.append(ns["criar_bicho"](nome, self.nivel))
-        ns["minha_equipa"] = equipa
+    def batalha(self, ns, noticia, ganhou=False):
+        # Comeca uma batalha com as funcoes do proprio jogo. ("ganhou": a
+        # anterior acabou de ser ganha. Ve "mesma_equipa", la em cima.)
+        if not (ganhou and self.mesma_equipa and ns.get("minha_equipa")):
+            equipa = []
+            for nome in self.equipa:
+                equipa.append(ns["criar_bicho"](nome, self.nivel))
+            ns["minha_equipa"] = equipa
         ns["comecar_batalha"]()
         if self.regra is not None:
             self.sem_conversa(ns)
@@ -1447,16 +1454,8 @@ class Palco:
         if len(ns["mensagens"]) == 0:
             ns["fase"] = "menu"
             ns["cursor"] = 0
-        if self.regra in COM_PRESSA:
-            for bicho in ns["equipa_inimiga"]:
-                bicho["vida"] = max(1, bicho["vida_max"] // 8)
-                bicho["vida_mostrada"] = bicho["vida"]
-        if self.regra == "ao_subir_de_nivel":
-            # Falta-lhe um ponto para subir: sobe logo que vencer um bicho.
-            eu = ns["minha_equipa"][0]
-            falta = ns["xp_para_subir"](eu)
-            if _numero(falta):
-                eu["xp"] = max(0, int(falta) - 1)
+        # (Nao se mexe na vida nem na experiencia de ninguem: a batalha e
+        # como no jogo, para o que se experimenta aqui valer la.)
         self.montra = [ns["criar_bicho"](nome, self.nivel) for nome in ns["nomes_dos_bichos"]]
         self.espera = 10
         self.fase_antes = None
@@ -1579,7 +1578,7 @@ class Palco:
         if ns["estado"] == "derrota":
             self.batalha(ns, "A tua equipa desmaiou... Vamos outra vez!")
         elif ns["estado"] != "batalha":
-            self.batalha(ns, "Ganhaste! Vamos outra vez.")
+            self.batalha(ns, "Ganhaste! Vamos outra vez.", True)
 
         if self.regra is not None:
             self.jogar_sozinho(ns, pygame)

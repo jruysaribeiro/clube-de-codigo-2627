@@ -479,7 +479,24 @@ def regiao(fonte, escolha):
                           "nivel": "Apagar este nível"}[tipo]
     resposta["caixas"] = True
     no = blocos.instrucao(arvore, LISTAS[tipo])
-    resposta.update(inicio=inicio, fim=fim, titulo=str(titulo), ajuda=_ajuda(linhas, no.lineno))
+    ajuda = _ajuda(linhas, no.lineno)
+    # As letras que ha agora, a cabeca: a explicacao que o ficheiro traz so
+    # conhece os inimigos que vinham com o jogo, e nao os que foram criados.
+    inimigos = [(blocos.texto_constante(letra), _valor(dele, "nome") or "sem nome")
+                for letra, dele, _, _ in _fichas(arvore, "INIMIGOS") if blocos.texto_constante(letra)]
+    if tipo == "nivel" and inimigos:
+        ajuda = ("OS INIMIGOS QUE HA AGORA, e a letra de cada um no mapa:\n"
+                 + "\n".join("  " + letra + "   " + str(nome) for letra, nome in inimigos)
+                 + "\nEscreve a letra de um no mapa, no sitio onde o queres.\n\nCOMO FUNCIONA UM NIVEL:\n" + ajuda)
+    if tipo == "inimigo" and blocos.texto_constante(chave):
+        letra = blocos.texto_constante(chave)
+        onde = [_nome_do_nivel(_fichas(arvore, "NIVEIS"), i) for i, (_, nivel, _, _) in enumerate(_fichas(arvore, "NIVEIS"))
+                if any(letra in fila.value for fila in _mapa(nivel) or [])]
+        ajuda = ("A LETRA DESTE INIMIGO NO MAPA E: " + letra + "\n"
+                 + ("Esta nos niveis: " + ", ".join(str(nome) for nome in onde[:8]) + (" ..." if len(onde) > 8 else "")
+                    if onde else "Ainda nao esta em nenhum nivel: abre um nivel e escreve a letra " + letra + " onde o quiseres.")
+                 + "\n\n" + ajuda)
+    resposta.update(inicio=inicio, fim=fim, titulo=str(titulo), ajuda=ajuda)
     return resposta
 
 

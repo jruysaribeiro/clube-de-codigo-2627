@@ -613,8 +613,16 @@ def regiao(fonte, escolha):
         # A explicacao das letras e a de dentro ou a de fora, conforme a zona.
         # E, por baixo, quem e cada numero e cada porta neste momento: isso
         # muda quando se cria, apaga ou muda o nome a um treinador.
+        # (Primeiro as letras que ha agora, que e o que se procura quando se
+        # esta a desenhar a zona; a explicacao geral vem depois.)
         ajuda = blocos.comentarios_a_partir_de(linhas, INICIO_DOS_INTERIORES if dentro else INICIO_DAS_ZONAS)
-        ajuda = (ajuda or blocos.ajuda_acima(linhas, no.lineno)) + "\n\n" + _quem_e_quem(arvore, nome, dentro)
+        ajuda = _quem_e_quem(arvore, nome, dentro) + "\n\nCOMO FUNCIONA UMA ZONA:\n" + (ajuda or blocos.ajuda_acima(linhas, no.lineno))
+        if dentro:
+            portas = _valor(arvore, "PORTAS")
+            dela = [letra for letra, destino in portas.items() if destino == nome] if _sao_portas(portas) else []
+            if dela:
+                ajuda = ("A PORTA DESTE EDIFICIO E A LETRA: " + dela[0] + "\nEscreve-a numa zona ca de fora, onde quiseres a entrada, "
+                         "e ca dentro, onde se sai.\n\n" + ajuda)
         return {"inicio": inicio, "fim": fim, "titulo": nome or escolha, "imagem": None, "som": None,
                 "ajuda": ajuda, "dica": DICAS["interior" if dentro else "zona"],
                 "sugestoes": SUGESTOES["interior" if dentro else "zona"],
@@ -651,6 +659,15 @@ def regiao(fonte, escolha):
         letra = str(int(numero) + 1)
         zonas = _valor(arvore, "ZONAS")
         onde = [nome for nome in zonas if letra in "".join(zonas[nome])] if _sao_zonas(zonas) else []
+        # (O mesmo, a cabeca do "O que quer dizer cada coisa".)
+        if int(letra) > 9:
+            no_mapa = "NO MAPA SO CABEM 9 TREINADORES (os numeros de 1 a 9): este nao aparece la."
+        elif onde:
+            no_mapa = "NO MAPA, ESTE TREINADOR E O NUMERO: " + letra + '\nEsta na zona "' + onde[0] + '".'
+        else:
+            no_mapa = ("NO MAPA, ESTE TREINADOR E O NUMERO: " + letra + "\nAinda nao esta em nenhuma zona: abre uma zona e "
+                       "escreve um " + letra + " onde o quiseres.")
+        resposta["ajuda"] = no_mapa + "\n\n" + (resposta.get("ajuda") or "")
         if int(letra) > 9:
             resposta["dica"] = "No mapa só cabem 9 treinadores: este não aparece lá. " + resposta["dica"]
         elif onde:
@@ -1897,6 +1914,11 @@ def _experimentar(ns, regra, problemas):
 
 class Palco(base.Palco):
 
+    # O palco corre como o jogo: nao enche a mochila, nao cura ninguem e nao
+    # da experiencia. Quem ganha uma batalha segue para a seguinte com os
+    # bichos como ficaram; quem perde comeca outra vez, do principio.
+    mesma_equipa = True
+
     def __init__(self, escolha):
         super().__init__(escolha)
         # no_mapa: o palco e o mapa, e nao uma batalha.
@@ -1993,12 +2015,14 @@ class Palco(base.Palco):
             todos.append(ficha)
         self.por(ns, "TREINADORES", todos)
 
-    def batalha(self, ns, noticia):
-        # No palco das batalhas e sempre contra um treinador, e a mochila
-        # vem cheia (no jogo, as sopas so se enchem em casa da avo).
+    def batalha(self, ns, noticia, ganhou=False):
+        # No palco das batalhas e sempre contra um treinador. As sopas sao as
+        # do jogo: gastam-se, e so voltam quando se comeca outra vez (depois
+        # de perder, ou de mudar o codigo), como quem acorda em casa da avo.
         ns["batalha_selvagem"] = False
-        ns["sopas"] = ns["SOPAS_NA_MOCHILA"]
-        super().batalha(ns, noticia)
+        if not (ganhou and ns.get("minha_equipa")):
+            ns["sopas"] = ns["SOPAS_NA_MOCHILA"]
+        super().batalha(ns, noticia, ganhou)
 
     def mundo(self, ns):
         # O mundo como esta agora no jogo, com a regra de andar que la estiver.
@@ -2206,15 +2230,13 @@ class Palco(base.Palco):
             return
         if ns["estado"] == "mundo":
             if not self.dados:               # numa zona anda so a crianca
-                # (Para haver sempre lugar na equipa e redes para atirar.)
-                if len(ns["minha_equipa"]) >= ns["EQUIPA_MAXIMA"]:
-                    del ns["minha_equipa"][3:]
-                ns["redes"] = max(ns["redes"], 3)
+                # (A mochila e a equipa sao as do jogo: as redes e as moedas
+                # gastam-se, e com a equipa cheia nao se apanha mais nenhum.)
                 if self.regra == "receber_compra" and self.relogio % 150 == 149 and len(ns["LOJA"]) > 0:
-                    # De vez em quando compra-se uma coisa, para se ver o que se recebe.
+                    # De vez em quando compra-se uma coisa, para se ver o que
+                    # se recebe: com as moedas que houver, como na loja.
                     nomes = list(ns["LOJA"])
                     nome = nomes[(self.relogio // 150) % len(nomes)]
-                    ns["moedas"] = max(ns["moedas"], 100)
                     self.ultima_compra = str(ns["comprar"](nome))
                 self.andar_sozinho(ns)
         elif ns["estado"] == "conversa":
@@ -2240,13 +2262,18 @@ class Palco(base.Palco):
                 # (ou atira-se-lhe a rede, se e isso que se quer ver).
                 self.espera = self.espera - 1
                 if self.espera <= 0:
-                    opcao = "Apanhar" if self.regra in COM_REDE and "Apanhar" in ns["opcoes_do_menu"]() else "Fugir"
-                    if opcao == "Apanhar":
-                        # (Ja magoado, como se tivesse havido luta: com a vida
-                        # toda, a regra original nao deixa apanhar.)
-                        bicho = ns["equipa_inimiga"][ns["ativo_inimigo"]]
-                        if bicho["vida"] == bicho["vida_max"]:
-                            bicho["vida"] = max(1, bicho["vida_max"] // 3)
+                    # Para apanhar, joga-se como uma crianca jogaria: primeiro
+                    # luta-se (com a vida toda, a regra original nao deixa
+                    # apanhar), e so com o bicho ja magoado se atira a rede.
+                    # Sem redes, ou sem lugar na equipa, foge-se.
+                    bicho = ns["equipa_inimiga"][ns["ativo_inimigo"]]
+                    quer = (self.regra in COM_REDE and "Apanhar" in ns["opcoes_do_menu"]() and ns["redes"] > 0
+                            and len(ns["minha_equipa"]) < ns["EQUIPA_MAXIMA"])
+                    opcao = "Fugir"
+                    if quer and bicho["vida"] * 2 > bicho["vida_max"] and "Lutar" in ns["opcoes_do_menu"]():
+                        opcao = "Lutar"
+                    elif quer:
+                        opcao = "Apanhar"
                     ns["cursor"] = ns["opcoes_do_menu"]().index(opcao)
                     ns["tecla_na_batalha"](pygame.K_RETURN)
                     self.espera = 40
@@ -2332,12 +2359,8 @@ class Palco(base.Palco):
             self.quadro_do_falador(ns, pygame)
             return
         if not self.no_mapa:
-            # (Quando o que esta aberto e um ataque, o bicho usa-o sem parar:
-            # ao gastar os usos, e como se fosse a casa da avo e voltasse.)
-            if self.ataque is not None and self.ataque in ns["ATAQUES"] and "usos_que_restam" in ns:
-                for bicho in ns["minha_equipa"]:
-                    if "gastos" in bicho and ns["usos_que_restam"](bicho, self.ataque) == 0:
-                        bicho["gastos"] = {}
+            # (Os usos de um ataque gastam-se como no jogo: quando acabam, o
+            # bicho fica com o ataque de quem ja nao tem forcas.)
             super().quadro(ns, pygame)
             return
         if not self.preparado:
