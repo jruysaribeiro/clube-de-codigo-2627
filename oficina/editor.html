@@ -728,6 +728,12 @@ async function criarNovo(jogo, grupo, qual) {
   let dados;
   try {
     dados = await pedir("/api/criar", {jogo, grupo, qual});
+    if (dados.perguntar) {
+      // Ha que dizer onde (um andar novo: em que edificio?).
+      const onde = await escolherUm(dados.perguntar);
+      if (onde === null) return;
+      dados = await pedir("/api/criar", {jogo, grupo, qual, onde});
+    }
   } catch (erro) {
     alert(erro.message);
     return;
@@ -766,6 +772,32 @@ function pintarLista(opcoes) {
     };
     caixa.append(botao);
   }
+}
+
+function escolherUm(pergunta) {
+  // Uma pergunta com varias respostas, para carregar numa: devolve a que foi
+  // escolhida, ou null se se desistiu. (Usa a mesma folha da lista.)
+  return new Promise(feito => {
+    const acabar = resposta => {
+      $("lista").hidden = true;
+      $("guardar-lista").hidden = false;
+      $("fechar-lista").onclick = () => { $("lista").hidden = true; };
+      feito(resposta);
+    };
+    $("titulo-lista").textContent = pergunta.titulo;
+    $("nota-lista").textContent = pergunta.nota || "";
+    const caixa = $("opcoes-lista");
+    caixa.replaceChildren();
+    for (const opcao of pergunta.opcoes) {
+      const botao = elemento("button", opcao);
+      botao.type = "button";
+      botao.onclick = () => acabar(opcao);
+      caixa.append(botao);
+    }
+    $("guardar-lista").hidden = true;
+    $("fechar-lista").onclick = () => acabar(null);
+    $("lista").hidden = false;
+  });
 }
 
 async function abrirLista() {

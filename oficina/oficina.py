@@ -921,7 +921,7 @@ class Sessao:
 
     # --- Criar uma coisa nova ---
 
-    def criar(self, jogo, grupo, qual=None):
+    def criar(self, jogo, grupo, qual=None, onde=None):
         # Um inimigo novo, uma torre nova: quem sabe faze-los e o ficheiro
         # do jogo em oficina/jogos/, que devolve o ficheiro ja com a coisa
         # nova la dentro (uma copia de uma que ja existia, com outro nome).
@@ -938,8 +938,22 @@ class Sessao:
             guardar_original(config)
             caminho = caminho_do_jogo(config)
             fonte, fim_de_linha = ler(caminho)
+            # Ha coisas que e preciso saber onde por (um andar novo: em que
+            # edificio?). Sem resposta, devolve-se a pergunta, e a pagina
+            # volta a pedir ja com ela ("onde").
+            perguntar = getattr(config, "onde_criar", None)
+            if perguntar is not None:
+                try:
+                    pergunta = perguntar(fonte, grupo, qual)
+                except (SyntaxError, ValueError):
+                    pergunta = None
+                if pergunta and onde not in pergunta["opcoes"]:
+                    return {"perguntar": pergunta}
             try:
-                nova, escolha, aviso = config.novo(fonte, grupo, qual) if varios else config.novo(fonte, grupo)
+                if onde is not None and perguntar is not None:
+                    nova, escolha, aviso = config.novo(fonte, grupo, qual, onde)
+                else:
+                    nova, escolha, aviso = config.novo(fonte, grupo, qual) if varios else config.novo(fonte, grupo)
                 compile(nova, config.FICHEIRO, "exec")
                 if escolha not in [e["id"] for e in config.escolhas(nova)]:
                     raise ValueError("a coisa nova não apareceu")
@@ -1505,7 +1519,7 @@ class Pedido(BaseHTTPRequestHandler):
         elif caminho == "/api/qual-imagem":
             self.tratar(lambda: sessao.escolher_imagem(dados.get("qual")))
         elif caminho == "/api/criar":
-            self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo")), dados.get("qual")))
+            self.tratar(lambda: sessao.criar(dados.get("jogo"), str(dados.get("grupo")), dados.get("qual"), dados.get("onde")))
         elif caminho == "/api/desenho":
             try:
                 self.responder(200, sessao.desenhar(dados))

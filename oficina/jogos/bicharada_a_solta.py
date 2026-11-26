@@ -924,9 +924,30 @@ def _a_pe_na_zona(mundo, zona, partida):
     return vistos
 
 
-def _novo_andar(fonte):
-    # Um andar por cima do ultimo edificio (o ultimo interior escrito em
-    # ZONAS): uma zona com a mesma forma do andar de baixo, umas escadas que
+def _edificios(mundo):
+    # Os edificios que ha: os interiores a que se chega da rua (e nao por
+    # umas escadas, que esses sao andares de outro edificio).
+    interiores = [nome for nome in mundo.zonas if nome in mundo.portas.values()]
+    andares = [_escadas_para_cima(mundo, nome) for nome in interiores]
+    return [nome for nome in interiores if nome not in andares]
+
+
+def onde_criar(fonte, grupo, qual=None):
+    # Antes de criar uma coisa, ha que perguntar onde? Devolve a pergunta e
+    # as respostas ({"titulo", "opcoes": [...]}), ou None se nao ha duvida.
+    # Um andar novo: em que edificio? (So se houver mais do que um.)
+    if grupo == "Edifícios" and qual == "Novo andar":
+        mundo = _ler_mundo(fonte)[1]
+        edificios = _edificios(mundo) if mundo is not None else []
+        if len(edificios) > 1:
+            return {"titulo": "Em que edifício pões o andar novo?",
+                    "nota": "Fica por cima do último andar que esse edifício já tiver.", "opcoes": edificios}
+    return None
+
+
+def _novo_andar(fonte, onde=None):
+    # Um andar por cima de um edificio (o que a crianca escolheu ou, se so ha
+    # um, esse): uma zona com a mesma forma do andar de baixo, umas escadas que
     # ligam os dois e, ca fora, mais uma fila de parede por cima do edificio.
     arvore, mundo = _ler_mundo(fonte)
     if mundo is None:
@@ -934,7 +955,7 @@ def _novo_andar(fonte):
     interiores = [nome for nome in mundo.zonas if nome in mundo.portas.values()]
     if not interiores:
         raise ValueError("ainda não há nenhum edifício: faz primeiro um, com «+ Novo edifício».")
-    baixo = interiores[-1]
+    baixo = onde if onde in interiores else interiores[-1]
     for _ in range(len(interiores)):             # ate ao andar mais alto desse edificio
         acima = _escadas_para_cima(mundo, baixo)
         if acima is None:
@@ -1045,7 +1066,6 @@ def _novo_andar(fonte):
         aviso = aviso + " Cá fora não lhe pus mais parede por cima, porque tapava um caminho."
     else:
         aviso = aviso + " Cá fora não coube mais uma fila de parede por cima dele: precisa de três quadrados de relva livres."
-    aviso = aviso + " (O andar novo vai sempre para o último edifício que foi feito.)"
     return "\n".join(linhas), "zona:" + str(len(mundo.zonas)), aviso
 
 
@@ -1150,9 +1170,9 @@ def _apagar_bloco(fonte, escolha):
     return base._aplicar(linhas, [(inicio, fim)], trocas), aviso
 
 
-def novo(fonte, grupo, qual=None):
+def novo(fonte, grupo, qual=None, onde=None):
     if grupo == "Edifícios" and qual == "Novo andar":
-        return _novo_andar(fonte)
+        return _novo_andar(fonte, onde)
     if grupo == "Blocos":
         return _novo_bloco(fonte)
     if grupo == "Mapa":
