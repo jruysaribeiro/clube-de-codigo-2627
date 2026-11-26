@@ -970,6 +970,17 @@ class Palco:
         if self.regra in DEPRESSA:
             ns["velocidade_jogo"] = 2
 
+    def recomecar(self, ns):
+        # Perdeu-se: o jogo comeca outra vez, com o palco montado como no inicio.
+        ns["comecar_jogo"]()
+        self.pausa_entre_ondas = 0
+        self.espera = 0
+        self.arrumar(ns)
+        if self.passeio:
+            self.espalhar_inimigos(ns)
+        if self.sozinho:
+            ns["ouro"] = 300
+
     def ao_mudar(self, ns):
         # O codigo mudou. Os inimigos que andavam no ecra foram feitos com
         # os numeros antigos, por isso saem e vem outros novos.
@@ -1090,10 +1101,12 @@ class Palco:
                 self.mostrar_contas(ns, pygame)
             return
 
-        # O jogo fica sempre "a meio": sem menu, sem ondas, sem perder.
+        # O jogo fica sempre "a meio": sem menu e sem ondas. As vidas sao as
+        # do jogo: se acabarem, a demonstracao comeca outra vez.
+        if ns["estado"] == "derrota":
+            self.recomecar(ns)
         ns["estado"] = "jogo"
         ns["ouro"] = 99999
-        ns["vidas"] = 99
         ns["numero_onda"] = 1
         ns["onda_a_decorrer"] = False
         ns["a_por_sair"] = []
@@ -1129,12 +1142,13 @@ class Palco:
         self.desenhar(ns, pygame, nomes)
 
     def jogar_sozinho(self, ns):
-        # O jogo verdadeiro, com as ondas a comecarem sozinhas e sem se
-        # perder. O ouro e as vidas ficam como o jogo (e o codigo da
-        # crianca) os deixar, e a barra de cima do jogo fica a vista.
+        # O jogo verdadeiro, com as ondas a comecarem sozinhas. O ouro e as
+        # vidas ficam como o jogo (e o codigo da crianca) os deixar, e a barra
+        # de cima do jogo fica a vista. Se as vidas acabarem, perde-se como no
+        # jogo, e a demonstracao comeca outra vez.
+        if ns["estado"] == "derrota":
+            self.recomecar(ns)
         ns["estado"] = "jogo"
-        if ns["vidas"] < 5:
-            ns["vidas"] = ns["VIDAS_INICIAIS"]
         # Nestes dois acontecimentos faz-se pela crianca o que os faz
         # acontecer: de vez em quando melhora-se, ou vende-se, uma torre.
         if self.regra == "ao_melhorar" and self.relogio % 120 == 0:

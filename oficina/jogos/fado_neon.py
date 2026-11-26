@@ -2,7 +2,7 @@
 # de cada uma, e o "palco" que mostra so essa coisa a funcionar.
 #
 # O palco nao e um jogo a parte: e o FADO//NEON verdadeiro a correr, sem
-# menu e sem perder, e nos a mandarmos vir o que interessa (um inimigo, o
+# menu, e nos a mandarmos vir o que interessa (um inimigo, o
 # chefe, as cartas...). Tudo o que se ve e desenhado pelo proprio jogo.
 #
 # Este jogo guarda tudo num objeto (o Jogo) que e feito dentro do main(),
@@ -325,24 +325,23 @@ ELENCO = {
 COM_TIRO_AUTOMATICO = ["inimigo", "chefe", "ataques", "invocados", "tiros", "laser", "jogo", "ondas", "onda",
                        "carta"]
 # Onde o jogador pode perder coracoes (quando ficam a zero, volta a nascer).
-PODE_LEVAR_DANO = ["vidas", "dash", "tiros", "laser"]
 
 JOGAR = "Clica no jogo para jogares: WASD anda, as setas disparam, Espaço investe, E é o laser."
 
 DICAS = {
     "inimigo": "Estão sempre a chegar mais destes, e tu disparas sozinho (a tecla T desliga isso). "
-               "No palco não perdes vidas. " + JOGAR,
-    "chefe": "O Saudosista está sempre na arena: quando cai, vem outro. Disparas sozinho e "
-             "não perdes vidas. A barra lá em cima é a vida dele.",
+               "Se ficares sem corações, começa outra vez. " + JOGAR,
+    "chefe": "O Saudosista está sempre na arena: quando cai, vem outro. Disparas sozinho. "
+             "Se ficares sem corações, começa outra vez. A barra lá em cima é a vida dele.",
     "ataques": "O Saudosista está sempre na arena, a fazer os ataques pela ordem da lista: a faixa lá em "
                "baixo diz qual é o de agora. «Escolher os ataques» mostra os cinco que ele sabe fazer.",
     "invocados": "O Saudosista está sempre na arena e aqui só faz o ataque de chamar inimigos, para veres "
                  "quem vem. «Escolher os inimigos» mostra os que existem.",
     "arranque": "É o jogo inteiro, desde a onda 1, a arrancar como aqui disseres: marca e desmarca as caixas "
                 "por cima do código. Sem o tiro automático ninguém dispara por ti: clica no jogo e joga. "
-                "No palco não perdes vidas.",
+                "Se ficares sem corações, começa outra vez.",
     "onda": "É esta onda, a jogar-se sozinha, outra vez e outra vez: conta os inimigos que chegam. "
-            "«Escolher os inimigos» mostra os que existem. No palco não perdes vidas.",
+            "«Escolher os inimigos» mostra os que existem. Se ficares sem corações, a onda começa outra vez.",
     "vidas": "Os corredores vêm bater-te para veres os corações a ir; quando acabam, nasces "
              "outra vez. " + JOGAR,
     "tiros": "Disparas sozinho contra o que vier (a tecla T desliga isso). Os números "
@@ -351,7 +350,7 @@ DICAS = {
             "recarga. Deixa que te batam para veres quanto tempo ficas a piscar.",
     "laser": "A barra do laser começa cheia e o laser dispara sozinho. Depois repara em "
              "quantos inimigos é preciso para ela voltar a encher.",
-    "jogo": "É o jogo inteiro a jogar-se sozinho, desde a onda 1, e tu não perdes vidas. "
+    "jogo": "É o jogo inteiro a jogar-se sozinho, desde a onda 1. Se ficares sem corações, começa outra vez. "
             "Quando mudas um número, recomeça. " + JOGAR,
     "ondas": "É o jogo inteiro a jogar-se sozinho, desde a onda 1: conta os inimigos que "
              "chegam. Quando mudas um número, recomeça.",
@@ -378,7 +377,7 @@ DICAS_DAS_FUNCOES = {
                      "números estão na faixa lá em baixo. Passados uns segundos vêm outras três cartas.",
     "ao_comecar_onda": "O jogo joga-se sozinho. Cada vez que mudas o código a onda começa outra vez, "
                        "para veres logo o teu acontecimento. A faixa lá em baixo mostra a tua memoria e em "
-                       "que onda vais. Aqui não se morre: com um coração só, deixas de levar dano.",
+                       "que onda vais. Se ficares sem corações, o jogo começa outra vez.",
     "ao_perder_coracao": "Aqui não disparas sozinho (a tecla T liga isso), para os inimigos te acertarem. "
                          "Cada vez que mudas o código levas um golpe, para veres logo o que acontece.",
     "ao_carregar_tecla": "O jogo joga-se sozinho. Clica no jogo e carrega na tua tecla para experimentares. "
@@ -387,7 +386,7 @@ DICAS_DAS_FUNCOES = {
                         "com os inimigos que a tua regra mandar: a faixa lá em baixo diz quais são.",
     "escolher_cartas": "É o jogo inteiro a jogar-se sozinho. Cada vez que mudas o código aparecem as cartas que a "
                        "tua regra escolher: a faixa lá em baixo diz quais são.",
-    "disparo_do_inimigo": "Há atiradores sempre a chegar e tu não perdes vidas, para veres bem as balas deles. "
+    "disparo_do_inimigo": "Há atiradores sempre a chegar, para veres bem as balas deles. Se ficares sem corações, começa outra vez. "
                           "Disparas sozinho (a tecla T desliga isso).",
     "ao_escolher_carta": "O jogo joga-se sozinho. Cada vez que mudas o código aparecem as cartas, e passado um "
                          "bocadinho uma é escolhida, para veres logo o teu acontecimento.",
@@ -1559,7 +1558,6 @@ class Palco:
         elif self.funcao == "ao_perder_coracao" and jogo.estado == "jogo" and jogo.fase != "morte":
             # Um golpe ja, vindo de cima, para o acontecimento acontecer agora.
             jogador = jogo.jogador
-            jogador.vida = max(jogador.vida, 2)
             jogador.invulneravel = 0.0
             jogador.dash_t = 0.0
             jogo.ferir_jogador(jogador.pos + ns["Vector2"](0, -30))
@@ -1624,12 +1622,8 @@ class Palco:
 
     # --- As pecas com que se montam os palcos ---
 
-    def sem_dano(self):
-        # Coracoes sempre cheios, e sempre um bocadinho de "invulneravel":
-        # tao pouco que o jogador nao chega a piscar.
-        jogador = self.jogo.jogador
-        jogador.vida = jogador.vida_max
-        jogador.invulneravel = 0.12
+    # (Em palco nenhum se mexe nos coracoes: o jogo porta-se como o jogo a
+    # serio. Perdem-se coracoes, morre-se, e a demonstracao comeca outra vez.)
 
     def a_meio_do_combate(self, ns):
         # Sem menu, sem fim e sem ondas: o jogo fica sempre a meio de um combate.
@@ -1757,22 +1751,10 @@ class Palco:
                     jogo.investir()
             elif self.funcao == "ao_disparar_laser" and jogo.estado == "jogo" and jogo.laser_t <= 0:
                 jogo.farol = min(1.0, jogo.farol + 0.004)       # enche em poucos segundos
-            if not self.sozinho:
-                self.sem_dano()
-            elif jogo.jogador.vida <= 1 and jogo.fase != "morte":
-                # Nos acontecimentos perdem-se coracoes a serio (ha um
-                # acontecimento para isso), mas aqui nao se morre. No
-                # "quando perdes um coracao", antes do ultimo voltam todos,
-                # para continuar a haver coracoes para perder. Nos outros, o
-                # ultimo coracao fica como esta e deixa de se levar dano:
-                # encher os coracoes desfazia o que a crianca escreveu
-                # ("na onda 2 ficas so com um coracao" nunca se chegava a ver).
-                if self.funcao == "ao_perder_coracao":
-                    jogo.jogador.vida = jogo.jogador.vida_max
-                else:
-                    jogo.jogador.invulneravel = max(jogo.jogador.invulneravel, 0.12)
+            # Os coracoes sao os do jogo: perdem-se, e quem fica sem nenhum
+            # morre. Ai a demonstracao comeca outra vez.
             if jogo.estado in ("titulo", "fim"):
-                jogo.novo_jogo()
+                self.comecar(ns)
             elif jogo.estado == "vitoria" and jogo.estado_t > 4:
                 jogo.novo_jogo()
             elif jogo.estado == "melhoria" and jogo.estado_t > 2.5:
@@ -1795,8 +1777,9 @@ class Palco:
 
         if self.com_cartas:
             if jogo.estado == "melhoria":
-                self.sem_dano()
                 return
+            if jogo.estado == "fim":
+                self.comecar(ns)        # morreu a experimentar a carta: comeca outra vez
             if jogo.estado != "jogo":
                 self.dar_cartas(ns, False)
                 return
@@ -1814,8 +1797,6 @@ class Palco:
                 return
 
         self.a_meio_do_combate(ns)
-        if tipo not in PODE_LEVAR_DANO:
-            self.sem_dano()
 
         if tipo == "inimigo":
             self.mandar_vir(ns, [self.o_inimigo(ns)], 4)

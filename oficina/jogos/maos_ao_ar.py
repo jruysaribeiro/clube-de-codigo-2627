@@ -1713,15 +1713,15 @@ class Palco:
             self.montar(ns)
             outro_ecra = True
 
-        # Nunca se perde: antes do ultimo coracao, voltam todos.
+        # Os coracoes sao os do jogo: perdem-se, e quem fica sem nenhum
+        # perde. Ai a demonstracao comeca outra vez, do principio.
         if jogo["fase"] == "perdeu":
+            self.montar(ns)
             jogo["fase"] = "jogar"
-            ns["repor_heroi"](nivel["ponto"][0], nivel["ponto"][1])
-            heroi["invencivel"] = 110
+            nivel = ns["nivel"]
+            heroi = ns["heroi"]
             heroi["vidas"] = ns["VIDAS"]
             outro_ecra = True
-        if heroi["vidas"] < 2 and self.tipo != "evento":
-            heroi["vidas"] = ns["VIDAS"]     # (nos acontecimentos os coracoes contam ate ao fim)
         if self.funcao is not None and self.guardado is not None:
             self.manter_arena(ns, pygame)
 
