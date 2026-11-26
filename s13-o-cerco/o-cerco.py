@@ -109,6 +109,7 @@ ARVORE = (40, 95, 50)
 #   T  arvore (nao se constroi)
 # O caminho tem de ter UM quadrado de largura e nao pode tocar em si
 # proprio, senao o jogo nao sabe por onde ir.
+# O E pode ficar em qualquer borda: os inimigos entram por tras dele.
 MAPA = [
     "....................",
     "E######.............",
@@ -428,10 +429,25 @@ def comecar_onda():
 def criar_inimigo(nome):
     vida = vida_do_inimigo(nome, numero_onda)
     inicio = CAMINHO_PONTOS[0]
+    # Nasce um quadrado atras da entrada, do lado contrario aquele para onde
+    # o caminho segue: com o E na borda da direita vem de fora pela direita,
+    # com o E em cima vem de cima.
+    atras_x = 0
+    atras_y = 0
+    if len(CAMINHO_PONTOS) > 1:
+        seguinte = CAMINHO_PONTOS[1]
+        if seguinte[0] > inicio[0]:
+            atras_x = -TILE
+        elif seguinte[0] < inicio[0]:
+            atras_x = TILE
+        elif seguinte[1] > inicio[1]:
+            atras_y = -TILE
+        else:
+            atras_y = TILE
     return {
         "nome": nome,
-        "x": inicio[0] - TILE,   # nasce um bocadinho fora do ecra
-        "y": inicio[1],
+        "x": inicio[0] + atras_x,
+        "y": inicio[1] + atras_y,
         "vida": vida,
         "vida_max": vida,
         "ponto": 0,              # o proximo ponto do caminho para onde vai

@@ -26,6 +26,41 @@ NOME = "Mãos ao Ar!"
 FICHEIRO = "s14-maos-ao-ar/maos-ao-ar.py"
 DESCRICAO = "Um jogo de plataformas. Aqui joga-se com o teclado."
 
+# As instrucoes do jogo, que a pagina mostra a entrada dele:
+#   "joga"    como se joga
+#   "comeca"  por onde comecar, passo a passo: (o que fazer, o titulo da coisa
+#             a abrir, ou None). Com titulo, o passo ganha um botao que a abre.
+#   "podes"   o que aqui se pode fazer
+#   "nao"     o que nao da, ou da asneira
+INSTRUCOES = {
+    "joga": "Aqui joga-se com o teclado, sem câmara. O Faísca anda sozinho: as setas viram-no, a seta para baixo "
+            "pára-o, Espaço salta, Shift corre e X dispara. Chega à saída de cada nível. No último está o Rei Sucata.",
+    "comeca": [
+        ("Joga o nível 1 no «Jogar o jogo inteiro», para saberes o que há.", None),
+        ("Abre o Faísca e muda-lhe as cores.", "O Faísca"),
+        ("Abre «Os números do jogo» e dá-lhe um salto mais alto, ou mais vidas.", "Os números do jogo"),
+        ("Abre o nível 1 e troca letras: põe moedas (o) e uma mola (M).", "1. Primeiros passos"),
+        ("Abre a Lesma e muda-lhe a vida, a velocidade e a cor.", "Lesma"),
+        ("Depois inventa: «+ Novo nível», «+ Novo inimigo», «+ Novo mundo», e as Regras do jogo.", None),
+    ],
+    "podes": [
+        "Desenhar níveis com letras: chão, plataformas, molas, espinhos, lava, moedas e inimigos.",
+        "Criar níveis, inimigos e mundos novos, e apagar os que não queres.",
+        "Mudar o Faísca e os inimigos: as cores, a vida, a velocidade, o jeito de cada um.",
+        "Dar uma imagem e um som teus ao Faísca, ao tiro e a cada inimigo.",
+        "Afinar o jogo: a força do salto, a gravidade, as vidas, os textos.",
+        "Mudar as regras, e escrever nos Acontecimentos o que acontece quando o Faísca salta, apanha uma moeda...",
+    ],
+    "nao": [
+        "Num nível, todas as linhas têm de ter o mesmo número de letras, e são sempre 12 linhas.",
+        "Um nível precisa de um P (onde o Faísca começa) e de um F (a saída).",
+        "Para o nível se conseguir passar: a andar salta-se um buraco de 2 quadrados e a correr de 3; "
+        "sobe-se no máximo 2 quadrados de cada vez, ou usa-se uma mola.",
+        "Cada inimigo tem a sua letra. Uma letra que não é de nenhum inimigo não mostra nada.",
+        "Na Oficina não há câmara nem gestos: isso é só no jogo a sério, fora daqui.",
+    ],
+}
+
 # Uma frase por grupo, para a pagina do jogo dizer o que la ha.
 SOBRE_OS_GRUPOS = {
     "Inimigos": "Vida, velocidade, tamanho, cor e jeito. Podes pôr uma imagem e um som teus.",

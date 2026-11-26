@@ -24,6 +24,42 @@ NOME = "Bicharada à Solta"
 FICHEIRO = "s15-bicharada-a-solta/bicharada-a-solta.py"
 DESCRICAO = "A Bicharada com um mundo: andas de zona em zona, e os bichos saltam da erva."
 
+# As instrucoes do jogo, que a pagina mostra a entrada dele:
+#   "joga"    como se joga
+#   "comeca"  por onde comecar, passo a passo: (o que fazer, o titulo da coisa
+#             a abrir, ou None). Com titulo, o passo ganha um botao que a abre.
+#   "podes"   o que aqui se pode fazer
+#   "nao"     o que nao da, ou da asneira
+INSTRUCOES = {
+    "joga": "As setas andam pelo mapa e mexem nos menus. Enter ou Espaço escolhem e passam o texto à frente; Esc "
+            "volta atrás. Começas sem bichos: anda contra o Mestre Zacarias, que te dá uma rede, e vai à erva alta "
+            "apanhar o primeiro. A casa da avó cura a equipa, e na mercearia compram-se sopas e redes.",
+    "comeca": [
+        ("Joga no «Jogar o jogo inteiro» até apanhares o teu primeiro bicho.", None),
+        ("Abre o Galo de Barcelos, muda-lhe a vida e a cor, e desenha-o à tua maneira.", "Galo de Barcelos"),
+        ("Abre a Bicada e muda-lhe o poder e a precisão.", "Bicada"),
+        ("Abre a aldeia e troca letras: mais erva alta (e), árvores (A), água (~).", "aldeia"),
+        ("Abre o Mestre Zacarias e muda o que ele diz.", "Mestre Zacarias"),
+        ("Depois inventa: «+ Novo bicho», «+ Novo ataque», «+ Novo treinador», «+ Nova zona».", None),
+    ],
+    "podes": [
+        "Criar bichos, ataques, tipos e treinadores novos, e apagar os que não queres.",
+        "Desenhar cada bicho (de frente e de costas) e o teu boneco, ou escolher imagens tuas.",
+        "Desenhar as zonas com letras, criar zonas e edifícios novos, e inventar blocos (areia, neve, lava).",
+        "Escolher de uma lista os ataques de um bicho e os bichos de um treinador.",
+        "Mudar o nome a uma coisa: a Oficina muda-o em todos os sítios onde é usada.",
+        "Mudar as regras (quanto magoa um ataque, que bicho salta da erva) e escrever nos Acontecimentos.",
+    ],
+    "nao": [
+        "Uma zona tem sempre 20 letras em cada linha e 14 linhas.",
+        "Para se passar de uma zona para a do lado tem de haver, na borda das duas e no mesmo sítio, "
+        "um bloco por onde se ande (relva, areia...).",
+        "Só pode haver um P (a partida) no mundo todo.",
+        "Os números de 1 a 9 nas zonas são os treinadores, pela ordem da lista: o 1 é o primeiro.",
+        "Um bicho só aprende ataques do tipo dele e ataques normais, e no máximo quatro.",
+    ],
+}
+
 # Uma frase por grupo, para a pagina do jogo dizer o que la ha. A ordem
 # daqui e a ordem dos grupos na pagina.
 SOBRE_OS_GRUPOS = {
@@ -2939,4 +2975,59 @@ def juntar_acabar(estado, fonte, ordem):
                     fonte = "\n".join(linhas)
                     arvore, mundo = _ler_mundo(fonte)
                     linhas = fonte.split("\n")
+    return _acertar_o_que_falta(fonte)
+
+
+def _acertar_o_que_falta(fonte):
+    # Um jogo apagou um ataque (e tirou-o dos bichos DELE); outro mexeu num
+    # bicho que ainda o sabia. Juntos, ficava um bicho com um ataque que ja
+    # nao existe, e a Oficina recusava mexer em qualquer bicho ate alguem o
+    # corrigir a mao. O mesmo com um bicho apagado que ainda esta na equipa de
+    # um treinador. Tira-se o que ja nao existe, como faz o botao de apagar:
+    # quem ficaria sem nada fica com outro. (Uma coisa de cada vez, para as
+    # linhas nao se desencontrarem.)
+    for _ in range(200):
+        try:
+            arvore = ast.parse(fonte)
+        except SyntaxError:
+            return fonte
+        linhas = fonte.split("\n")
+        cortes, trocas = [], []
+        ataques = [nome for nome, _, _, _ in base._fichas(blocos.instrucao(arvore, "ATAQUES"))]
+        bichos = base._fichas(blocos.instrucao(arvore, "BICHOS"))
+        feito = False
+        for _, ficha, _, _ in bichos if ataques else []:
+            if feito or not isinstance(ficha, ast.Dict):
+                continue
+            sabe = base._lista_da_chave(ficha, "ataques")
+            a_mais = [no for no in sabe.elts if blocos.texto_constante(no) is not None
+                      and blocos.texto_constante(no) not in ataques] if sabe is not None else []
+            if a_mais:
+                if len(sabe.elts) == 1 or not base._tirar_da_lista(linhas, a_mais[0], cortes, trocas):
+                    base._trocar_no(linhas, a_mais[0], '"' + str(ataques[0]) + '"', trocas)
+                feito = True
+                continue
+            aprende = base._no_da_chave(ficha, "aprende")
+            for chave, valor in zip(aprende.keys, aprende.values) if isinstance(aprende, ast.Dict) else []:
+                nome = blocos.texto_constante(chave)
+                if not feito and nome is not None and nome not in ataques \
+                        and base._tirar_da_lista(linhas, _Bocado(chave, valor), cortes, trocas):
+                    feito = True
+        nomes = [nome for nome, _, _, _ in bichos]
+        for _, ficha, _, _ in base._fichas(blocos.instrucao(arvore, "TREINADORES")) if nomes else []:
+            equipa = base._lista_da_chave(ficha, "equipa") if isinstance(ficha, ast.Dict) else None
+            a_mais = [m for m in equipa.elts if isinstance(m, ast.Dict) and blocos.valor_da_chave(m, "bicho") is not None
+                      and blocos.valor_da_chave(m, "bicho") not in nomes] if equipa is not None else []
+            if a_mais and not feito:
+                if len(equipa.elts) == 1 or not base._tirar_da_lista(linhas, a_mais[0], cortes, trocas):
+                    base._trocar_no(linhas, base._no_da_chave(a_mais[0], "bicho"), '"' + str(nomes[0]) + '"', trocas)
+                feito = True
+        if not feito:
+            return fonte
+        nova = base._aplicar(linhas, cortes, trocas)
+        try:
+            ast.parse(nova)
+        except SyntaxError:
+            return fonte          # nao deu para acertar sem estragar: fica como estava
+        fonte = nova
     return fonte

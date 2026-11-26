@@ -27,6 +27,40 @@ NOME = "FADO//NEON"
 FICHEIRO = "s10-jogo-do-ano/fado-neon.py"
 DESCRICAO = "Um roguelite de saudade e neon. Jogo do Ano 2026."
 
+# As instrucoes do jogo, que a pagina mostra a entrada dele:
+#   "joga"    como se joga
+#   "comeca"  por onde comecar, passo a passo: (o que fazer, o titulo da coisa
+#             a abrir, ou None). Com titulo, o passo ganha um botao que a abre.
+#   "podes"   o que aqui se pode fazer
+#   "nao"     o que nao da, ou da asneira
+INSTRUCOES = {
+    "joga": "WASD anda e as setas disparam. Espaço é a investida e E é o laser, quando o farol estiver cheio. "
+            "Entre as ondas escolhes uma carta com 1, 2 ou 3. Ganhas se sobreviveres a 10 ondas; o Saudosista "
+            "aparece na 5 e na 10.",
+    "comeca": [
+        ("Joga até à onda 2 ou 3 no «Jogar o jogo inteiro», para saberes o que há.", None),
+        ("Abre «Vidas e velocidade» e dá-te mais vidas.", "Vidas e velocidade"),
+        ("Abre «Os teus tiros» e põe-nos mais rápidos, ou mais fortes.", "Os teus tiros"),
+        ("Abre o corredor e muda-lhe o tamanho, a vida e a cor.", "corredor"),
+        ("Abre as «Frases das ondas» e escreve as tuas.", "Frases das ondas"),
+        ("Depois inventa: «+ Novo inimigo», «+ Nova carta», e as Regras do jogo.", None),
+    ],
+    "podes": [
+        "Mudar os inimigos e o chefe: a vida, a velocidade, a cor, se disparam, os ataques do Saudosista.",
+        "Criar inimigos novos, com uma imagem e um som teus.",
+        "Criar cartas novas e ondas especiais, com os inimigos que tu mandares.",
+        "Mudar as frases que o jogo diz, as críticas do menu e os créditos.",
+        "Ligar e desligar coisas em «Como o jogo arranca», com as caixas.",
+        "Mudar as regras, e escrever nos Acontecimentos o que acontece quando um inimigo morre, quando disparas...",
+    ],
+    "nao": [
+        "Números gigantes (milhares de inimigos, tamanhos enormes) deixam o jogo lento ou preso. Sobe aos poucos.",
+        "Uma cor são sempre três números entre 0 e 255, entre parênteses.",
+        "Uma carta nova ainda não faz nada: o que ela faz escreve-se nas Regras do jogo, em «O que cada carta faz».",
+        "Um inimigo novo só se vê quando chegar a vez dele: a Oficina diz em que onda aparece.",
+    ],
+}
+
 # Uma frase por grupo, para a pagina do jogo dizer o que la ha.
 SOBRE_OS_GRUPOS = {
     "Inimigos": "Tamanho, vida, velocidade, cor, se disparam. Podes pôr uma imagem e um som teus. "

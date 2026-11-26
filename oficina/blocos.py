@@ -151,6 +151,35 @@ def nomes_das_funcoes(arvore):
     return [no.name for no in arvore.body if isinstance(no, ast.FunctionDef)]
 
 
+def repetidos(antes, agora):
+    # As frases a mostrar por cada nome que passou a estar escrito mais vezes
+    # encostado a margem ("VIDAS = 3" duas vezes, duas funcoes com o mesmo
+    # nome). O Python fica com a ultima, e a Oficina so mostra a primeira: a
+    # outra ficava no ficheiro, escondida, a mandar no jogo.
+    def contar(arvore):
+        contas = {}
+        for no in arvore.body:
+            if isinstance(no, ast.Assign):
+                nomes = [("linha", alvo.id) for alvo in no.targets if isinstance(alvo, ast.Name)]
+            elif isinstance(no, ast.FunctionDef):
+                nomes = [("funcao", no.name)]
+            else:
+                nomes = []
+            for nome in nomes:
+                contas[nome] = contas.get(nome, 0) + 1
+        return contas
+    havia = contar(antes)
+    frases = []
+    for (tipo, nome), vezes in contar(agora).items():
+        if vezes > 1 and vezes > havia.get((tipo, nome), 0):
+            if tipo == "linha":
+                frases.append('Há mais do que uma linha "' + nome + ' = ...". Só pode haver uma: apaga a que está a mais.')
+            else:
+                frases.append('Há mais do que uma função chamada "' + nome + '". Só pode haver uma: '
+                              "apaga a que está a mais, ou dá-lhe outro nome.")
+    return frases
+
+
 # O que o codigo escrito na Oficina nao pode fazer: ir buscar outros modulos,
 # mexer em ficheiros, correr outros programas. Um jogo nao precisa de nada
 # disto, e um engano (da crianca ou do ajudante) podia estragar o computador.

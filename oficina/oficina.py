@@ -12,6 +12,7 @@
 # imagem dele e manda-lhe o rato e o teclado.
 # Para fechar: Ctrl+C aqui no terminal.
 #
+#     --verificar       so ve se este computador esta pronto para uma sessao
 #     --sem-navegador   nao abre o browser (abre tu http://127.0.0.1:8765)
 #     --porta 9000      usa outra porta
 #     --servidor http://192.168.1.50:11434
@@ -31,6 +32,7 @@ import importlib
 import io
 import json
 import os
+import queue
 import re
 import shutil
 import socket
@@ -43,6 +45,7 @@ import webbrowser
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+from urllib.request import urlopen
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
@@ -83,7 +86,9 @@ LEIA_ME = ("Este é um jogo guardado na Oficina.\n\n"
            "Oficina dele, \"Juntar jogos\", e escolhe este ficheiro.\n\n"
            "(A pasta \"base\" tem o jogo de onde partiste: é com ela que a Oficina\n"
            "descobre o que mudaste.)\n")
-PACIENCIA = 6                 # segundos a espera de um jogo que nao responde
+PACIENCIA = 6                 # segundos sem o jogo mostrar um frame: ficou preso
+ARRANQUE = 60                 # segundos que um jogo pode levar a mostrar o primeiro (um computador lento)
+PROVA = 15                    # segundos que o jogo tem para mostrar que o codigo novo corre (ve desprender)
 
 
 # =====================================================================
@@ -108,11 +113,28 @@ def ler(caminho):
     return texto.replace("\r\n", "\n"), fim_de_linha
 
 
+def trocar_ficheiro(provisorio, caminho):
+    # Poe o ficheiro novo no lugar do antigo, de uma vez. No Windows, um
+    # antivirus (ou outro programa) a espreitar o ficheiro nao deixa troca-lo
+    # durante uns instantes: tenta-se outra vez antes de desistir.
+    for tentativa in range(40):
+        try:
+            os.replace(provisorio, caminho)
+            return
+        except PermissionError:
+            if tentativa == 39:
+                raise
+            time.sleep(0.05)
+
+
+def escrever_bytes(caminho, conteudo):
+    with open(caminho + ".novo", "wb") as f:
+        f.write(conteudo)
+    trocar_ficheiro(caminho + ".novo", caminho)
+
+
 def escrever(caminho, texto, fim_de_linha):
-    provisorio = caminho + ".novo"
-    with open(provisorio, "w", encoding="utf-8", newline="") as f:
-        f.write(texto.replace("\n", fim_de_linha))
-    os.replace(provisorio, caminho)
+    escrever_bytes(caminho, texto.replace("\n", fim_de_linha).encode("utf-8"))
 
 
 def caminho_do_original(config):
@@ -199,8 +221,7 @@ def guardar_base(config, fonte, info=None):
                 info["imagens"][PASTAS_DO_ZIP[tipo] + "/" + nome] = impressao(f.read())
     os.makedirs(BASES, exist_ok=True)
     escrever(caminho_da_base(config), fonte, "\n")
-    with open(caminho_da_base(config) + ".json", "w", encoding="utf-8") as f:
-        json.dump(info, f)
+    escrever_bytes(caminho_da_base(config) + ".json", json.dumps(info).encode("utf-8"))
 
 
 class Falha(Exception):
@@ -260,6 +281,20 @@ class Sessao:
         # ficheiro quando a crianca carrega em "Guardar alteracoes".
         self.provado = None
         self.a_provar = None         # (numero, hora) do codigo que o jogo esta a experimentar
+        # Cada vez que se abre uma coisa (ou o jogo inteiro) ha um numero novo.
+        # A pagina manda-o com cada pedido: um pedido com um numero antigo vem
+        # de outro separador (ou de antes de a Oficina voltar a arrancar), que
+        # ainda julga ter aberta outra coisa, e nao se lhe faz a vontade.
+        self.abertura = int(time.time() * 1000) % 1000000000
+        # Para dar por um jogo preso: quando foi lancado, a ultima vez que deu
+        # sinal de vida (um frame, uma mensagem), se ja chegou ao primeiro frame, e
+        # a ultima vez que a pagina perguntou por ele.
+        self.lancado = 0
+        self.sinal = 0
+        self.arrancou = False
+        self.pronto_desde = 0        # quando chegou ao primeiro frame
+        self.perguntado = 0
+        self.fila_do_jogo = None     # o que ha para dizer ao jogo (ve escrever_ao_jogo)
         # A imagem do jogo: o palco liga-se a esta porta e manda os frames.
         self.quadro = None
         self.numero_do_quadro = 0
@@ -286,6 +321,10 @@ class Sessao:
                 with self.ha_quadro:
                     self.quadro = dados
                     self.numero_do_quadro = self.numero_do_quadro + 1
+                    self.sinal = time.time()
+                    if not self.arrancou:
+                        self.arrancou = True
+                        self.pronto_desde = self.sinal
                     self.ha_quadro.notify_all()
         except OSError:
             pass
@@ -316,18 +355,41 @@ class Sessao:
             encoding="utf-8", errors="replace", bufsize=1,
         )
         self.processo = processo
+        self.lancado = time.time()
+        self.sinal = self.lancado
+        self.arrancou = False
+        self.fila_do_jogo = queue.Queue()
+        threading.Thread(target=self.escrever_ao_jogo, args=(processo, self.fila_do_jogo), daemon=True).start()
         threading.Thread(target=self.ouvir, args=(processo,), daemon=True).start()
+
+    def escrever_ao_jogo(self, processo, fila):
+        # (Corre a parte.) Quem escreve ao jogo e so este fio. Um jogo preso
+        # deixa de ler o que se lhe escreve e, com o cano cheio, quem escreve
+        # fica parado: se fosse quem tem a tranca da sessao, a Oficina inteira
+        # ficava parada com ele, e ja nem dava para o fechar.
+        while True:
+            linha = fila.get()
+            if linha is None:
+                return
+            try:
+                processo.stdin.write(linha)
+                processo.stdin.flush()
+            except (OSError, ValueError):
+                return
 
     def parar(self):
         processo = self.processo
+        fila = self.fila_do_jogo
         self.processo = None
+        self.fila_do_jogo = None
         if processo is not None and processo.poll() is None:
+            fila.put(json.dumps({"tipo": "sair"}) + "\n")
             try:
-                processo.stdin.write(json.dumps({"tipo": "sair"}) + "\n")
-                processo.stdin.flush()
                 processo.wait(timeout=1.5)
-            except (OSError, ValueError, subprocess.TimeoutExpired):
+            except subprocess.TimeoutExpired:
                 processo.kill()
+        if fila is not None:
+            fila.put(None)
 
     def viva(self):
         return self.processo is not None and self.processo.poll() is None
@@ -335,11 +397,7 @@ class Sessao:
     def dizer(self, pedido):
         if not self.viva():
             self.lancar()
-        try:
-            self.processo.stdin.write(json.dumps(pedido) + "\n")
-            self.processo.stdin.flush()
-        except (OSError, ValueError):
-            pass
+        self.fila_do_jogo.put(json.dumps(pedido) + "\n")
 
     def ouvir(self, processo):
         for linha in processo.stdout:
@@ -355,7 +413,12 @@ class Sessao:
                 continue
             with self.tranca:
                 if processo is self.processo:
-                    self.receber(mensagem)
+                    self.sinal = time.time()
+                    if not self.arrancou:
+                        self.arrancou = True
+                        self.pronto_desde = self.sinal
+                    if mensagem.get("tipo") != "pronto":     # (essa e so o sinal de que arrancou)
+                        self.receber(mensagem)
 
     def receber(self, mensagem):
         pedido = self.pedidos.get(mensagem.get("id"))
@@ -420,6 +483,7 @@ class Sessao:
             jogo = {"id": nome, "nome": config.NOME, "descricao": config.DESCRICAO, "escolhas": [], "erro": None,
                     "grupos": getattr(config, "SOBRE_OS_GRUPOS", {}),
                     "criaveis": getattr(config, "CRIAVEIS", {}),
+                    "instrucoes": getattr(config, "INSTRUCOES", None),
                     "capa": os.path.isfile(os.path.join(CAPAS, nome + ".png"))}
             try:
                 fonte, _ = ler(caminho_do_jogo(config))
@@ -458,8 +522,10 @@ class Sessao:
             self.provado = None
             self.mensagens = []
             self.a_provar = None
+            self.abertura = self.abertura + 1
             self.lancar()
             return {
+                "abertura": self.abertura,
                 "codigo": "\n".join(blocos.tirar_margem(bloco, self.margem)),
                 "titulo": regiao["titulo"], "ajuda": regiao["ajuda"], "dica": regiao["dica"],
                 "jogo": config.NOME, "desde": self.contador, "imagem": self.estado_da_imagem(),
@@ -491,8 +557,9 @@ class Sessao:
             self.provado = None
             self.mensagens = []
             self.a_provar = None
+            self.abertura = self.abertura + 1
             self.lancar()
-            return {"jogo": config.NOME, "desde": self.contador}
+            return {"jogo": config.NOME, "desde": self.contador, "abertura": self.abertura}
 
     def nome_escrito(self, bloco):
         # Se a crianca mudou, no codigo, o nome da coisa aberta (e essa coisa
@@ -543,6 +610,16 @@ class Sessao:
             if self.config is None or self.escolha == JOGAR:
                 raise Falha("Ainda não escolheste nada.")
             bloco = texto.replace("\r\n", "\n").rstrip().split("\n")
+            if all(linha.strip() == "" or linha.lstrip().startswith("#") for linha in bloco):
+                # Sem isto, apagar a ficha de um inimigo (ou de um bicho, de
+                # uma onda...) tirava-o do jogo sem o tirar dos sitios onde
+                # e usado, e o jogo parava mais tarde, ja longe daqui.
+                return {"ok": False, "erro": {
+                    "linha": None,
+                    "texto": "Apagaste o código todo. O jogo precisa deste bocado: escreve-o outra vez, ou carrega em "
+                             "«Repor o original». Para tirar uma coisa do jogo há o botão vermelho de apagar, "
+                             "nas coisas que se podem apagar.",
+                    "detalhe": ""}}
             # O nome da coisa foi mudado no codigo? Da primeira vez so se
             # avisa a pagina, que espera que a crianca acabe de o escrever e
             # volta a mandar o codigo com "mudar_nome".
@@ -607,22 +684,59 @@ class Sessao:
 
     def desprender(self):
         # Ha codigo que nao rebenta mas deixa o jogo preso (um numero
-        # gigante, um ciclo sem fim). Se o jogo aceitou codigo e depois se
-        # calou, fecha-se e abre-se outra vez com o ultimo ficheiro bom.
-        if self.a_provar is None or time.time() - self.a_provar[1] < PACIENCIA:
+        # gigante, um ciclo sem fim). Um jogo a correr mostra frames sem
+        # parar: se esta vivo e deixou de os mostrar, fecha-se e abre-se outra
+        # vez com o ultimo ficheiro bom. Tanto faz se ficou preso com o codigo
+        # que acabou de chegar ou mais tarde (numa funcao que so corre quando
+        # se carrega numa tecla, por exemplo).
+        agora = time.time()
+        parado = agora - self.perguntado > 2
+        self.perguntado = agora
+        if not self.viva():
+            if self.processo is not None and self.a_provar is not None:
+                # O jogo fechou-se sozinho com o codigo que estava a
+                # experimentar (um "raise SystemExit", ou rebentou de vez):
+                # abre-se outra vez como estava, com o aviso.
+                numero = self.a_provar[0]
+                self.a_provar = None
+                self.lancar()
+                self.receber({"tipo": "erro", "id": numero, "linhas": [],
+                              "texto": "O jogo fechou-se com este código. Voltei a abri-lo como estava antes.",
+                              "detalhe": "o jogo deixou de correr enquanto experimentava o código"})
             return
-        numero = self.a_provar[0]
+        if parado:
+            # Ninguem perguntava pelo jogo ha um bocado (o computador esteve
+            # a dormir, a pagina esteve escondida): a paciencia conta de agora.
+            self.sinal = agora
+            return
+        # (Ate ao primeiro frame da-se mais tempo: num computador lento, so
+        # abrir o pygame leva uns segundos.)
+        preso = agora - self.sinal >= (PACIENCIA if self.arrancou else ARRANQUE)
+        # Ha codigo que nao prende o jogo mas o deixa a passo de caracol (um
+        # ciclo com milhoes de voltas em cada frame): ainda mostra um frame de
+        # vez em quando, mas nunca mais acaba de experimentar o codigo.
+        lento = (self.a_provar is not None and self.arrancou
+                 and agora - max(self.a_provar[1], self.pronto_desde) >= PROVA)
+        if not preso and not lento:
+            return
+        numero = self.a_provar[0] if self.a_provar is not None else None
+        calado = round(agora - self.sinal)
         self.a_provar = None
-        if self.processo is not None:
-            self.processo.kill()
+        self.processo.kill()
         self.lancar()
-        self.receber({
-            "tipo": "erro", "id": numero, "linhas": [],
-            "texto": "O jogo ficou preso com este código. Há algum número grande demais, "
-                     "ou um ciclo que nunca acaba? "
-                     "Voltei a abrir o jogo como estava antes.",
-            "detalhe": "sem resposta ao fim de " + str(PACIENCIA) + " segundos",
-        })
+        if preso and numero is not None:
+            texto = ("O jogo ficou preso com este código. Há algum número grande demais, "
+                     "ou um ciclo que nunca acaba? Voltei a abrir o jogo como estava antes.")
+            detalhe = "sem dar sinal durante " + str(calado) + " segundos"
+        elif preso:
+            texto = ("O jogo ficou preso e deixou de responder. Há um ciclo que nunca acaba, "
+                     "ou um número grande demais, numa das coisas que mudaste? Voltei a abri-lo.")
+            detalhe = "sem dar sinal durante " + str(calado) + " segundos"
+        else:
+            texto = ("O jogo ficou lento demais com este código. Há um ciclo com voltas a mais, "
+                     "ou algum número grande demais? Voltei a abrir o jogo como estava antes.")
+            detalhe = "ao fim de " + str(PROVA) + " segundos ainda não tinha acabado de o experimentar"
+        self.receber({"tipo": "erro", "id": numero, "linhas": [], "texto": texto, "detalhe": detalhe})
 
     def estado(self, desde):
         with self.tranca:
@@ -652,6 +766,7 @@ class Sessao:
         with self.tranca:
             self.parar()
             self.config = None
+            self.abertura = self.abertura + 1
             return {"ok": True}
 
     # --- A imagem e o som do bocado aberto ---
@@ -759,9 +874,7 @@ class Sessao:
             if len(conteudo) > FICHEIRO_MAXIMO:
                 raise Falha("Esse ficheiro é grande demais.")
             os.makedirs(pasta, exist_ok=True)
-            with open(caminho + ".novo", "wb") as f:
-                f.write(conteudo)
-            os.replace(caminho + ".novo", caminho)
+            escrever_bytes(caminho, conteudo)
             self.avisar_dos_ficheiros()
             # (A imagem leva tambem quais sao as outras imagens da coisa.)
             return {tipo: self.estado_da_imagem() if tipo == "imagem" else self.estado_do_ficheiro(tipo)}
@@ -1033,9 +1146,7 @@ class Sessao:
             for tipo, nome, conteudo in ficheiros:
                 pasta = FICHEIROS[tipo][0]
                 os.makedirs(pasta, exist_ok=True)
-                with open(os.path.join(pasta, nome) + ".novo", "wb") as f:
-                    f.write(conteudo)
-                os.replace(os.path.join(pasta, nome) + ".novo", os.path.join(pasta, nome))
+                escrever_bytes(os.path.join(pasta, nome), conteudo)
             # De onde este jogo partiu: o que o zip disser ou, se nao disser
             # (um jogo sozinho, ou um zip antigo), ele proprio.
             if base is not None:
@@ -1157,9 +1268,7 @@ class Sessao:
                     dono = donos.get((tipo, nome))
                     if (dono is not None and dono[1] == entra["quem"]) or (dono is None and not os.path.exists(destino)):
                         os.makedirs(pasta, exist_ok=True)
-                        with open(destino + ".novo", "wb") as f:
-                            f.write(conteudo)
-                        os.replace(destino + ".novo", destino)
+                        escrever_bytes(destino, conteudo)
             # (Um ficheiro a que o jogo mudou o nome ao juntar: ve o
             # "renomeados" do juntar_preparar.)
             estado = junto.get("estado")
@@ -1169,8 +1278,8 @@ class Sessao:
                         conteudo = entra["ficheiros"].get((tipo, antigo))
                         _, regra, _, _ = FICHEIROS[tipo]
                         if entra["quem"] == quem and conteudo is not None and regra.fullmatch(str(novo)):
-                            with open(os.path.join(FICHEIROS[tipo][0], novo), "wb") as f:
-                                f.write(conteudo)
+                            os.makedirs(FICHEIROS[tipo][0], exist_ok=True)
+                            escrever_bytes(os.path.join(FICHEIROS[tipo][0], novo), conteudo)
             guardar_base(config, junto["fonte"])
             frases = {"novo": "Novo", "mudou": "Mudado", "juntei": "Juntei as mudanças de vários", "escolhido": "Escolheste"}
             feito = [frases[que] + ": " + onde + " — " + ", ".join(quem) for quem, que, onde in junto["relato"]
@@ -1184,6 +1293,25 @@ sessao = Sessao()
 # =====================================================================
 #                           O SERVIDOR
 # =====================================================================
+
+OUTRO_SEPARADOR = ("Esta página ficou para trás: a Oficina foi aberta noutro separador, "
+                   "ou voltou a arrancar. Carrega em «Continuar aqui».")
+
+
+class Servidor(ThreadingHTTPServer):
+
+    # No Windows, "reutilizar o endereco" deixa dois programas ficarem com a
+    # mesma porta: uma segunda Oficina abria por cima da primeira e os pedidos
+    # da pagina iam ora para uma, ora para a outra.
+    allow_reuse_address = os.name != "nt"
+
+    def handle_error(self, request, client_address):
+        # Uma pagina que fecha a meio de um pedido nao e um erro: nao enche o
+        # terminal. O resto mostra-se, numa linha.
+        erro = sys.exc_info()[1]
+        if not isinstance(erro, (ConnectionError, TimeoutError)):
+            print("Erro da Oficina: " + type(erro).__name__ + ": " + str(erro))
+
 
 class Pedido(BaseHTTPRequestHandler):
 
@@ -1215,8 +1343,8 @@ class Pedido(BaseHTTPRequestHandler):
                 self.responder(200, resposta)
         except Falha as falha:
             self.responder(400, {"falha": str(falha)})
-        except BrokenPipeError:
-            pass
+        except ConnectionError:
+            pass                    # a pagina fechou
         except Exception as erro:   # um erro nosso: mostra-se, nao se esconde
             self.responder(500, {"falha": "Erro da Oficina: " + type(erro).__name__ + ": " + str(erro)})
 
@@ -1226,6 +1354,10 @@ class Pedido(BaseHTTPRequestHandler):
         if url.path == "/":
             with open(os.path.join(AQUI, "editor.html"), "rb") as f:
                 self.responder(200, f.read(), "text/html; charset=utf-8")
+        elif url.path == "/api/ola":
+            # Para uma Oficina que arranca saber que ja ha outra aberta, e se
+            # e a desta pasta (ve main).
+            self.responder(200, {"oficina": AQUI})
         elif url.path == "/api/jogos":
             self.tratar(sessao.lista_de_jogos)
         elif url.path == "/api/ajudante":
@@ -1235,7 +1367,11 @@ class Pedido(BaseHTTPRequestHandler):
                                  "ligados": sessao.ajudante.quantos_ligados()})
         elif url.path == "/api/estado":
             desde = int(parametros.get("desde", ["0"])[0])
-            self.tratar(lambda: sessao.estado(desde))
+            abertura = parametros.get("abertura", [None])[0]
+            if abertura is not None and abertura != str(sessao.abertura):
+                self.responder(409, {"falha": OUTRO_SEPARADOR})
+            else:
+                self.tratar(lambda: sessao.estado(desde))
         elif url.path == "/api/quadro":
             self.quadro(int(parametros.get("depois", ["0"])[0]))
         elif url.path == "/api/capa":
@@ -1326,6 +1462,18 @@ class Pedido(BaseHTTPRequestHandler):
             self.responder(400, {"falha": "Pedido mal feito."})
             return
         caminho = urlparse(self.path).path
+        if not isinstance(dados, dict):
+            self.responder(400, {"falha": "Pedido mal feito."})
+            return
+        if dados.get("abertura") is not None and dados["abertura"] != sessao.abertura:
+            # Um separador que ficou para tras (ve "abertura", na Sessao). O
+            # rato e as teclas dele deitam-se fora sem aviso: sao pedidos que
+            # ja vinham a caminho quando se abriu outra coisa.
+            if caminho == "/api/entrada":
+                self.responder(200, {"ok": True})
+            else:
+                self.responder(409, {"falha": OUTRO_SEPARADOR})
+            return
         if caminho == "/api/abrir":
             self.tratar(lambda: sessao.abrir(dados.get("jogo"), str(dados.get("escolha"))))
         elif caminho == "/api/jogar":
@@ -1377,8 +1525,97 @@ class Pedido(BaseHTTPRequestHandler):
             self.responder(404, {"falha": "Não existe."})
 
 
+def verificar():
+    # Para o professor, antes de uma sessao: ve se neste computador esta tudo
+    # pronto, sem abrir a pagina e sem mexer em jogo nenhum. Devolve True se sim.
+    #     python3 oficina/oficina.py --verificar
+    tudo_bem = True
+
+    def linha(certo, texto):
+        nonlocal tudo_bem
+        if certo is False:
+            tudo_bem = False
+        print(("  ok     " if certo else "  FALHA  " if certo is False else "  nota   ") + texto)
+
+    print("A verificar a Oficina neste computador...")
+    linha(sys.version_info >= (3, 9), "Python " + sys.version.split()[0])
+    try:
+        import pygame
+        linha(True, "pygame-ce " + pygame.version.ver)
+    except ImportError:
+        linha(False, "Falta o pygame: activa o ambiente virtual, ou corre o instalar (ver COMO-CORRER.md, secção 1).")
+        return False
+
+    # Da para escrever onde a Oficina escreve?
+    pastas = [AQUI] + [FICHEIROS[tipo][0] for tipo in FICHEIROS]
+    for nome in JOGOS:
+        try:
+            pastas.append(os.path.dirname(caminho_do_jogo(configuracao(nome))))
+        except Exception:
+            pass
+    for pasta in dict.fromkeys(pastas):
+        try:
+            os.makedirs(pasta, exist_ok=True)
+            experiencia = os.path.join(pasta, ".oficina-a-verificar")
+            escrever_bytes(experiencia, b"ola")
+            os.remove(experiencia)
+        except OSError as erro:
+            linha(False, "Não consigo escrever em " + pasta + " (" + str(erro) + "): as crianças não iam conseguir guardar.")
+    if tudo_bem:
+        linha(True, "Dá para escrever nas pastas dos jogos, das imagens e dos sons.")
+
+    # Cada jogo: le-se, e corre ate mostrar o primeiro frame.
+    for nome in JOGOS:
+        try:
+            config = configuracao(nome)
+            fonte, _ = ler(caminho_do_jogo(config))
+            compile(fonte, config.FICHEIRO, "exec")
+            coisas = len(config.escolhas(fonte))
+        except Exception as erro:
+            linha(False, nome + ": não se consegue ler (" + type(erro).__name__ + ": " + str(erro)[:120] + ").")
+            continue
+        if coisas == 0:
+            linha(False, config.NOME + ": a Oficina não encontra nada para mudar no ficheiro.")
+            continue
+        inicio = time.time()
+        sessao.jogar(nome)
+        while time.time() - inicio < ARRANQUE and sessao.viva() and sessao.quadro is None:
+            time.sleep(0.05)
+        demorou = time.time() - inicio
+        time.sleep(1)                # mais um bocadinho a correr, para apanhar um erro logo a seguir
+        erros = [m for m in sessao.mensagens if m["tipo"] == "erro"]
+        correu = sessao.viva() and sessao.quadro is not None and not erros
+        sessao.fechar()
+        if not correu:
+            motivo = (erros[0].get("detalhe") or erros[0].get("texto")) if erros else "não chegou a mostrar nada"
+            linha(False, config.NOME + ": o jogo não corre (" + str(motivo)[:160] + ").")
+            continue
+        linha(True, config.NOME + ": " + str(coisas) + " coisas para mudar; abre em " + str(round(demorou, 1)) + " s.")
+        if demorou > 8:
+            linha(None, "Este computador é lento a abrir os jogos: da primeira vez a imagem demora a aparecer.")
+        original = caminho_do_original(config)
+        if os.path.exists(original) and ler(original)[0] != fonte:
+            linha(None, config.NOME + ": neste computador o jogo já foi mudado (não é o original). "
+                        "Para recomeçar do zero: git checkout -- " + config.FICHEIRO)
+
+    # O ajudante.
+    servidores = sessao.ajudante.servidores
+    if not servidores:
+        linha(None, "Sem computadores ajudantes (oficina/servidores.txt vazio): não há botão «Pedir ajuda».")
+    else:
+        sessao.ajudante.ver_ligados()
+        ligados = sessao.ajudante.ligados
+        linha(None if ligados < len(servidores) else True,
+              "Ajudante: " + str(ligados) + " de " + str(len(servidores)) + " computadores a atender."
+              + ("" if ligados else " As crianças vão ver «O ajudante não responde agora»."))
+    print("Está tudo pronto." if tudo_bem else "HÁ COISAS A RESOLVER (as linhas que dizem FALHA).")
+    return tudo_bem
+
+
 def main():
     argumentos = argparse.ArgumentParser(description="A Oficina do Clube de Código")
+    argumentos.add_argument("--verificar", action="store_true",
+                            help="vê se este computador está pronto para uma sessão, e sai")
     argumentos.add_argument("--porta", type=int, default=8765)
     argumentos.add_argument("--sem-navegador", action="store_true")
     argumentos.add_argument("--servidor", action="append", default=[],
@@ -1393,6 +1630,10 @@ def main():
     sessao.ajudante = modulo_do_ajudante.Ajudante(servidores, argumentos.modelo or modelo)
 
     os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
+    if argumentos.verificar:
+        certo = verificar()
+        sessao.parar()
+        sys.exit(0 if certo else 1)
     try:
         import pygame  # noqa: F401
     except ImportError:
@@ -1402,10 +1643,25 @@ def main():
     servidor = None
     for porta in range(argumentos.porta, argumentos.porta + 20):
         try:
-            servidor = ThreadingHTTPServer(("127.0.0.1", porta), Pedido)
+            servidor = Servidor(("127.0.0.1", porta), Pedido)
             break
         except OSError:
-            continue
+            pass
+        # A porta esta ocupada. Se for por uma Oficina desta mesma pasta, nao
+        # se abre outra: as duas a mexer nos mesmos ficheiros desfaziam o
+        # trabalho uma da outra. Mostra-se a que ja esta aberta.
+        endereco = "http://127.0.0.1:" + str(porta)
+        try:
+            with urlopen(endereco + "/api/ola", timeout=2) as resposta:
+                outra = json.loads(resposta.read()).get("oficina")
+        except (OSError, ValueError, AttributeError):
+            outra = None
+        if outra is not None and os.path.normcase(str(outra)) == os.path.normcase(AQUI):
+            print("A Oficina já estava aberta em " + endereco + " (noutra janela do terminal).")
+            print("Não abri outra: uso essa. Para a fechar, Ctrl+C nessa janela.")
+            if not argumentos.sem_navegador:
+                webbrowser.open(endereco)
+            sys.exit(0)
     if servidor is None:
         print("Não encontrei uma porta livre. Tenta: --porta 9000")
         sys.exit(1)

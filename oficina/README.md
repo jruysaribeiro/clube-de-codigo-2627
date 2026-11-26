@@ -24,6 +24,50 @@ código para escrever). Para fechar: `Ctrl+C` no terminal.
 
 Não precisa de internet nem de instalar mais nada.
 
+## Antes de uma sessão
+
+```bash
+python3 oficina/oficina.py --verificar
+```
+
+Vê, sem abrir a página e sem mexer em jogo nenhum, se o computador está
+pronto: o Python e o pygame, se dá para escrever nas pastas dos jogos, das
+imagens e dos sons, se cada um dos quatro jogos abre (e em quantos segundos),
+se o jogo já foi mudado nesse computador, e quantos computadores ajudantes
+estão a atender. As linhas que dizem `FALHA` são para resolver antes de as
+crianças se sentarem.
+
+## Com a sala cheia
+
+- **Uma Oficina por computador.** Quem a correr outra vez com uma já aberta
+  (noutra janela do terminal) fica com a que já estava: abre-se a página
+  dela, e não uma segunda Oficina a mexer nos mesmos ficheiros.
+- **Um separador de cada vez.** Se a Oficina for aberta noutro separador (ou
+  voltar a arrancar), a página antiga mostra uma faixa vermelha com
+  **Continuar aqui**, em vez de pôr o que lá se escreve no bocado errado. O
+  que estava escrito e por guardar volta para o editor.
+- **A Oficina fechou-se** (alguém fechou a janela do terminal): a página
+  di-lo numa faixa vermelha, e volta ao normal quando a Oficina voltar.
+- **Um jogo preso** (um ciclo sem fim, um número gigante) é fechado e aberto
+  outra vez ao fim de 6 segundos sem mostrar imagem, com o aviso ao lado do
+  código. Vale também para o que só prende mais tarde, numa função que corre
+  quando se carrega numa tecla.
+- **Apagar o código todo** de uma coisa não a tira do jogo: a Oficina pede
+  para o escrever outra vez, ou para usar o botão vermelho de apagar (que a
+  tira também dos sítios onde é usada). Uma linha `NOME = ...` ou uma função
+  escrita duas vezes também não entra.
+- Um `print` numa função que corre a cada frame não afoga a Oficina: de cada
+  segundo só se mostram as primeiras linhas.
+
+## As instruções de cada jogo
+
+A página de cada jogo abre com as instruções dele: como se joga, por onde
+começar (passo a passo, com um botão que abre a coisa de cada passo), o que se
+pode fazer e o que não dá. Ficam abertas até a criança as fechar. Estão no
+ficheiro do jogo em `oficina/jogos/`, em `INSTRUCOES`; o que vale para todos
+os jogos (não apagar tudo, guardar, descarregar o zip) está no `editor.html`,
+em `NAO_DA_EM_NENHUM` e `PARA_NAO_PERDER`.
+
 ## Jogar o jogo inteiro
 
 O botão verde **Jogar o jogo inteiro** (na página de cada jogo e ao lado do
@@ -266,6 +310,7 @@ coisa: cada bicho, cada zona, cada bloco, cada função.
 | Dois desenhos novos com o mesmo nome de ficheiro | Um muda de nome |
 | A mesma coisa mudada por dois, de maneiras diferentes | **Pergunta** qual fica, mostrando as duas |
 | Uma coisa que alguém apagou | **Pergunta** antes de a apagar para todos |
+| Um ataque (ou um bicho, ou um inimigo d'O Cerco) apagado num jogo e ainda usado noutro | Sai também de onde era usado, como faz o botão de apagar |
 
 Enquanto houver perguntas por responder não muda nada. No fim diz o que
 entrou e o que acertou sozinha, e o jogo como estava fica ao lado, com

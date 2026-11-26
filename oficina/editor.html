@@ -62,6 +62,17 @@
   .podes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 4px 0 6px; padding: 0; list-style: none; }
   .podes li { background: var(--painel-2); border: 1px solid var(--linha); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--fraco); }
   .podes b { display: block; color: var(--texto); font-size: 15px; margin-bottom: 2px; }
+  .instrucoes { background: var(--painel-2); border: 1px solid var(--linha); border-radius: 10px; padding: 10px 14px; margin: 4px 0 6px; font-size: 15px; }
+  .instrucoes summary { cursor: pointer; font-weight: 600; }
+  .instrucoes .colunas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 28px; margin-top: 6px; }
+  @media (max-width: 760px) { .instrucoes .colunas { grid-template-columns: minmax(0, 1fr); } }
+  .instrucoes .larga { grid-column: 1 / -1; }
+  .instrucoes h4 { margin: 10px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .09em; color: var(--fraco); }
+  .instrucoes .nao h4 { color: var(--vermelho); }
+  .instrucoes p { margin: 0; line-height: 1.45; }
+  .instrucoes ul, .instrucoes ol { margin: 0; padding-left: 22px; line-height: 1.45; }
+  .instrucoes li { margin: 3px 0; }
+  .instrucoes li button { font-size: 13px; padding: 1px 9px; }
   .jogo h3 small { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 14px; margin-left: 8px; }
   .jogo { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 18px; margin-bottom: 18px; max-width: 1240px; }
   .jogo h2 { margin: 0; font-size: 21px; }
@@ -86,6 +97,10 @@
   .so-jogo .lado-codigo, .so-jogo #jogar-tudo { display: none; }
   .so-jogo .lado-jogo { border: 0; }
   #aviso-jogo { margin: 10px auto 0; max-width: 720px; text-align: center; font-size: 15px; color: var(--vermelho); }
+  /* ---------- a Oficina deixou de responder, ou esta pagina ficou para tras ---------- */
+  #faixa { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 10px 14px; background: var(--vermelho); color: #1a1010; font-size: 16px; font-weight: 600; text-align: center; }
+  #faixa[hidden] { display: none; }
+  #faixa button { font-size: 15px; }
   #aviso-jogo small { display: block; color: var(--fraco); font-family: var(--letra-codigo); font-size: 12px; }
   #jogar-outra { display: block; margin: 10px auto 0; }
   #jogo { margin: 0 auto; border: 3px solid var(--linha); border-radius: 10px; overflow: hidden; line-height: 0; background: #000; cursor: crosshair; outline: none; }
@@ -160,7 +175,8 @@
   #desenho .folha { background: var(--painel); border: 1px solid var(--linha); border-radius: 14px; padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; max-width: 760px; }
   #desenho h2 { margin: 0 0 4px; font-size: 19px; flex-basis: 100%; }
   #desenho h2 small { color: var(--fraco); font-weight: 400; font-size: 14px; margin-left: 6px; }
-  #grelha { width: min(384px, 80vw); height: auto; aspect-ratio: 1; border: 1px solid var(--linha); border-radius: 6px; cursor: crosshair; touch-action: none; image-rendering: pixelated; }
+  /* (A folha estica o que tem dentro ate a altura da coluna das ferramentas: a grelha nao, senao os quadradinhos ficavam retangulos.) */
+  #grelha { width: min(384px, 80vw); height: min(384px, 80vw); flex: none; align-self: flex-start; box-sizing: content-box; border: 1px solid var(--linha); border-radius: 6px; cursor: crosshair; touch-action: none; image-rendering: pixelated; }
   #desenho .lado { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 200px; }
   #paleta { display: grid; grid-template-columns: repeat(6, 30px); gap: 6px; }
   #paleta button { width: 30px; height: 30px; padding: 0; border-radius: 6px; border: 2px solid var(--linha); }
@@ -254,6 +270,8 @@
 </style>
 </head>
 <body>
+
+<div id="faixa" role="alert" hidden><span id="texto-faixa"></span><button type="button" id="continuar-aqui" hidden>Continuar aqui</button></div>
 
 <main id="escolher">
   <h1>Oficina</h1>
@@ -432,15 +450,76 @@ let aVer = null;
 const jogo = $("jogo");
 const imagem = $("imagem");
 
+// O numero que a Oficina deu a coisa aberta (ou ao jogo inteiro). Vai com
+// os pedidos que mexem nela: se entretanto foi aberta outra coisa noutro
+// separador, ou a Oficina voltou a arrancar, a Oficina recusa-os (409) em vez
+// de por o que aqui se escreveu no sitio errado.
+let abertura = null;
+const DA_COISA_ABERTA = ["/api/codigo", "/api/guardar", "/api/original", "/api/entrada", "/api/reabrir", "/api/fechar",
+  "/api/imagem", "/api/som", "/api/tirar-imagem", "/api/tirar-som", "/api/apagar", "/api/renomear", "/api/lista",
+  "/api/caixas", "/api/qual-imagem", "/api/pergunta"];
+const SEM_RESPOSTA = "A Oficina deixou de responder. A janela preta onde ela corre foi fechada? "
+  + "Chama o professor. O que já guardaste não se perdeu.";
+let falhasSeguidas = 0;
+// Abrir uma coisa, abrir o jogo inteiro e fechar mudam esse numero. Enquanto
+// um desses pedidos vai a caminho, os outros pedidos desta pagina ainda levam
+// o antigo: a recusa deles nao quer dizer nada.
+const MUDAM_A_ABERTURA = ["/api/abrir", "/api/jogar", "/api/fechar"];
+let aMudar = 0;
+
+function mostrarFaixa(texto, comBotao) {
+  $("texto-faixa").textContent = texto;
+  $("continuar-aqui").hidden = !comBotao;
+  $("faixa").hidden = false;
+}
+
 async function pedir(caminho, dados) {
+  const minha = abertura;
+  if (dados !== undefined && abertura !== null && DA_COISA_ABERTA.includes(caminho)) dados = {...dados, abertura};
   const opcoes = dados === undefined ? {} : {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(dados),
   };
-  const resposta = await fetch(caminho, opcoes);
-  const corpo = await resposta.json();
-  if (!resposta.ok) throw new Error(corpo.falha || "Não deu.");
-  return corpo;
+  const muda = MUDAM_A_ABERTURA.includes(caminho);
+  if (muda) aMudar++;
+  try {
+    let resposta;
+    try {
+      resposta = await fetch(caminho, opcoes);
+    } catch (erro) {
+      // Nem chegou a Oficina: o programa dela foi fechado.
+      falhasSeguidas++;
+      if (falhasSeguidas >= 4 && $("continuar-aqui").hidden) mostrarFaixa(SEM_RESPOSTA, false);
+      throw new Error(SEM_RESPOSTA);
+    }
+    falhasSeguidas = 0;
+    if ($("continuar-aqui").hidden) $("faixa").hidden = true;      // voltou a responder
+    const corpo = await resposta.json();
+    if (resposta.status === 409 && minha === abertura && (muda || aMudar === 0)) mostrarFaixa(corpo.falha, true);
+    if (!resposta.ok) throw new Error(corpo.falha || "Não deu.");
+    if (muda) abertura = caminho === "/api/fechar" ? null : corpo.abertura;
+    return corpo;
+  } finally {
+    if (muda) aMudar--;
+  }
 }
+
+$("continuar-aqui").onclick = async () => {
+  // Esta pagina passa a ser a que vale. O que ca estava escrito e ainda nao
+  // tinha sido guardado volta para o editor, e segue o caminho de sempre.
+  $("continuar-aqui").hidden = true;
+  $("faixa").hidden = true;
+  abertura = null;
+  if ($("editar").hidden) { mostrarJogos(); return; }
+  if (aJogarTudo) { jogarTudo(jogoAberto, voltarPara); return; }
+  const meu = codigo.value;
+  const mexido = porGuardar();
+  await abrir(jogoAberto, escolhaAberta);
+  if (mexido && codigo.value !== meu) {
+    codigo.value = meu;
+    pintar();
+    enviar();
+  }
+};
 
 /* ---------------- escolher ---------------- */
 
@@ -473,6 +552,65 @@ function cartaoDoJogo(jogo) {
   cartao.append(capa, dentro);
   cartao.onclick = () => { jogoVisto = jogo.id; mostrarJogos(); };
   return cartao;
+}
+
+// O que vale em todos os jogos (o de cada um vem do ficheiro dele, em oficina/jogos/).
+const NAO_DA_EM_NENHUM = [
+  "Não apagues o código todo de uma coisa. Para a tirares do jogo há o botão vermelho de apagar.",
+  "Nas regras, nos acontecimentos e nos desenhos, não mudes a primeira linha (a do def): o jogo chama a função por esse nome.",
+  "Aqui não se usa import nem open: o código mexe no jogo, não no computador.",
+];
+const PARA_NAO_PERDER = [
+  "O que escreves só fica no jogo quando carregas em «Guardar alterações» (o botão acende quando o jogo aceita o código).",
+  "Um erro não estraga nada: o jogo fica como estava e a Oficina diz em que linha está. Se te perderes, «Repor o original».",
+  "No fim, carrega em «Descarregar o meu jogo»: o zip é o teu trabalho. Para continuares noutro dia, «Abrir um jogo guardado».",
+  "Usa a Oficina num só separador do browser.",
+];
+
+function instrucoesDoJogo(jogo) {
+  // As instrucoes do jogo: como se joga, por onde comecar, o que se pode e o
+  // que nao da. Abertas da primeira vez; quem as fechar fica com elas fechadas.
+  const dados = jogo.instrucoes;
+  const caixa = elemento("details", "", "instrucoes");
+  const chave = "oficina-instrucoes-" + jogo.id;
+  let fechadas = false;
+  try { fechadas = localStorage.getItem(chave) === "fechadas"; } catch (erro) {}
+  caixa.open = !fechadas;
+  caixa.ontoggle = () => { try { localStorage.setItem(chave, caixa.open ? "abertas" : "fechadas"); } catch (erro) {} };
+  caixa.append(elemento("summary", "Instruções: por onde começar, o que podes e o que não dá"));
+  const dentro = elemento("div", "", "colunas");
+  const parte = (titulo, classe) => {
+    const div = elemento("div", "", classe);
+    div.append(elemento("h4", titulo));
+    dentro.append(div);
+    return div;
+  };
+  const listar = (onde, frases) => {
+    const ul = elemento("ul");
+    for (const frase of frases) ul.append(elemento("li", frase));
+    onde.append(ul);
+  };
+  if (dados.joga) parte("Como se joga", "larga").append(elemento("p", dados.joga));
+  const comeca = parte("Por onde começar", "larga");
+  const passos = elemento("ol");
+  for (const [texto, titulo] of dados.comeca || []) {
+    const li = elemento("li", texto);
+    const escolha = titulo && jogo.escolhas.find(e => e.titulo === titulo);
+    if (escolha) {
+      const botao = elemento("button", "Abrir");
+      botao.type = "button";
+      botao.onclick = () => abrir(jogo.id, escolha.id);
+      li.append(" ", botao);
+    }
+    passos.append(li);
+  }
+  comeca.append(passos);
+  const podes = parte("O que podes fazer", "sim");
+  listar(podes, (dados.podes || []).concat(haAjudante ? ["Pedir ao ajudante: pergunta o que não percebes, ou pede-lhe uma mudança."] : []));
+  listar(parte("O que não dá", "nao"), (dados.nao || []).concat(NAO_DA_EM_NENHUM));
+  listar(parte("Para não perderes o teu trabalho", "larga"), PARA_NAO_PERDER);
+  caixa.append(dentro);
+  return caixa;
 }
 
 async function mostrarJogos() {
@@ -528,7 +666,8 @@ async function mostrarJogos() {
     pode("Pôr as tuas imagens e sons", "Desenha aqui mesmo, escolhe um ficheiro, ou grava um som com o microfone.");
     if (haAjudante) pode("Pedir ao ajudante", "Pergunta o que não percebes, ou pede-lhe uma mudança.");
     pode("Jogar o jogo inteiro", "Para veres como ficou com tudo o que mudaste.");
-    cartao.append(podes);
+    if (jogo.instrucoes) cartao.append(instrucoesDoJogo(jogo));
+    else cartao.append(podes);
     const grupos = new Map();
     for (const escolha of jogo.escolhas) {
       if (!grupos.has(escolha.grupo)) grupos.set(escolha.grupo, []);
@@ -816,6 +955,7 @@ async function pedirParaJuntar(jogo, nome, pacotes, decisoes) {
 /* ---------------- editar ---------------- */
 
 async function abrir(jogo, escolha, recado) {
+  clearTimeout(espera);      // o que estava para ser mandado era da coisa de antes
   let dados;
   try {
     dados = await pedir("/api/abrir", {jogo, escolha});
@@ -986,7 +1126,7 @@ function mostrarErro(erro) {
 async function verEstado() {
   let estado;
   try {
-    estado = await pedir("/api/estado?desde=" + desde);
+    estado = await pedir("/api/estado?desde=" + desde + (abertura === null ? "" : "&abertura=" + abertura));
   } catch (erro) {
     return;
   }
@@ -1933,7 +2073,7 @@ async function perguntar(texto) {
     const pedido = await fetch("/api/pergunta", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
-        pergunta: texto, codigo: codigo.value, conversa,
+        abertura, pergunta: texto, codigo: codigo.value, conversa,
         erro: haAviso() ? $("estado").innerText : "", linha: linhaMal,
       }),
     });
@@ -2039,6 +2179,7 @@ $("voltar").onclick = async () => {
   if (!(await podeSair())) return;
   clearTimeout(espera);
   try { await pedir("/api/fechar", {}); } catch (erro) {}
+  clearInterval(aVer);
   if (aJogarTudo && voltarPara) {
     abrir(jogoAberto, voltarPara);
     return;

@@ -28,6 +28,7 @@ import socket
 import struct
 import sys
 import threading
+import time
 import traceback
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -73,10 +74,27 @@ def enviar(mensagem):
 
 
 class Prints:
-    # O que o jogo escreve com print() vai para o editor.
+    # O que o jogo escreve com print() vai para o editor. Um print dentro de
+    # uma funcao que corre a cada frame (ou para cada quadrado do mapa) sao
+    # milhares de linhas por segundo, e a oficina afogava-se nelas: de cada
+    # segundo so seguem as primeiras.
+    POR_SEGUNDO = 20
+
+    def __init__(self):
+        self.desde = 0
+        self.quantos = 0
+
     def write(self, texto):
         if texto.strip() != "":
-            enviar({"tipo": "print", "texto": texto.rstrip()})
+            agora = time.monotonic()
+            if agora - self.desde >= 1:
+                self.desde = agora
+                self.quantos = 0
+            self.quantos = self.quantos + 1
+            if self.quantos <= self.POR_SEGUNDO:
+                enviar({"tipo": "print", "texto": texto.rstrip()[:500]})
+            elif self.quantos == self.POR_SEGUNDO + 1:
+                enviar({"tipo": "print", "texto": "(... o jogo está a escrever muitas linhas por segundo: só mostro algumas)"})
         return len(texto)
 
     def flush(self):
@@ -183,6 +201,7 @@ class Corrida:
         self.em_prova = None         # numero do pedido ainda a ser provado
         self.quadros = 0
         self.foto = None
+        self.pronto = False          # ja se disse a oficina que o jogo arrancou
         self.ns = None
         self.palco = None
         self.flip = None
@@ -270,6 +289,11 @@ class Corrida:
             raise Sair()
 
     def antes_de_mostrar(self):
+        if not self.pronto:
+            # O jogo chegou ao primeiro frame: daqui em diante, se se calar
+            # e porque ficou preso (ate aqui podia so estar a arrancar).
+            self.pronto = True
+            enviar({"tipo": "pronto"})
         while True:
             try:
                 pedido = recebidas.get_nowait()
@@ -344,6 +368,7 @@ class Corrida:
             em_falta += ['Falta a função "' + nome + '". O jogo chama-a por esse nome: '
                          "não lhe mudes o nome nem a apagues."
                          for nome in blocos.nomes_das_funcoes(antes) if nome not in funcoes]
+            em_falta += blocos.repetidos(antes, arvore)
             em_falta += blocos.proibidos(nos)
             if em_falta:
                 enviar({"tipo": "problemas", "id": numero, "avisos": [], "problemas": em_falta})

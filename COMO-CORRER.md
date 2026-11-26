@@ -456,6 +456,11 @@ batalhas por turnos com um mundo por onde se anda), **O Cerco** (s13) e **Mãos 
   (costuma ser `http://127.0.0.1:8765`). Com `--sem-navegador` não tenta
   abrir; com `--porta 9000` usa outra porta.
 - Não precisa de internet.
+- **Antes de uma sessão**, em cada computador: `python3 oficina/oficina.py --verificar`
+  diz se está tudo pronto (o pygame, as pastas, os quatro jogos, o ajudante)
+  e se o jogo já foi mudado nesse computador.
+- A página de cada jogo abre com as **instruções** dele: como se joga, por
+  onde começar, o que se pode e o que não dá.
 
 O botão verde **Jogar o jogo inteiro** abre o jogo como ele é, com tudo o que
 já foi mudado, para experimentar a sério; **Voltar** regressa ao código.
@@ -572,6 +577,9 @@ aparece em vez do quadrado azul, **sem mexer numa linha de código**.
 | s14: «sem câmara» no título | Lê a linha laranja, que diz o motivo. No Mac, a causa habitual é a permissão: Definições do Sistema → Privacidade e Segurança → Câmara. Depois tecla **C** |
 | s14: abre a câmara errada | Tecla **C**, ou muda a constante `CAMARA` no topo do ficheiro |
 | s14: `Password:` no terminal ao arrancar | É o `sudo` a instalar o `mediapipe` no Python do sistema. Escreve a palavra-passe de administrador (não aparece nada enquanto escreves) |
+| Oficina: faixa vermelha «A Oficina deixou de responder» | Fecharam a janela do terminal onde ela corria. Corre-a outra vez: a página volta sozinha, e o que estava guardado não se perdeu |
+| Oficina: faixa vermelha «Esta página ficou para trás» | A Oficina foi aberta noutro separador, ou voltou a arrancar. **Continuar aqui**, e fecha o outro separador |
+| Oficina: «O jogo ficou preso» | O código tem um ciclo que nunca acaba, ou um número gigante. A Oficina já voltou a abrir o jogo: é corrigir, ou **Repor o original** |
 | Oficina: não há botão «Pedir ajuda» | O `oficina/servidores.txt` não tem nenhum endereço sem `#` à frente |
 | Oficina: «O ajudante não responde agora» | Nenhum dos computadores ajudantes atendeu. `python3 oficina/ajudante.py ver` diz qual está em baixo; o motivo de cada um fica também no terminal da Oficina |
 | Oficina: a primeira resposta do ajudante demora muito | O modelo ainda estava a ir para a memória. Corre o `acordar` antes da sessão |

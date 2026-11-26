@@ -18,6 +18,41 @@ NOME = "O Cerco"
 FICHEIRO = "s13-o-cerco/o-cerco.py"
 DESCRICAO = "Um tower defense. Guimarães, 1128."
 
+# As instrucoes do jogo, que a pagina mostra a entrada dele:
+#   "joga"    como se joga
+#   "comeca"  por onde comecar, passo a passo: (o que fazer, o titulo da coisa
+#             a abrir, ou None). Com titulo, o passo ganha um botao que a abre.
+#   "podes"   o que aqui se pode fazer
+#   "nao"     o que nao da, ou da asneira
+INSTRUCOES = {
+    "joga": "As teclas 1, 2, 3 e 4 escolhem a torre, e um clique na relva constrói-a. Espaço manda vir a onda "
+            "seguinte. Com uma torre escolhida, U melhora-a e V vende-a. F põe o jogo a dobrar e P faz pausa. "
+            "Perdes se os inimigos chegarem ao castelo vezes demais.",
+    "comeca": [
+        ("Joga uma ou duas ondas no «Jogar o jogo inteiro», para saberes o que há.", None),
+        ("Abre o Soldado e muda-lhe a velocidade e a cor. Vês logo a diferença no jogo.", "Soldado"),
+        ("Abre o Besteiro e dá-lhe mais alcance, ou põe-no mais barato.", "Besteiro"),
+        ("Abre a Onda 1 e manda vir mais inimigos, ou outros.", "Onda 1"),
+        ("Abre o mapa e desenha outro caminho com as letras.", "O mapa"),
+        ("Depois inventa: «+ Novo inimigo», «+ Nova torre», e as Regras do jogo.", None),
+    ],
+    "podes": [
+        "Mudar os números, as cores e os nomes dos inimigos e das torres.",
+        "Criar inimigos, torres e ondas novas, e apagar os que não queres.",
+        "Desenhar outro caminho. A entrada (E) pode ficar em qualquer borda: os inimigos entram por aí.",
+        "Dar uma imagem e um som teus a cada inimigo e a cada torre.",
+        "Mudar as regras: quem a torre ataca, quanto custa melhorar, quanto ouro dá uma onda.",
+        "Escrever nos Acontecimentos o que acontece quando um inimigo cai, quando começa uma onda...",
+    ],
+    "nao": [
+        "No mapa tem de haver um só E e um só C, e o caminho (#) tem de ir de um ao outro sem buracos.",
+        "O caminho só pode ter um quadrado de largura e não pode tocar em si próprio.",
+        "O mapa tem 20 letras em cada linha e 13 linhas. O que passar disso fica fora do ecrã.",
+        "Uma onda só pode chamar inimigos que existam. Para os escolheres sem te enganares no nome, "
+        "usa o botão «Escolher os inimigos», com a onda aberta.",
+    ],
+}
+
 # Uma frase por grupo, para a pagina do jogo dizer o que la ha.
 SOBRE_OS_GRUPOS = {
     "Inimigos": "Vida, velocidade, cor, tamanho. Podes pôr uma imagem tua.",
@@ -424,6 +459,45 @@ def _arrumar_ondas(fonte):
     texto = re.sub(r'\[[ \t]*\n[ \t]*(\{"inimigo")', r"[\1", texto)
     texto = re.sub(r"\},[ \t]*\n[ \t]*\]", "}]", texto)
     return "\n".join(linhas[:no.lineno - 1] + texto.split("\n") + linhas[no.end_lineno:])
+
+
+def juntar_acabar(estado, fonte, ordem):
+    # (Para o "Juntar jogos": ve o juntar.py.) Um jogo apagou um inimigo (e
+    # tirou-o das ondas DELE); outro mexeu numa onda que ainda o chamava.
+    # Juntos, ficava uma onda a chamar por um inimigo que ja nao existe, e o
+    # jogo parava quando ela chegasse. Tira-se das ondas o que ja nao existe,
+    # como faz o botao de apagar. (Um de cada vez, para as linhas nao se
+    # desencontrarem.)
+    for _ in range(200):
+        try:
+            arvore = ast.parse(fonte)
+        except SyntaxError:
+            return fonte
+        linhas = fonte.split("\n")
+        cortes, trocas = [], []
+        no = blocos.instrucao(arvore, "INIMIGOS")
+        existem = [blocos.texto_constante(chave) for chave in no.value.keys] \
+            if no is not None and isinstance(no.value, ast.Dict) else []
+        ondas = blocos.instrucao(arvore, "ONDAS")
+        feito = False
+        for onda in ondas.value.elts if existem and ondas is not None and isinstance(ondas.value, ast.List) else []:
+            grupos = onda.elts if isinstance(onda, ast.List) else []
+            a_mais = [grupo for grupo in grupos if isinstance(grupo, ast.Dict)
+                      and blocos.valor_da_chave(grupo, "inimigo") is not None
+                      and blocos.valor_da_chave(grupo, "inimigo") not in existem]
+            if a_mais and not feito:
+                if len(grupos) == 1 or not base._tirar_da_lista(linhas, a_mais[0], cortes, trocas):
+                    base._trocar_no(linhas, base._no_da_chave(a_mais[0], "inimigo"), '"' + str(existem[0]) + '"', trocas)
+                feito = True
+        if not feito:
+            return fonte
+        nova = base._aplicar(linhas, cortes, trocas)
+        try:
+            ast.parse(nova)
+        except SyntaxError:
+            return fonte
+        fonte = nova
+    return fonte
 
 
 def apagar(fonte, escolha):
@@ -901,13 +975,19 @@ class Palco:
         # os numeros antigos, por isso saem e vem outros novos.
         if not self.preparado:
             return
+        outro_caminho = False
         if self.tipo == "mapa":
+            antigo = ns.get("CAMINHO_PONTOS")
             ns["CAMINHO_PONTOS"] = ns["encontrar_caminho"]()
+            outro_caminho = ns["CAMINHO_PONTOS"] != antigo
         if self.sozinho:
             # O jogo continua como ia. So recomeca a onda quando isso e
             # preciso para se ver a mudanca: as ondas novas desde a primeira,
-            # e "quando comeca uma onda" a acontecer outra vez, ja.
-            if self.tipo in ("ondas", "onda") or self.regra == "ao_comecar_onda":
+            # e "quando comeca uma onda" a acontecer outra vez, ja. E quando
+            # o caminho muda: os inimigos que ja la andavam iam pelo caminho
+            # antigo (a corta-mato, por cima da relva), por isso saem e a
+            # onda recomeca, a entrar pela entrada nova.
+            if self.tipo in ("ondas", "onda") or self.regra == "ao_comecar_onda" or outro_caminho:
                 ns["inimigos"] = []
                 ns["projeteis"] = []
                 ns["a_por_sair"] = []
