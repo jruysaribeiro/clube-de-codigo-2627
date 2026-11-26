@@ -29,3 +29,6 @@ comum/assets/imagens/*.png
 comum/assets/imagens/*.novo
 comum/assets/sons/*.wav
 comum/assets/sons/*.novo
+
+# Definicoes do editor de cada um (as cores da janela do VS Code, por exemplo)
+.vscode/
