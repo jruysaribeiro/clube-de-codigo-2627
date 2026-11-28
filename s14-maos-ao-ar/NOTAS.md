@@ -149,7 +149,7 @@ O ficheiro tem o mesmo formato do Halloween: **«MEXE SÓ AQUI»** em cima,
 - Guardar o recorde de estrelas num ficheiro.
 - Duas mãos, dois jogadores (`num_hands=2` em `ligar_camara()`).
 
-## Todos ao molho: 2, 3 ou 4 jogadores
+## Todos ao molho: de 1 a 4 jogadores
 
 ```
 python3 maos-ao-ar-ao-molho.py
@@ -163,18 +163,21 @@ números: quem mudar a `GRAVIDADE` lá, muda-a aqui).
   Com 2 jogadores, metade para cada um (esquerda e direita). Com 3 ou 4, um
   quarto para cada um: dois de pé atrás, dois à frente de joelhos ou sentados.
   O bocado de cada um aparece no canto do ecrã que lhe corresponde.
-- No título, as teclas `2`, `3` e `4` dizem quantos jogam. Tudo o resto
+- No título, as teclas `1` a `4` (ou um clique) dizem quantos jogam. Quem joga
+  sozinho fica com a imagem toda, contra três bots. Tudo o resto
   faz-se com a mão.
-- **São sempre quatro em campo.** Com 2 ou 3 jogadores, os lugares que sobram
+- **São sempre quatro em campo.** Com 1, 2 ou 3 jogadores, os lugares que sobram
   são de bots, que jogam sozinhos e ficam nos cantos de baixo do ecrã. Para
   os tornar mais fáceis ou mais difíceis: `BOT_DESCUIDO`, `BOT_PONTARIA` e
   `BOT_A_PENSAR`. Para jogar sem eles: `COM_BOTS = False`.
 - **Escolher a personagem só com gestos:** mão para os lados muda, punho
   fechado escolhe, apontar o indicador volta atrás. São oito, cada uma com o
   seu jeito (a lista `PERSONAGENS`), e duas pessoas não podem ficar com a mesma.
-- **É um torneio de seis rondas**, de três tipos: corrida (as moedas dão
-  turbo), caça às moedas (uma pancada faz cair moedas) e batalha (o último de
-  pé). Os pontos somam-se e a final vale a dobrar.
+- **É um torneio de seis rondas**, e há **quarenta níveis** de três tipos:
+  14 corridas (as moedas dão turbo), 13 caças às moedas (uma pancada faz cair
+  moedas) e 13 batalhas (o último de pé). Antes de cada ronda, uma roleta de
+  cartas sorteia o nível: nunca sai o mesmo duas vezes no mesmo torneio, nem
+  dois do mesmo tipo de seguida. Os pontos somam-se e a final vale a dobrar.
 - **O molho:** os jogadores ressaltam uns nos outros, um tiro deixa o outro
   tonto, e saltar para cima de alguém também.
 - Numa corrida o ecrã segue quem vai à frente. Quem ficar para trás do ecrã é
@@ -188,9 +191,10 @@ pequenas: a luz de frente conta ainda mais. Isto foi testado com jogadores a
 fingir (sem câmara), **não com quatro pessoas a sério à frente de uma
 câmara**: se as mãos falharem muito, aproximem-se e joguem a dois ou a três.
 
-Para mexer: as rondas são mapas de texto como os outros (a lista `RONDAS`,
-com `1 2 3 4` onde cada um começa), e as regras do molho são constantes
-(`FORCA_DO_CHOQUE`, `TEMPO_TONTO`, `PONTOS_POR_LUGAR`...).
+Para mexer: os níveis são mapas de texto como os outros (a lista `NIVEIS`,
+com `1 2 3 4` onde cada um começa). Um nível novo que se acrescente entra logo
+no sorteio, e `RONDAS_POR_TORNEIO` diz quantos se jogam. As regras do molho
+são constantes (`FORCA_DO_CHOQUE`, `TEMPO_TONTO`, `PONTOS_POR_LUGAR`...).
 
 ## A conversa: o que torna um jogo divertido?
 
