@@ -30,7 +30,7 @@
 # Cada jogador escolhe a sua personagem SO COM A MAO: mao para os lados
 # muda, punho fechado escolhe, apontar o indicador volta atras.
 #
-#   2, 3, 4   quantos jogam (no titulo)      P   pausa
+#   2, 3, 4   quantos jogam (no titulo; ou clica)   P   pausa
 #   C         a camara seguinte              T   jogar so com o teclado
 #   F, F11    janela / ecra inteiro          Esc voltar ao titulo / sair
 #   Enter     comecar ja com quem esta pronto
@@ -1907,6 +1907,11 @@ def como_confirmar():
 # =====================================================================
 # M. OS ECRAS DE TITULO E DE ESCOLHA
 # =====================================================================
+def caixa_de_quantos(quantos):
+    # O botao do titulo para escolher 2, 3 ou 4 jogadores.
+    return pygame.Rect(80 + (quantos - 2) * 84, 184, 72, 72)
+
+
 def desenhar_titulo(v):
     ecra = b.janela["ecra"]
     frame = b.jogo["frame"]
@@ -1919,10 +1924,10 @@ def desenhar_titulo(v):
     escrever(SUBTITULO, "m", BRANCO, meio, 100, "centro")
 
     # quantos jogam
-    escrever("Quantos jogam?  (teclas 2, 3 e 4)", "p", BRANCO, 200, 150, "centro")
+    escrever("Quantos jogam?  (clica, ou teclas 2, 3 e 4)", "p", BRANCO, 200, 150, "centro")
     for i in range(3):
         quantos = i + 2
-        caixa = pygame.Rect(80 + i * 84, 184, 72, 72)
+        caixa = caixa_de_quantos(quantos)
         cor = (60, 65, 110)
         if quantos == jogo["quantos"]:
             cor = VERDE
@@ -2189,6 +2194,13 @@ def main():
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 a_correr = False
+            elif evento.type == pygame.MOUSEBUTTONDOWN and fase == "titulo":
+                # clicar num dos botoes 2, 3, 4
+                for quantos in (2, 3, 4):
+                    if caixa_de_quantos(quantos).collidepoint(evento.pos):
+                        if quantos != jogo["quantos"]:
+                            definir_jogadores(quantos)
+                        tocar("toque")
             elif evento.type == pygame.KEYDOWN:
                 tecla = evento.key
                 for i in range(4):
