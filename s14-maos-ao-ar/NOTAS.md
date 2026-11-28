@@ -165,6 +165,10 @@ números: quem mudar a `GRAVIDADE` lá, muda-a aqui).
   O bocado de cada um aparece no canto do ecrã que lhe corresponde.
 - No título, as teclas `2`, `3` e `4` dizem quantos jogam. Tudo o resto
   faz-se com a mão.
+- **São sempre quatro em campo.** Com 2 ou 3 jogadores, os lugares que sobram
+  são de bots, que jogam sozinhos e ficam nos cantos de baixo do ecrã. Para
+  os tornar mais fáceis ou mais difíceis: `BOT_DESCUIDO`, `BOT_PONTARIA` e
+  `BOT_A_PENSAR`. Para jogar sem eles: `COM_BOTS = False`.
 - **Escolher a personagem só com gestos:** mão para os lados muda, punho
   fechado escolhe, apontar o indicador volta atrás. São oito, cada uma com o
   seu jeito (a lista `PERSONAGENS`), e duas pessoas não podem ficar com a mesma.

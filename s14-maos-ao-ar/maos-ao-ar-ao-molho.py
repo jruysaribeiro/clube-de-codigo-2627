@@ -30,6 +30,9 @@
 # Cada jogador escolhe a sua personagem SO COM A MAO: mao para os lados
 # muda, punho fechado escolhe, apontar o indicador volta atras.
 #
+# Sao sempre QUATRO em campo: com 2 ou 3 jogadores, os lugares que sobram
+# sao de bots, que jogam sozinhos (e que se distraem, para dar hipotese).
+#
 #   2, 3, 4   quantos jogam (no titulo; ou clica)   P   pausa
 #   C         a camara seguinte              T   jogar so com o teclado
 #   F, F11    janela / ecra inteiro          Esc voltar ao titulo / sair
@@ -71,6 +74,12 @@ ZONA_DIREITA = 0.62      # mao a direita desta linha: vira-se para a direita
 LINHA_CORRER = 0.36      # mao acima desta linha: corre
 TEMPO_SEM_MAO = 0.35     # segundos sem ver a mao ate a personagem parar
 ECRA_INTEIRO = True
+
+# Os bots: as personagens que jogam sozinhas nos lugares que sobram.
+COM_BOTS = True          # False: jogam so as pessoas
+BOT_DESCUIDO = 0.2       # de 0 a 1: quantas vezes se esquece de saltar um perigo
+BOT_PONTARIA = 0.03      # de 0 a 1: a vontade de disparar quando tem alguem a frente
+BOT_A_PENSAR = 60        # frames que demora a escolher a moeda seguinte
 
 
 # ---------------------------------------------------------------------
@@ -380,7 +389,8 @@ def zonas_para(quantos):
 
 def canto_de(indice, quantos):
     # Em que canto do ecra fica o jogador: (0 esquerda / 1 direita, 0 cima / 1 baixo)
-    if quantos == 2:
+    # Com 2 jogadores, os dois ficam em cima; os bots ficam sempre em baixo.
+    if quantos == 2 and indice < 2:
         return (indice, 0)
     return (indice % 2, indice // 2)
 
@@ -645,15 +655,33 @@ def novo_jogador(numero):
         "chegou": 0, "fora": 0, "vidas": 0, "moedas": 0,
         "tonto": 0, "invencivel": 0, "congelado": 0, "recuo": 0, "passo": 0.0,
         "anda": False, "corre": False,
+        # so para os bots (ver comando_do_bot)
+        "bot": False, "bot_relogio": 200, "bot_parado": False,
+        "bot_perigo": None, "bot_salta": True, "bot_alvo": None, "bot_alvo_tempo": 0,
     }
 
 
 def definir_jogadores(quantos):
+    # quantos: as pessoas. Os lugares ate 4 ficam para os bots, que nao tem
+    # bocado da camara: as zonas sao so das pessoas.
     jogo["quantos"] = quantos
     jogadores.clear()
-    for numero in range(1, quantos + 1):
-        jogadores.append(novo_jogador(numero))
+    total = quantos
+    if COM_BOTS:
+        total = 4
+    for numero in range(1, total + 1):
+        jogador = novo_jogador(numero)
+        jogador["bot"] = numero > quantos
+        jogadores.append(jogador)
     definir_zonas(quantos)
+
+
+def pessoas():
+    lista = []
+    for p in jogadores:
+        if not p["bot"]:
+            lista.append(p)
+    return lista
 
 
 def participantes():
@@ -682,6 +710,8 @@ def cor_de(p):
 
 
 def nome_de(p):
+    if p["bot"]:
+        return "Bot " + personagem_de(p)["nome"]
     return "J" + str(p["numero"]) + " " + personagem_de(p)["nome"]
 
 
@@ -1396,6 +1426,132 @@ def ler_comando(p, m, teclas, saltou):
     return comando
 
 
+# --- Os bots ---
+def perigo_a_frente(p, lado):
+    # O que o bot tem mesmo a frente dos pes: "parede", "perigo" (espinhos,
+    # lava ou um buraco sem fundo) ou "nada". Devolve tambem a coluna.
+    frente = p["x"] + 15 + lado * (21 + abs(p["vx"]) * 5)
+    coluna = int(frente // TILE)
+    linha = int((p["y"] + ALTURA_J - 1) // TILE)
+    letra = b.letra_em(coluna, linha)
+    if letra in "#B":
+        return "parede", coluna
+    if letra == "^" or b.letra_em(coluna, linha + 1) == "~":
+        return "perigo", coluna
+    ha_fundo = False
+    for abaixo in range(linha + 1, LINHAS):
+        if b.ha_chao(coluna, abaixo):
+            ha_fundo = True
+    if not ha_fundo:
+        return "perigo", coluna
+    return "nada", coluna
+
+
+def comando_do_bot(p):
+    # Um bot decide o mesmo que uma pessoa: para onde se vira, se anda, se
+    # corre, se salta e se dispara. Nao faz batota: so ve o que esta no
+    # nivel, e de vez em quando distrai-se.
+    comando = {"direcao": 0, "andar": True, "correr": False,
+               "saltar": False, "disparar": False}
+    if p["congelado"] > 0:
+        p["bot_perigo"] = None          # renasceu: volta a pensar no perigo
+
+    # De tempos a tempos para um bocadinho, como quem tira a mao.
+    p["bot_relogio"] -= 1
+    if p["bot_relogio"] <= 0:
+        p["bot_parado"] = not p["bot_parado"]
+        if p["bot_parado"]:
+            p["bot_relogio"] = random.randint(30, 80)
+        else:
+            p["bot_relogio"] = random.randint(240, 480)
+
+    meu_x = p["x"] + 15
+    alvo = None                         # (x, y) para onde quer ir
+    if ronda["modo"] == "corrida":
+        comando["direcao"] = 1
+        da_frente = lider()
+        # so corre quando vai atras: assim a corrida fica renhida
+        if da_frente is not None and da_frente["x"] - p["x"] > 150:
+            comando["correr"] = True
+    elif ronda["modo"] == "moedas":
+        # Vai a moeda mais facil (perto e a mesma altura). De vez em quando
+        # muda de ideias, para nao ficar preso debaixo de uma que nao alcanca.
+        p["bot_alvo_tempo"] -= 1
+        if p["bot_alvo"] is not None and p["bot_alvo"] not in nivel["moedas"]:
+            # A moeda desapareceu (apanhou-a ele, ou outro): fica um instante
+            # a pensar, como uma pessoa a procurar a seguinte.
+            p["bot_alvo"] = None
+            p["bot_alvo_tempo"] = random.randint(BOT_A_PENSAR // 2, BOT_A_PENSAR)
+        elif p["bot_alvo_tempo"] <= 0:
+            p["bot_alvo"] = None
+            p["bot_alvo_tempo"] = 150
+            if len(nivel["moedas"]) > 0:
+                if random.random() < 0.3:
+                    p["bot_alvo"] = random.choice(nivel["moedas"])
+                else:
+                    melhor = None
+                    for moeda in nivel["moedas"]:
+                        custo = abs(moeda.centerx - meu_x) + 3 * abs(moeda.centery - (p["y"] + 21))
+                        if melhor is None or custo < melhor[0]:
+                            melhor = (custo, moeda)
+                    p["bot_alvo"] = melhor[1]
+        if p["bot_alvo"] is not None:
+            alvo = (p["bot_alvo"].centerx, p["bot_alvo"].centery - 21)
+    else:
+        # Numa batalha vai atras de quem estiver mais perto.
+        for outro in em_campo():
+            if outro is not p:
+                if alvo is None or abs(outro["x"] + 15 - meu_x) < abs(alvo[0] - meu_x):
+                    alvo = (outro["x"] + 15, outro["y"])
+
+    if alvo is not None:
+        dx = alvo[0] - meu_x
+        dy = alvo[1] - p["y"]           # negativo: o alvo esta mais acima
+        if abs(dx) > 12:
+            comando["direcao"] = sinal(dx)
+        if dy < -30 and abs(dx) < 120 and random.random() < 0.06:
+            comando["saltar"] = True    # tenta subir
+        if ronda["modo"] == "batalha":
+            if abs(dy) < 30 and abs(dx) < 380:
+                if abs(dx) < 110:
+                    comando["andar"] = False        # ja chega de perto
+                if random.random() < BOT_PONTARIA:
+                    comando["disparar"] = True
+    elif ronda["modo"] != "corrida":
+        comando["andar"] = False        # nada para fazer: espera
+
+    lado = comando["direcao"]
+    if lado == 0:
+        lado = p["virado"]
+
+    # Os inimigos a frente: um tiro de longe, um salto de perto.
+    for inimigo in nivel["inimigos"]:
+        distancia = (inimigo["x"] - p["x"]) * lado
+        mesma_altura = abs((inimigo["y"] + inimigo["a"]) - (p["y"] + ALTURA_J)) < 40
+        if mesma_altura and 0 < distancia < 240:
+            comando["disparar"] = True
+            if distancia < 75 and p["no_chao"]:
+                comando["saltar"] = True
+
+    if p["bot_parado"]:
+        comando["andar"] = False
+        comando["disparar"] = False
+
+    # O que tem a frente dos pes. Uma parede salta-se sempre. Um perigo
+    # salta-se quase sempre: a decisao toma-se uma vez por cada perigo.
+    if p["no_chao"] and comando["andar"]:
+        o_que, coluna = perigo_a_frente(p, lado)
+        if o_que == "parede":
+            comando["saltar"] = True
+        elif o_que == "perigo":
+            if p["bot_perigo"] != coluna:
+                p["bot_perigo"] = coluna
+                p["bot_salta"] = random.random() >= BOT_DESCUIDO
+            if p["bot_salta"]:
+                comando["saltar"] = True
+    return comando
+
+
 # =====================================================================
 # I. O ECRA DE ESCOLHA: cada um escolhe a sua personagem, so com a mao
 # =====================================================================
@@ -1462,12 +1618,12 @@ def escolher(p, m, toque, saltou):
 
 def atualizar_escolha(v, toques, saltos, forcar):
     prontos = 0
-    for p in jogadores:
+    for p in pessoas():
         i = p["numero"] - 1
         escolher(p, v["maos"][i], toques[i], saltos[i])
         if p["pronto"]:
             prontos += 1
-    if prontos == len(jogadores):
+    if prontos == len(pessoas()):
         jogo["arranque"] -= 1
     else:
         jogo["arranque"] = 150
@@ -1477,6 +1633,15 @@ def atualizar_escolha(v, toques, saltos, forcar):
 
 def comecar_torneio():
     for p in jogadores:
+        if p["bot"]:
+            # Um bot fica com uma personagem ao calhas, das que sobraram.
+            livres = []
+            for indice in range(len(PERSONAGENS)):
+                if not ocupada(indice, p):
+                    livres.append(indice)
+            if len(livres) > 0:
+                p["personagem"] = random.choice(livres)
+            p["pronto"] = True
         p["joga"] = p["pronto"]
         p["pontos"] = 0
     comecar_ronda(0)
@@ -1712,7 +1877,7 @@ def desenhar_bocado(v, indice, sitio, cor):
 def sitio_do_canto(indice):
     # Onde fica, no ecra, o bocado da camara de cada jogador durante o jogo.
     largura, altura = 128, 96
-    if jogo["quantos"] == 2:
+    if jogo["quantos"] == 2 and indice < 2:
         largura, altura = 96, 144
     lado, andar = canto_de(indice, jogo["quantos"])
     x = 8
@@ -1734,7 +1899,15 @@ def desenhar_canto(v, p):
     indice = p["numero"] - 1
     sitio = sitio_do_canto(indice)
     cor = cor_de(p)
-    desenhar_bocado(v, indice, sitio, cor)
+    if p["bot"]:
+        # um bot nao tem camara: fica o retrato dele
+        pygame.draw.rect(ecra, (30, 30, 48), sitio, border_radius=6)
+        ecra.blit(retrato(personagem_de(p), 1.25, b.jogo["frame"], False),
+                  (sitio.centerx - 40, sitio.y + 2))
+        escrever("BOT", "pp", CINZA, sitio.centerx, sitio.bottom - 20, "centro")
+        pygame.draw.rect(ecra, cor, sitio.inflate(4, 4), 4, border_radius=6)
+    else:
+        desenhar_bocado(v, indice, sitio, cor)
     lado = canto_de(indice, jogo["quantos"])[0]
     if lado == 0:
         x = sitio.right + 10
@@ -1933,9 +2106,11 @@ def desenhar_titulo(v):
             cor = VERDE
         pygame.draw.rect(ecra, cor, caixa, border_radius=12)
         escrever(str(quantos), "g", BRANCO, caixa.centerx, caixa.y + 16, "centro")
-    escrever("Cada um fica no seu bocado", "p", CINZA, 200, 280, "centro")
-    escrever("da imagem, e é só aí que", "p", CINZA, 200, 304, "centro")
-    escrever("a sua mão manda.", "p", CINZA, 200, 328, "centro")
+    escrever("Cada um fica no seu bocado", "p", CINZA, 200, 272, "centro")
+    escrever("da imagem, e é só aí que", "p", CINZA, 200, 294, "centro")
+    escrever("a sua mão manda.", "p", CINZA, 200, 316, "centro")
+    if COM_BOTS and jogo["quantos"] < 4:
+        escrever("Os lugares que sobram são de bots.", "pp", AMARELO, 200, 344, "centro")
 
     # a camara inteira, com o bocado de cada um
     quadro = pygame.Rect(400, 150, 480, 360)
@@ -1977,7 +2152,7 @@ def desenhar_escolha(v):
     frame = b.jogo["frame"]
     ecra.fill((22, 24, 48))
     com_camara = olho["ligada"] and not jogo["modo_teclado"]
-    for p in jogadores:
+    for p in pessoas():
         indice = p["numero"] - 1
         m = v["maos"][indice]
         r = celula(indice).inflate(-10, -10)
@@ -2038,9 +2213,13 @@ def desenhar_escolha(v):
 
     if jogo["quantos"] == 3:
         r = celula(3)
-        escrever("Escolham a personagem", "m", BRANCO, r.centerx, r.y + 90, "centro")
-        escrever("Enter: começar já com quem está pronto", "p", CINZA, r.centerx, r.y + 140, "centro")
-        escrever("Esc: voltar", "p", CINZA, r.centerx, r.y + 170, "centro")
+        escrever("Escolham a personagem", "m", BRANCO, r.centerx, r.y + 80, "centro")
+        if COM_BOTS:
+            escrever("O quarto jogador é um bot", "p", AMARELO, r.centerx, r.y + 124, "centro")
+        escrever("Enter: começar já com quem está pronto", "p", CINZA, r.centerx, r.y + 160, "centro")
+        escrever("Esc: voltar", "p", CINZA, r.centerx, r.y + 190, "centro")
+    elif jogo["quantos"] == 2 and COM_BOTS:
+        escrever("Os outros dois jogadores são bots", "p", AMARELO, LARGURA // 2, ALTURA - 40, "centro")
     if jogo["arranque"] < 150:
         b.escurecer(90)
         escrever("Todos prontos!", "g", BRANCO, LARGURA // 2, ALTURA // 2 - 100, "centro")
@@ -2075,6 +2254,9 @@ def logica(v, toques, confirmou, forcar):
     # o punho de cada jogador
     saltos = []
     for p in jogadores:
+        if p["bot"]:
+            saltos.append(False)        # um bot nao tem mao nem teclas
+            continue
         m = v["maos"][p["numero"] - 1]
         saltou = toques[p["numero"] - 1]["salto"]
         if m["saltos"] != p["saltos_vistos"]:
@@ -2106,7 +2288,10 @@ def logica(v, toques, confirmou, forcar):
         comandos = {}
         for p in jogadores:
             i = p["numero"] - 1
-            comandos[p["numero"]] = ler_comando(p, v["maos"][i], teclas, saltos[i])
+            if p["bot"]:
+                comandos[p["numero"]] = comando_do_bot(p)
+            else:
+                comandos[p["numero"]] = ler_comando(p, v["maos"][i], teclas, saltos[i])
         passo_da_ronda(comandos)
     elif fase == "ronda_fim":
         b.atualizar_particulas()
