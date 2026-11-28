@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>O que torna um jogo divertido?</title>
+<!-- Apresentacao da sessao 14. Abre-se num navegador, sem instalar nada.
+     Setas ou Espaco: avancar e recuar.   N: notas para quem apresenta.   F: ecra inteiro.
+     O tipo de letra (Montserrat) vem da internet; sem ela, fica o Arial. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap">
+<style>
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; background: #06202F; overflow: hidden; }
+#palco { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0; }
+#palco > section { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; display: none; overflow: hidden; }
+#palco > section.atual { display: block; }
+section > aside { display: none; }
+ul, ol { padding-left: 1.2em; }
+table { border-collapse: collapse; }
+th, td { padding: 0.5em 0.6em; text-align: left; border-bottom: 1px solid #C9D2D8; }
+#notas { position: fixed; left: 0; right: 0; bottom: 0; padding: 16px 24px; background: #06202F; color: #FFFFFF;
+         font: 400 18px/1.4 Montserrat, Arial, sans-serif; display: none; }
+#notas.visivel { display: block; }
+#conta { position: fixed; right: 12px; top: 8px; color: #6B7C86; font: 400 14px Montserrat, Arial, sans-serif; }
+section {
+  --azul-fiolhais: #0A3953;
+  --laranja-inovacao: #F28C26;
+  --laranja-texto: #C9690E;
+  --nevoa: #E2E7EA;
+  --surface: #FFFFFF;
+  --surface-laranja: #F9EDE2;
+  --ink: #2E3E48;
+  --ink-muted: #6B7C86;
+  --on-azul: #FFFFFF;
+  --universe-code: #007BFF;
+  --on-universe: #000000;
+  padding: 128px 128px 160px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: 'Montserrat', Arial, sans-serif;
+}
+
+h1 { font-size: 112px; line-height: 1.1; font-weight: 700; color: var(--azul-fiolhais); }
+h2 { font-size: 72px; line-height: 1.1; font-weight: 700; color: var(--azul-fiolhais); }
+h3 { font-size: 44px; line-height: 1.15; font-weight: 700; color: var(--azul-fiolhais); }
+p { font-size: 32px; line-height: 1.35; font-weight: 400; }
+
+.corpo { display: flex; flex-direction: column; gap: 40px; }
+.titulo { display: flex; flex-direction: column; gap: 16px; }
+.olho { font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: 4px; color: var(--laranja-texto); }
+.linha { display: flex; gap: 40px; }
+.grelha { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+
+.cartao { flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 40px; border-radius: 14px; background: var(--nevoa); }
+.cartao .texto { font-size: 32px; line-height: 1.35; color: var(--ink); }
+.cartao .rotulo { font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: 4px; color: var(--ink-muted); }
+
+.ingrediente { background: var(--azul-fiolhais); }
+.ingrediente h3 { color: var(--on-azul); }
+.ingrediente .texto { color: var(--on-azul); }
+.ingrediente .rotulo { color: var(--laranja-inovacao); }
+
+.quente { background: var(--surface-laranja); }
+
+.fragment { opacity: 0; transition: opacity 400ms; }
+.fragment.visible { opacity: 1; }
+
+.etiquetas { display: flex; gap: 22px; align-items: center; }
+.universo { font-size: 32px; line-height: 1.2; font-weight: 700; letter-spacing: 4px; padding: 12px 24px; border-radius: 7px; background: var(--universe-code); color: var(--on-universe); }
+.idade { font-size: 32px; line-height: 1.2; font-weight: 700; padding: 12px 28px; border-radius: 256px; background: var(--laranja-inovacao); color: var(--azul-fiolhais); }
+
+.rodape { position: absolute; left: 128px; bottom: 64px; width: 1664px; font-size: 24px; line-height: 1.2; color: var(--ink-muted); }
+
+.escuro { background: var(--azul-fiolhais); color: var(--on-azul); }
+.escuro h1 { color: var(--on-azul); }
+.escuro h2 { color: var(--on-azul); }
+.escuro .lead { font-size: 44px; line-height: 1.3; color: var(--on-azul); }
+.escuro .rodape { color: var(--on-azul); }
+.escuro .olho { color: var(--laranja-inovacao); }
+
+.capa .corpo { gap: 56px; }
+
+.tabela { width: 100%; font-size: 28px; color: var(--ink); }
+.tabela .cabeca { background: var(--azul-fiolhais); }
+.tabela .par { background: var(--nevoa); }
+
+</style>
+</head>
+<body>
+<div id="palco">
+<section id="capa" class="escuro capa" data-transition="fade">
+<div class="corpo">
+<div class="etiquetas">
+<p class="universo">CODE</p>
+</div>
+<h1>O que torna um jogo divertido?</h1>
+<p class="lead">Oito jogos que conheces, oito ingredientes e uma pergunta para cada um.</p>
+</div>
+<p class="rodape">Centro de Inovação Carlos Fiolhais · Universo CODE</p>
+<aside>Antes de avançar, pergunta à sala: «Quem jogou alguma coisa esta semana? O quê?» Aponta dois ou três nomes de jogos no quadro: vão dar jeito mais à frente. A ideia da sessão: um jogo divertido não é sorte, é feito de ingredientes que se podem nomear, e que eles próprios podem pôr nos jogos que fazem.</aside>
+</section>
+<section id="pergunta" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">PARA COMEÇAR</p>
+<h2>Qual foi o último jogo que não conseguiste largar?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><h3>Como se chama?</h3><p class="texto">Pode ser de consola, de telemóvel, de tabuleiro ou do recreio.</p></div>
+<div class="cartao"><h3>O que fazias nele?</h3><p class="texto">Conta numa frase, como se explicasses a alguém que nunca o viu.</p></div>
+<div class="cartao quente"><h3>Porque querias «só mais uma»?</h3><p class="texto">É esta resposta que vamos procurar hoje.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Dá um minuto para cada um pensar e ouve três ou quatro respostas. Não corrijas nada: escreve no quadro as razões que disserem («é com os meus amigos», «nunca sei o que vai acontecer», «quero passar o nível»). Quase todas vão aparecer nos próximos diapositivos, e convém apontar para o quadro quando aparecerem.</aside>
+</section>
+<section id="fortnite" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">FORTNITE</p>
+<h2>Achas o Fortnite divertido? Porquê?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">Cem jogadores saltam para a mesma ilha. Cais onde quiseres, usas o que encontrares e a tempestade vai fechando o mapa.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 1</p><h3>Surpresa</h3><p class="texto">Nenhuma partida é igual à anterior. Nunca sabes o que vais encontrar nem quem vai aparecer.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Faz primeiro a pergunta do título e ouve as respostas; só depois clica para mostrar o ingrediente. Pergunta a seguir: «Se caísses sempre no mesmo sítio, com as mesmas armas e contra as mesmas pessoas, ainda jogavas?» Outros jogos com surpresa: jogos de cartas, o Mario Kart com as caixas de itens.</aside>
+</section>
+<section id="rocket-league" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">ROCKET LEAGUE</p>
+<h2>Achas o Rocket League divertido? Porquê?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">É futebol com carros a jato. Em cinco minutos percebes tudo: acelerar, saltar e bater na bola.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 2</p><h3>Aprender depressa, dominar devagar</h3><p class="texto">Há sempre um truque novo para treinar. Sentes que estás a ficar melhor, e isso sabe bem.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Pergunta: «Quem já jogou? Quanto tempo demoraste a marcar o primeiro golo? E a conseguir acertar na bola no ar?» A diferença entre as duas respostas é o ingrediente. Compara com o xadrez ou com um instrumento: as regras cabem numa folha, e dominar leva anos.</aside>
+</section>
+<section id="minecraft" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">MINECRAFT</p>
+<h2>Achas o Minecraft divertido? Porquê?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">Um mundo de blocos sem objetivo obrigatório. Constróis uma cabana, um castelo ou uma montanha-russa.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 3</p><h3>Criar</h3><p class="texto">O jogo dá-te as peças e a ideia é tua. Aquilo que constróis não existe em mais nenhum mundo.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Pergunta: «Qual foi a melhor coisa que construíste? Mostraste a alguém?» Quase todos mostraram: criar e mostrar andam juntos. Liga ao que fazem aqui: quando mudam um nível ou inventam uma personagem, estão a usar este ingrediente.</aside>
+</section>
+<section id="roblox" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">ROBLOX</p>
+<h2>Achas o Roblox divertido? Porquê?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">Milhões de jogos feitos por outros jogadores. Entras com os teus amigos e escolhem juntos o que jogar.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 4</p><h3>Amigos</h3><p class="texto">Ganhar sozinho é bom, rir com os amigos é melhor. Há jogos que são divertidos por causa de quem joga contigo.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Pergunta: «Jogavas o mesmo jogo sozinho, sem ninguém para falar?» Para muitos a resposta é não. Vale a pena dizer que os jogos do Roblox são feitos por jogadores, muitos deles adolescentes: quem faz jogos também é um Digger.</aside>
+</section>
+<section id="gta" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">GTA · PARA MAIORES DE 18</p>
+<h2>Porque é que tanta gente fala do GTA?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">Uma cidade inteira onde vais para onde quiseres, pela ordem que quiseres. O jogo é para maiores de 18.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 5</p><h3>Liberdade</h3><p class="texto">É o «mundo aberto»: decides tu o que fazer a seguir. A mesma ideia está em jogos para a tua idade, como o Zelda.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>O GTA aparece porque eles falam dele, não para o recomendar: tem classificação PEGI 18 e convém dizê-lo sem drama. O que interessa é a ideia de mundo aberto. Pergunta: «Em que jogos é que podes ir para onde quiseres?» (Zelda, Minecraft, Spider-Man.) E depois: «E em quais é que só há um caminho? São piores por isso?»</aside>
+</section>
+<section id="geometry-dash" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">GEOMETRY DASH</p>
+<h2>Achas o Geometry Dash divertido? Porquê?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">Um cubo, um botão e obstáculos ao ritmo da música. Falhas, e recomeças no mesmo segundo.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 6</p><h3>Dificuldade no ponto</h3><p class="texto">É difícil, mas justo: quando falhas sabes porquê. Cada tentativa chega um bocadinho mais longe.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Pergunta: «Quantas vezes já morreste no mesmo nível? Porque é que não desististe?» Duas respostas a procurar: a culpa é minha (o jogo é justo) e recomeçar não custa nada. O diapositivo seguinte fica só na dificuldade.</aside>
+</section>
+<section id="dificuldade" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">A DIFICULDADE</p>
+<h2>Como se acerta a dificuldade?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">FÁCIL DEMAIS</p><h3>Aborrece</h3><p class="texto">Ganhas sem pensar. Ao fim de pouco tempo já não apetece.</p></div>
+<div class="cartao ingrediente"><p class="rotulo">NO PONTO</p><h3>Diverte</h3><p class="texto">Quase consegues. Falhas, percebes porquê e tentas outra vez.</p></div>
+<div class="cartao"><p class="rotulo">DIFÍCIL DEMAIS</p><h3>Frustra</h3><p class="texto">Perdes sem perceber porquê. Dá vontade de desistir.</p></div>
+</div>
+<p>Os bons jogos começam fáceis e sobem aos poucos: o primeiro nível ensina, o último põe-te à prova.</p>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Este é o ingrediente em que eles mais podem mexer nos seus jogos. Pede exemplos de cada caixa: um jogo que largaram por ser fácil demais e outro por ser difícil demais. No Mãos ao Ar a dificuldade sobe assim: o recreio não tira corações, e só no nível 6 aparecem os espinhos. Há ainda duas ajudas invisíveis, TEMPO_COIOTE e TOLERANCIA_SALTO: se as puserem a 0, o jogo é o mesmo e parece injusto.</aside>
+</section>
+<section id="brawl-stars" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">BRAWL STARS</p>
+<h2>Achas o Brawl Stars divertido? Porquê?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">Partidas curtas. Ganhas troféus, desbloqueias personagens novas e vais subindo de nível.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 7</p><h3>Progresso</h3><p class="texto">Há sempre uma recompensa quase a chegar. Ver a barra a encher dá vontade de jogar mais uma partida.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Pergunta: «O que é que estás quase a desbloquear agora?» Quase todos sabem de cor. Boa altura para uma conversa honesta: este ingrediente também serve para te prender mais tempo do que querias. «Como é que sabes quando é o jogo a mandar em ti?»</aside>
+</section>
+<section id="super-mario" class="jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">SUPER MARIO</p>
+<h2>Achas o Super Mario divertido? Porquê?</h2>
+</div>
+<div class="linha">
+<div class="cartao"><p class="rotulo">O QUE ACONTECE</p><p class="texto">Carregas no botão e o Mario salta logo. Se carregares mais tempo, salta mais alto.</p></div>
+<div class="cartao ingrediente fragment"><p class="rotulo">INGREDIENTE 8</p><h3>Sensação nos dedos</h3><p class="texto">O jogo responde exatamente ao que fazes. Só mexer na personagem já é divertido, mesmo sem ganhar nada.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>É o ingrediente mais difícil de explicar e o mais fácil de sentir. Pergunta: «Já jogaste um jogo em que a personagem parecia pesada ou atrasada? Como era?» No código deles são números: GRAVIDADE, FORCA_SALTO, VEL_ANDAR. Mudar um deles muda a sensação toda.</aside>
+</section>
+<section id="resumo" data-transition="fade">
+<div class="corpo">
+<h2>Os oito ingredientes</h2>
+<table class="tabela">
+<tr class="cabeca"><th style="width:34%; color:#FFFFFF; text-align:left">Ingrediente</th><th style="width:22%; color:#FFFFFF; text-align:left">Onde o vimos</th><th style="color:#FFFFFF; text-align:left">A pergunta para o teu jogo</th></tr>
+<tr><td>Surpresa</td><td>Fortnite</td><td>Cada partida é diferente?</td></tr>
+<tr class="par"><td>Aprender depressa, dominar devagar</td><td>Rocket League</td><td>Fico melhor com o treino?</td></tr>
+<tr><td>Criar</td><td>Minecraft</td><td>Posso fazer uma coisa só minha?</td></tr>
+<tr class="par"><td>Amigos</td><td>Roblox</td><td>É melhor com outras pessoas?</td></tr>
+<tr><td>Liberdade</td><td>GTA, Zelda</td><td>Sou eu que escolho o que fazer?</td></tr>
+<tr class="par"><td>Dificuldade no ponto</td><td>Geometry Dash</td><td>Falho e quero tentar outra vez?</td></tr>
+<tr><td>Progresso</td><td>Brawl Stars</td><td>Há sempre algo quase a chegar?</td></tr>
+<tr class="par"><td>Sensação nos dedos</td><td>Super Mario</td><td>Mexer na personagem sabe bem?</td></tr>
+</table>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Volta ao quadro do início: cada razão que eles deram cabe em que linha? Se alguma não couber em nenhuma, ótimo: é um nono ingrediente, e dá-se-lhe um nome (história, música, competição, colecionar). Nenhum jogo tem os oito; os melhores têm três ou quatro muito bem feitos.</aside>
+</section>
+<section id="nosso-jogo" data-transition="fade">
+<div class="corpo">
+<div class="titulo">
+<p class="olho">O NOSSO JOGO</p>
+<h2>E o Mãos ao Ar! Todos ao molho?</h2>
+</div>
+<div class="grelha">
+<div class="cartao"><h3>Amigos</h3><p class="texto">Dois a quatro jogadores no mesmo ecrã, com a mesma câmara.</p></div>
+<div class="cartao"><h3>Surpresa</h3><p class="texto">Os jogadores ressaltam uns nos outros: tudo muda num segundo.</p></div>
+<div class="cartao"><h3>Dificuldade</h3><p class="texto">Três tipos de ronda, e a última vale a dobrar.</p></div>
+<div class="cartao"><h3>Sensação nos dedos</h3><p class="texto">Fechas o punho e a personagem salta. Cada uma tem o seu jeito.</p></div>
+</div>
+</div>
+<p class="rodape">O que torna um jogo divertido?</p>
+<aside>Joga-se uma ronda antes ou depois deste diapositivo. Pergunta: «Que ingredientes sentiram? Qual falta?» Falta progresso (não se desbloqueia nada) e criar (até eles mexerem no código). É por aí que entra o desafio do diapositivo seguinte.</aside>
+</section>
+<section id="desafio" class="escuro capa">
+<div class="corpo">
+<p class="olho">O DESAFIO</p>
+<h1>Agora és tu, Digger</h1>
+<p class="lead">Escolhe o teu jogo favorito. Que ingredientes tem? Qual lhe falta?</p>
+<p class="lead">Depois muda um número no nosso jogo e descobre: ficou mais divertido, ou menos?</p>
+</div>
+<p class="rodape">Centro de Inovação Carlos Fiolhais · Universo CODE</p>
+<aside>Em pares: dois minutos para o jogo favorito, e depois o código. Números bons para mexer no maos-ao-ar-ao-molho.py: FORCA_DO_CHOQUE (o ressalto), TEMPO_TONTO, VIDAS_BATALHA, TURBO_DA_MOEDA. No fim, cada par diz o que mudou e a que ingrediente isso mexeu.</aside>
+</section>
+</div>
+<div id="notas"></div>
+<div id="conta"></div>
+<script>
+var palco = document.getElementById("palco");
+var diapositivos = Array.prototype.slice.call(palco.children);
+var notas = document.getElementById("notas");
+var conta = document.getElementById("conta");
+var atual = 0;
+
+function ajustar() {
+  var escala = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  palco.style.transform = "scale(" + escala + ") translate(-50%, -50%)";
+}
+
+function mostrar() {
+  diapositivos.forEach(function (d, i) { d.classList.toggle("atual", i === atual); });
+  var nota = diapositivos[atual].querySelector("aside");
+  notas.textContent = nota ? nota.textContent : "";
+  conta.textContent = (atual + 1) + " / " + diapositivos.length;
+}
+
+function avancar() {
+  // Primeiro mostra o que ainda esta escondido neste diapositivo.
+  var escondido = diapositivos[atual].querySelector(".fragment:not(.visible)");
+  if (escondido) { escondido.classList.add("visible"); return; }
+  if (atual < diapositivos.length - 1) { atual += 1; mostrar(); }
+}
+
+function recuar() {
+  var visiveis = diapositivos[atual].querySelectorAll(".fragment.visible");
+  if (visiveis.length > 0) { visiveis[visiveis.length - 1].classList.remove("visible"); return; }
+  if (atual > 0) { atual -= 1; mostrar(); }
+}
+
+document.addEventListener("keydown", function (e) {
+  if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown" || e.key === "Enter") { avancar(); e.preventDefault(); }
+  else if (e.key === "ArrowLeft" || e.key === "PageUp" || e.key === "Backspace") { recuar(); e.preventDefault(); }
+  else if (e.key === "n" || e.key === "N") { notas.classList.toggle("visivel"); }
+  else if (e.key === "f" || e.key === "F") {
+    if (document.fullscreenElement) { document.exitFullscreen(); } else { document.documentElement.requestFullscreen(); }
+  }
+});
+palco.addEventListener("click", avancar);
+window.addEventListener("resize", ajustar);
+ajustar();
+mostrar();
+</script>
+</body>
+</html>

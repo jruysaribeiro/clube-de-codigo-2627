@@ -149,6 +149,54 @@ O ficheiro tem o mesmo formato do Halloween: **«MEXE SÓ AQUI»** em cima,
 - Guardar o recorde de estrelas num ficheiro.
 - Duas mãos, dois jogadores (`num_hands=2` em `ligar_camara()`).
 
+## Todos ao molho: 2, 3 ou 4 jogadores
+
+```
+python3 maos-ao-ar-ao-molho.py
+```
+
+O mesmo jogo, mas **uns contra os outros, no mesmo ecrã e com a mesma
+câmara**. Precisa do `maos-ao-ar.py` ao lado: é de lá que vem o motor (e os
+números: quem mudar a `GRAVIDADE` lá, muda-a aqui).
+
+- **Cada jogador tem o seu bocado da imagem**, e é só aí que a mão dele manda.
+  Com 2 jogadores, metade para cada um (esquerda e direita). Com 3 ou 4, um
+  quarto para cada um: dois de pé atrás, dois à frente de joelhos ou sentados.
+  O bocado de cada um aparece no canto do ecrã que lhe corresponde.
+- No título, as teclas `2`, `3` e `4` dizem quantos jogam. Tudo o resto
+  faz-se com a mão.
+- **Escolher a personagem só com gestos:** mão para os lados muda, punho
+  fechado escolhe, apontar o indicador volta atrás. São oito, cada uma com o
+  seu jeito (a lista `PERSONAGENS`), e duas pessoas não podem ficar com a mesma.
+- **É um torneio de seis rondas**, de três tipos: corrida (as moedas dão
+  turbo), caça às moedas (uma pancada faz cair moedas) e batalha (o último de
+  pé). Os pontos somam-se e a final vale a dobrar.
+- **O molho:** os jogadores ressaltam uns nos outros, um tiro deixa o outro
+  tonto, e saltar para cima de alguém também.
+- Numa corrida o ecrã segue quem vai à frente. Quem ficar para trás do ecrã é
+  puxado para junto dele e perde um segundo.
+- `Enter` começa já com quem está pronto, `N` acaba a ronda, e sem câmara
+  joga-se com o teclado (as teclas de cada um aparecem no ecrã de escolha).
+
+**Antes da aula:** experimenta a distância. Quatro pessoas têm de caber na
+imagem, por isso ficam a uns dois metros, e a essa distância as mãos são
+pequenas: a luz de frente conta ainda mais. Isto foi testado com jogadores a
+fingir (sem câmara), **não com quatro pessoas a sério à frente de uma
+câmara**: se as mãos falharem muito, aproximem-se e joguem a dois ou a três.
+
+Para mexer: as rondas são mapas de texto como os outros (a lista `RONDAS`,
+com `1 2 3 4` onde cada um começa), e as regras do molho são constantes
+(`FORCA_DO_CHOQUE`, `TEMPO_TONTO`, `PONTOS_POR_LUGAR`...).
+
+## A conversa: o que torna um jogo divertido?
+
+O `o-que-torna-um-jogo-divertido.html` é uma apresentação para abrir a sessão:
+oito jogos que eles conhecem (Fortnite, Rocket League, Minecraft, Roblox...),
+um ingrediente da diversão em cada um, e a dificuldade em destaque. Abre-se
+num navegador, com dois cliques. Setas ou `Espaço` avançam (o ingrediente de
+cada jogo só aparece ao segundo toque, depois de a sala responder), `N` mostra
+as notas para quem apresenta e `F` põe em ecrã inteiro.
+
 ## Os níveis passam-se todos (testado)
 
 Um robot jogou cada nível com o motor verdadeiro, à procura de um caminho
